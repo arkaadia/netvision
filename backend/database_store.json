@@ -1,0 +1,1030 @@
+{
+  "users": [
+    {
+      "id": "user-admin",
+      "username": "admin",
+      "password_hash": "19a708fe756db7416b3c28cec2038a11db87339d1243c91429c2d1f64d113d6d919a4c4530326f031d878a0099d00ba33f983df052344967322d6bba3a7c03ac",
+      "password_salt": "seed_salt_admin_2026",
+      "full_name": "مدیر ارشد شبکه (Network Administrator)",
+      "email": "admin@nettopology.internal",
+      "role": "Super Administrator",
+      "user_type": "local",
+      "status": "active",
+      "group_ids": [
+        "group-admin"
+      ],
+      "is_builtin": true,
+      "created_at": "2026-09-14T09:35:13.477Z",
+      "last_login": "2026-09-15T07:38:17.873Z"
+    },
+    {
+      "id": "user-helpdesk",
+      "username": "helpdesk_user",
+      "password_hash": "8741c5889103b373d9067f0d82c48eeb203318aae4c4a7af2bb3d153e6680a7662c53e1c6ff0036c6169c87f838bb55a54e705ae2838f9e1951c37847d4c90a4",
+      "password_salt": "seed_salt_helpdesk_2026",
+      "full_name": "کاربر هلپ‌دسک محلی (Helpdesk Local)",
+      "email": "helpdesk@nettopology.internal",
+      "role": "Helpdesk Specialist",
+      "user_type": "local",
+      "status": "active",
+      "group_ids": [
+        "group-helpdesk-ops"
+      ],
+      "is_builtin": false,
+      "created_at": "2026-09-14T09:35:13.477Z",
+      "last_login": null
+    },
+    {
+      "id": "user-noc",
+      "username": "noc_operator",
+      "password_hash": "70a5a8138a868d0b9d3c8608f61957fb8848fed8571272830c9967ce0fcdc68e0fe1b7a2bf389abd3e72b29614337076d33efc4875052113db0fca3082caf314",
+      "password_salt": "seed_salt_noc_2026",
+      "full_name": "اپراتور محلی NOC (Local NOC)",
+      "email": "noc@nettopology.internal",
+      "role": "NOC Analyst",
+      "user_type": "local",
+      "status": "active",
+      "group_ids": [
+        "group-noc"
+      ],
+      "is_builtin": false,
+      "created_at": "2026-09-14T09:35:13.477Z",
+      "last_login": null
+    }
+  ],
+  "user_groups": [
+    {
+      "id": "group-admin",
+      "name": "مدیران ارشد شبکه (Super Administrators)",
+      "description": "دسترسی نامحدود به تمامی منابع، نقشه‌ها، پیکربندی تجهیزات و احراز هویت",
+      "color": "indigo",
+      "member_user_ids": [
+        "user-admin"
+      ],
+      "is_builtin": true,
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "group-noc",
+      "name": "تیم پایش و عملیات NOC (NOC Operations)",
+      "description": "پایش برخط وضعیت لینک‌ها، اجرای ابزارهای عیب‌یابی و مشاهده نقشه‌ها",
+      "color": "cyan",
+      "member_user_ids": [
+        "user-noc"
+      ],
+      "is_builtin": false,
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "group-helpdesk-ops",
+      "name": "کارشناسان پشتیبانی و هلپ‌دسک (Helpdesk Support)",
+      "description": "پشتیبانی کاربران محلی، بررسی پورت‌ها و خطایابی کلاینت‌های شبکه",
+      "color": "emerald",
+      "member_user_ids": [
+        "user-helpdesk"
+      ],
+      "is_builtin": false,
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "group-readonly",
+      "name": "ناظران و مانیتورینگ فقط-خواندنی (Read-Only Auditors)",
+      "description": "مشاهده گزارشات، نقشه‌های عمومی و ممیزی سیستم بدون امکان اعمال تغییرات",
+      "color": "amber",
+      "member_user_ids": [],
+      "is_builtin": false,
+      "created_at": "2026-09-14T19:20:03.024Z"
+    }
+  ],
+  "access_policies": [
+    {
+      "id": "policy-full",
+      "name": "دسترسی کامل مدیریتی (Full Admin Policy)",
+      "description": "دسترسی بی‌قید و شرط به تمام ماژول‌ها، تجهیزات، نقشه‌ها و تنظیمات",
+      "priority": 1,
+      "is_builtin": true,
+      "policy_data": {
+        "devices": [
+          "*"
+        ],
+        "maps": [
+          "*"
+        ],
+        "actions": [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "execute",
+          "manage"
+        ],
+        "modules": [
+          "all"
+        ]
+      },
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "policy-operator",
+      "name": "عملیات استاندارد شبکه (Network Operator Policy)",
+      "description": "امکان اجرای دستورات عیب‌یابی، مشاهده توپولوژی و ایجاد نقشه‌های اختصاصی",
+      "priority": 10,
+      "is_builtin": false,
+      "policy_data": {
+        "devices": [
+          "*"
+        ],
+        "maps": [
+          "read",
+          "create_own"
+        ],
+        "actions": [
+          "read",
+          "ping",
+          "traceroute",
+          "check_port"
+        ],
+        "modules": [
+          "topology",
+          "tools",
+          "devices"
+        ]
+      },
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "policy-helpdesk",
+      "name": "خطایابی هلپ‌دسک (Helpdesk Diagnostics Policy)",
+      "description": "مشاهده وضعیت تجهیزات لایه دسترسی و اجرای ابزارهای پایه مانیتورینگ",
+      "priority": 20,
+      "is_builtin": false,
+      "policy_data": {
+        "devices": [
+          "type:switch",
+          "role:Access Switch"
+        ],
+        "maps": [
+          "read_public"
+        ],
+        "actions": [
+          "read",
+          "ping",
+          "port_status"
+        ],
+        "modules": [
+          "topology",
+          "tools"
+        ]
+      },
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "policy-readonly",
+      "name": "سیاست فقط-خواندنی (Read-Only Observer Policy)",
+      "description": "صرفاً مشاهده وضعیت کلی شبکه و نقشه‌های پابلیک",
+      "priority": 30,
+      "is_builtin": false,
+      "policy_data": {
+        "devices": [
+          "*"
+        ],
+        "maps": [
+          "read_public"
+        ],
+        "actions": [
+          "read"
+        ],
+        "modules": [
+          "topology"
+        ]
+      },
+      "created_at": "2026-09-14T19:20:03.024Z"
+    }
+  ],
+  "device_groups": [
+    {
+      "id": "devgroup-core",
+      "name": "سوییچ‌های لایه هسته و توزیع (Core & Distribution)",
+      "description": "سوییچ‌های پرسرعت Catalyst و Nexus مسئول ترافیک اصلی ستون‌فقرات",
+      "color": "indigo",
+      "icon": "Layers",
+      "device_ids": [
+        "dev-core-01",
+        "dev-dist-01",
+        "dev-core-02"
+      ],
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "devgroup-access",
+      "name": "سوییچ‌های لایه دسترسی (Access Layer Switches)",
+      "description": "سوییچ‌های ارتباط دهنده کلاینت‌ها، ایستگاه‌های کاری و اکسس‌پوینت‌ها",
+      "color": "emerald",
+      "icon": "Server",
+      "device_ids": [
+        "dev-acc-01",
+        "dev-acc-02",
+        "dev-acc-03"
+      ],
+      "created_at": "2026-09-14T19:20:03.024Z"
+    },
+    {
+      "id": "devgroup-routers",
+      "name": "روترها و لبه شبکه WAN (Edge & Gateways)",
+      "description": "تجهیزات مرزی مسیریابی، گیت‌وی اینترنت و تانل‌های VPN",
+      "color": "cyan",
+      "icon": "Radio",
+      "device_ids": [
+        "dev-router-gw",
+        "dev-wan-gw"
+      ],
+      "created_at": "2026-09-14T19:20:03.024Z"
+    }
+  ],
+  "custom_maps": [
+    {
+      "id": "map-enterprise-core",
+      "name": "شبکه ستون‌فقرات و دیتاسنتر (Backbone & Datacenter)",
+      "description": "نقشه توپولوژی ارتباطی سوییچ‌های Core، روتر مرزی و سوییچ‌های توزیع",
+      "createdAt": "2026-09-14T19:20:03.024Z",
+      "updatedAt": "2026-09-14T19:48:34.157Z",
+      "deviceIds": [
+        "dev-router-gw",
+        "dev-core-01",
+        "dev-dist-01",
+        "dev-acc-01",
+        "dev-acc-02"
+      ],
+      "devicePositions": {
+        "dev-router-gw": {
+          "x": 480,
+          "y": 80
+        },
+        "dev-core-01": {
+          "x": 480,
+          "y": 240
+        },
+        "dev-dist-01": {
+          "x": 240,
+          "y": 420
+        },
+        "dev-acc-01": {
+          "x": 120,
+          "y": 620
+        },
+        "dev-acc-02": {
+          "x": 360,
+          "y": 620
+        }
+      },
+      "links": [
+        {
+          "id": "link-gw-core",
+          "sourceDeviceId": "dev-router-gw",
+          "targetDeviceId": "dev-core-01",
+          "sourceInterface": "GigabitEthernet0/0/0",
+          "targetInterface": "FortyGigE1/0/1",
+          "color": "#3b82f6",
+          "type": "fiber",
+          "speed": "40Gbps",
+          "status": "connected"
+        },
+        {
+          "id": "link-core-dist",
+          "sourceDeviceId": "dev-core-01",
+          "targetDeviceId": "dev-dist-01",
+          "sourceInterface": "TenGigE1/0/1",
+          "targetInterface": "TenGigE1/1/1",
+          "color": "#10b981",
+          "type": "fiber",
+          "speed": "10Gbps",
+          "status": "connected"
+        },
+        {
+          "id": "link-dist-acc1",
+          "sourceDeviceId": "dev-dist-01",
+          "targetDeviceId": "dev-acc-01",
+          "sourceInterface": "GigabitEthernet1/0/1",
+          "targetInterface": "GigabitEthernet0/1",
+          "color": "#6366f1",
+          "type": "copper",
+          "speed": "1Gbps",
+          "status": "connected"
+        },
+        {
+          "id": "link-dist-acc2",
+          "sourceDeviceId": "dev-dist-01",
+          "targetDeviceId": "dev-acc-02",
+          "sourceInterface": "GigabitEthernet1/0/2",
+          "targetInterface": "GigabitEthernet0/1",
+          "color": "#6366f1",
+          "type": "copper",
+          "speed": "1Gbps",
+          "status": "connected"
+        }
+      ],
+      "visibility": "public",
+      "ownerId": "user-admin",
+      "ownerName": "admin",
+      "allowedUsers": []
+    },
+    {
+      "id": "custom-map-1789415355645",
+      "name": "abc",
+      "createdAt": "2026-09-14T19:49:15.645Z",
+      "updatedAt": "2026-09-14T19:48:34.157Z",
+      "deviceIds": [],
+      "devicePositions": {},
+      "links": [],
+      "visibility": "public",
+      "ownerId": "user-admin",
+      "ownerName": "admin",
+      "allowedUsers": [],
+      "racks": [
+        {
+          "name": "Rack-01",
+          "units": 42,
+          "depth": 100,
+          "viewMode": "front",
+          "color": "#0f172a",
+          "id": "rack-1789415362694-k82u",
+          "x": 336,
+          "y": 186,
+          "devices": []
+        }
+      ]
+    }
+  ],
+  "topology_hierarchy": [
+    {
+      "id": "bldg-central",
+      "type": "building",
+      "name": "ساختمان مرکزی (Central Bldg)",
+      "description": "ساختمان اداری مرکزی و دیتاسنتر اصلی سازمان",
+      "parentId": null,
+      "metadata": {
+        "address": "تهران، خیابان ولیعصر",
+        "floorsCount": 4
+      }
+    },
+    {
+      "id": "bldg-west",
+      "type": "building",
+      "name": "شعبه غرب (West Branch)",
+      "description": "ساختمان پشتیبان و شعبه توسعه نرم‌افزار",
+      "parentId": null,
+      "metadata": {
+        "address": "شعبه غرب، پارک فناوری",
+        "floorsCount": 2
+      }
+    },
+    {
+      "id": "floor-dc",
+      "type": "floor",
+      "name": "مرکز داده (DC Floor)",
+      "description": "طبقه زیرهمکف اختصاصی مرکز داده و رک‌های سرور",
+      "parentId": "bldg-central",
+      "metadata": {
+        "securityLevel": "High",
+        "cooling": "Precision AC"
+      }
+    },
+    {
+      "id": "floor-1",
+      "type": "floor",
+      "name": "طبقه ۱ (Floor 1)",
+      "description": "طبقه اداری و اتاق کارشناسان شبکه",
+      "parentId": "bldg-central",
+      "metadata": {
+        "usersCount": 45
+      }
+    },
+    {
+      "id": "unit-server-room",
+      "type": "unit",
+      "name": "اتاق سرور اصلی (Main Server Room)",
+      "description": "اتاق سرور مرکزی مجهز به سیستم اطفا حریق و کنترل تردد",
+      "parentId": "floor-dc",
+      "metadata": {
+        "doorAccess": "Biometric"
+      }
+    },
+    {
+      "id": "unit-idf-1",
+      "type": "unit",
+      "name": "اتاق رک طبقه ۱ (IDF-1)",
+      "description": "رک‌های توزیع طبقه اول برای کلاینت‌ها",
+      "parentId": "floor-1",
+      "metadata": {}
+    },
+    {
+      "id": "rack-a01",
+      "type": "rack",
+      "name": "Rack-A01 (Core & WAN)",
+      "description": "رک اختصاصی تجهیزات Core و Edge سازمان",
+      "parentId": "unit-server-room",
+      "metadata": {
+        "totalU": 42,
+        "usedU": 14
+      }
+    },
+    {
+      "id": "rack-a02",
+      "type": "rack",
+      "name": "Rack-A02 (Distribution)",
+      "description": "رک سوییچ‌های لایه توزیع و ارتباطی شعب",
+      "parentId": "unit-server-room",
+      "metadata": {
+        "totalU": 42,
+        "usedU": 10
+      }
+    },
+    {
+      "id": "rack-b01",
+      "type": "rack",
+      "name": "Rack-B01 (Access Floor 1)",
+      "description": "رک توزیع کابلی طبقه ۱",
+      "parentId": "unit-idf-1",
+      "metadata": {
+        "totalU": 24,
+        "usedU": 8
+      }
+    }
+  ],
+  "node_positions": {
+    "default": {
+      "dev-router-gw": {
+        "x": -269,
+        "y": -183
+      },
+      "dev-core-01": {
+        "x": 480,
+        "y": 240
+      },
+      "dev-dist-01": {
+        "x": 240,
+        "y": 420
+      },
+      "dev-core-02": {
+        "x": 720,
+        "y": 420
+      },
+      "dev-acc-01": {
+        "x": 120,
+        "y": 620
+      },
+      "dev-acc-02": {
+        "x": 360,
+        "y": 620
+      },
+      "dev-acc-03": {
+        "x": 600,
+        "y": 620
+      },
+      "dev-wan-gw": {
+        "x": 840,
+        "y": 620
+      },
+      "dev-mikrotik-ccr2004": {
+        "x": 1114,
+        "y": -165
+      }
+    }
+  },
+  "audit_logs": [
+    {
+      "id": "log-1789381944786-2a0sf",
+      "timestamp": "2026-09-14T10:32:24.786Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
+    },
+    {
+      "id": "log-1789381951511-ql7pp",
+      "timestamp": "2026-09-14T10:32:31.511Z",
+      "user_name": "admin",
+      "action": "User Logout",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "info",
+      "details": "User \"admin\" logged out from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
+    },
+    {
+      "id": "log-1789382243886-f4elq",
+      "timestamp": "2026-09-14T10:37:23.886Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
+    },
+    {
+      "id": "log-1789382246348-uao1g",
+      "timestamp": "2026-09-14T10:37:26.348Z",
+      "user_name": "admin",
+      "action": "User Logout",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "info",
+      "details": "User \"admin\" logged out from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
+    },
+    {
+      "id": "log-1789382343733-dzr6i",
+      "timestamp": "2026-09-14T10:39:03.733Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
+    },
+    {
+      "id": "log-1789415288279-b8qir",
+      "timestamp": "2026-09-14T19:48:08.279Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
+    },
+    {
+      "id": "log-1789419796317-zhh4d",
+      "timestamp": "2026-09-14T21:03:16.317Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 127.0.0.1",
+      "ip_address": "127.0.0.1",
+      "user_agent": "curl/7.88.1"
+    },
+    {
+      "id": "log-1789419864044-woyhd",
+      "timestamp": "2026-09-14T21:04:24.044Z",
+      "user_name": "nonexistent",
+      "action": "Failed Login (User Not Found)",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "warning",
+      "details": "Failed local login attempt for non-existing user \"nonexistent\" from IP 127.0.0.1",
+      "ip_address": "127.0.0.1",
+      "user_agent": "curl/7.88.1"
+    },
+    {
+      "id": "log-1789419872635-ija83",
+      "timestamp": "2026-09-14T21:04:32.635Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 127.0.0.1",
+      "ip_address": "127.0.0.1",
+      "user_agent": "curl/7.88.1"
+    },
+    {
+      "id": "log-1789419954090-8ftxz",
+      "timestamp": "2026-09-14T21:05:54.090Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 127.0.0.1",
+      "ip_address": "127.0.0.1",
+      "user_agent": "curl/7.88.1"
+    },
+    {
+      "id": "log-1789457898094-aa421",
+      "timestamp": "2026-09-15T07:38:18.094Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 194.116.236.174",
+      "ip_address": "194.116.236.174",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+    }
+  ],
+  "ad_config": {
+    "domain": "corp.internal",
+    "server": "192.168.1.10",
+    "port": 389,
+    "use_ssl": false,
+    "base_dn": "DC=corp,DC=internal",
+    "bind_user": "CN=ldap_service,OU=ServiceAccounts,DC=corp,DC=internal",
+    "bind_password": "encrypted_service_pass_2026",
+    "sync_interval_min": 15,
+    "auto_sync": true,
+    "role_mappings": {
+      "Domain Admins": "Super Administrator",
+      "Network Engineers": "NOC Analyst",
+      "Helpdesk Staff": "Helpdesk Specialist"
+    },
+    "last_sync": "2026-09-14T19:20:03.024Z",
+    "status": "configured"
+  },
+  "devices": [
+    {
+      "id": "dev-core-01",
+      "name": "SW-CORE-01",
+      "ip": "192.168.1.1",
+      "type": "switch",
+      "role": "Core Switch",
+      "model": "Cisco Catalyst 9500-48Y4C",
+      "mac": "00:50:56:A1:B2:C0",
+      "building": "ساختمان مرکزی (Central Bldg)",
+      "floor": "طبقه ۱ (Floor 1)",
+      "unit": "اتاق سرور اصلی (Main Server Room)",
+      "rack": "Rack-A01",
+      "is_online": true,
+      "latency_ms": 2.6,
+      "packet_loss": 0,
+      "uptime": "142 days, 6 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Cisco IOS-XE 17.09.03",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 48,
+      "has_unsaved_changes": false,
+      "last_modified_time": "09:54:55",
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.1",
+      "platform": "cisco_ios_xe",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.1",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-router-gw",
+      "name": "RT-EDGE-01",
+      "ip": "192.168.1.254",
+      "type": "router",
+      "role": "Edge Gateway",
+      "model": "Cisco ISR 4451-X",
+      "mac": "00:50:56:C2:D3:E1",
+      "building": "ساختمان مرکزی (Central Bldg)",
+      "floor": "طبقه ۱ (Floor 1)",
+      "unit": "اتاق سرور اصلی (Main Server Room)",
+      "rack": "Rack-A02",
+      "is_online": true,
+      "latency_ms": 2.6,
+      "packet_loss": 0,
+      "uptime": "210 days, 14 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Cisco IOS-XE 17.06.04",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 8,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.254",
+      "platform": "cisco_ios",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.254",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-dist-bldg-a",
+      "name": "SW-DIST-BLDG-A",
+      "ip": "192.168.1.10",
+      "type": "switch",
+      "role": "Distribution Switch",
+      "model": "Cisco Catalyst 9300-48P",
+      "mac": "00:50:56:D4:E5:F2",
+      "building": "ساختمان مهندسی (Engineering Bldg)",
+      "floor": "طبقه ۲ (Floor 2)",
+      "unit": "واحد آزمایشگاه و R&D (Lab Unit 201)",
+      "rack": "",
+      "is_online": true,
+      "latency_ms": 0.8,
+      "packet_loss": 0,
+      "uptime": "89 days, 2 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Cisco IOS-XE 17.09.02",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 48,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.10",
+      "platform": "cisco_ios_xe",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.10",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-acc-bldg-a-f3",
+      "name": "SW-ACC-BLDG-A-F3",
+      "ip": "192.168.1.21",
+      "type": "switch",
+      "role": "Access Switch",
+      "model": "Cisco Catalyst 2960X-48FPS-L",
+      "mac": "00:50:56:E6:F7:03",
+      "building": "ساختمان مرکزی (Central Bldg)",
+      "floor": "طبقه ۳ (Floor 3)",
+      "unit": "واحد توسعه نرم‌افزار (Dev Unit 302)",
+      "rack": "Wall-Rack-302",
+      "is_online": true,
+      "latency_ms": 2.7,
+      "packet_loss": 0,
+      "uptime": "45 days, 11 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Cisco IOS 15.2(7)E2",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 48,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.21",
+      "platform": "cisco_ios",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.21",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-dist-bldg-b",
+      "name": "SW-DIST-BLDG-B",
+      "ip": "192.168.1.11",
+      "type": "switch",
+      "role": "Distribution Switch",
+      "model": "Cisco Catalyst 9300-24T",
+      "mac": "00:50:56:F8:09:14",
+      "building": "ساختمان مهندسی (Engineering Bldg)",
+      "floor": "طبقه ۱ (Floor 1)",
+      "unit": "مرکز داده فرعی (MDF Room)",
+      "rack": "Rack-MDF-B1",
+      "is_online": true,
+      "latency_ms": 1.4,
+      "packet_loss": 0,
+      "uptime": "73 days, 19 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Cisco IOS-XE 17.09.01",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 24,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.11",
+      "platform": "cisco_ios_xe",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.11",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-acc-bldg-b-f2",
+      "name": "SW-ACC-BLDG-B-F2",
+      "ip": "192.168.1.32",
+      "type": "switch",
+      "role": "Access Switch",
+      "model": "Cisco Catalyst 9200L-24P-4G",
+      "mac": "00:50:56:6C:3B:6B",
+      "building": "ساختمان مهندسی (Engineering Bldg)",
+      "floor": "طبقه ۲ (Floor 2)",
+      "unit": "واحد آزمایشگاه و R&D (Lab Unit 201)",
+      "rack": "Rack-ENG-201",
+      "is_online": false,
+      "latency_ms": null,
+      "packet_loss": 100,
+      "uptime": "آفلاین (Offline)",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Cisco IOS-XE 17.06.03",
+      "last_seen": "۲ ساعت پیش (2 hours ago)",
+      "total_ports": 28,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.32",
+      "platform": "cisco_ios",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.32",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-ap-bldg-a-f1",
+      "name": "AP-WIFI-BLDG-A-LOBBY",
+      "ip": "192.168.1.101",
+      "type": "access_point",
+      "role": "Wireless Access Point",
+      "model": "Cisco Catalyst 9120AXI",
+      "mac": "00:50:56:11:22:33",
+      "building": "ساختمان مرکزی (Central Bldg)",
+      "floor": "طبقه ۱ (Floor 1)",
+      "unit": "لابی و سالن همایش (Main Lobby)",
+      "rack": "سقف کاذب لابی",
+      "is_online": true,
+      "latency_ms": 2.2,
+      "packet_loss": 0,
+      "uptime": "142 days, 5 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Capwap 8.10.162.0",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 2,
+      "has_unsaved_changes": false,
+      "last_modified_time": "10:38:37",
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.101",
+      "platform": "cisco_ios",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.101",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-ap-bldg-a-f3",
+      "name": "AP-WIFI-BLDG-A-DEV",
+      "ip": "192.168.1.103",
+      "type": "access_point",
+      "role": "Wireless Access Point",
+      "model": "Cisco Catalyst 9130AX Series",
+      "mac": "00:50:56:70:A7:41",
+      "building": "ساختمان مرکزی (Central Bldg)",
+      "floor": "طبقه ۳ (Floor 3)",
+      "unit": "واحد توسعه نرم‌افزار (Dev Unit 302)",
+      "rack": "سقف راهرو شرقی",
+      "is_online": true,
+      "latency_ms": 1.2,
+      "packet_loss": 0,
+      "uptime": "45 days, 8 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Capwap 8.10.185.0",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 2,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.103",
+      "platform": "cisco_ios",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.103",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-ap-bldg-b-f1",
+      "name": "AP-WIFI-BLDG-B-MDF",
+      "ip": "192.168.1.105",
+      "type": "access_point",
+      "role": "Wireless Access Point",
+      "model": "Cisco Aironet 2802I",
+      "mac": "00:50:56:94:B4:0F",
+      "building": "ساختمان مهندسی (Engineering Bldg)",
+      "floor": "طبقه ۱ (Floor 1)",
+      "unit": "مرکز داده فرعی (MDF Room)",
+      "rack": "دیواری ورودی مهندسی",
+      "is_online": true,
+      "latency_ms": 1.6,
+      "packet_loss": 0,
+      "uptime": "73 days, 16 hours",
+      "cdp_enabled": true,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "Capwap 8.10.151.0",
+      "last_seen": "هم اکنون (Just now)",
+      "total_ports": 2,
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "cisco123",
+      "enable_password": "cisco_enable",
+      "ssh_status": "authenticated",
+      "ssh_host": "192.168.1.105",
+      "platform": "cisco_ios",
+      "connection_mode": "simulator",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.1.105",
+        "port": 22,
+        "username": "admin",
+        "password": "cisco123"
+      }
+    },
+    {
+      "id": "dev-mikrotik-ccr2004",
+      "name": "MK-CCR2004-CORE",
+      "ip": "192.168.88.1",
+      "type": "router",
+      "role": "Border Router / Core Gateway",
+      "model": "MikroTik CCR2004-16G-2S+",
+      "platform": "mikrotik_routeros",
+      "connection_mode": "simulator",
+      "mac": "48:8F:5A:12:34:01",
+      "building": "ساختمان اداری مرکزی",
+      "floor": "طبقه همکف",
+      "unit": "اتاق سرور و رک اصلی",
+      "rack": "R-MK-01",
+      "is_online": true,
+      "latency_ms": 2.9,
+      "packet_loss": 0,
+      "uptime": "48d 14:32:10",
+      "cdp_enabled": false,
+      "lldp_enabled": true,
+      "snmp_community": "public",
+      "firmware": "RouterOS v7.14.3 (stable)",
+      "total_ports": 18,
+      "ssh_host": "192.168.88.1",
+      "ssh_port": 22,
+      "ssh_username": "admin",
+      "ssh_password": "admin",
+      "connection": {
+        "protocol": "ssh",
+        "host": "192.168.88.1",
+        "port": 22,
+        "username": "admin",
+        "password": "admin"
+      },
+      "last_seen": "هم اکنون (Just now)"
+    }
+  ]
+}

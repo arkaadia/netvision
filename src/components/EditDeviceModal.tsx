@@ -1,0 +1,1573 @@
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  X,
+  Minus,
+  Edit3,
+  Server,
+  Router as RouterIcon,
+  Wifi,
+  Shield,
+  HardDrive,
+  MapPin,
+  Terminal,
+  Key,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  RefreshCw,
+  Cpu,
+  Radio,
+  Lock,
+  Unlock,
+  Layers,
+  Network,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Info
+} from 'lucide-react';
+import { Device, DeviceType, DevicePlatform, ConnectionMode, SwitchPort } from '../types';
+import { testDeviceConnection, pingDevice, fetchDevicePorts } from '../services/api';
+import { useLanguage } from '../i18n';
+import { getDevicePortComment } from '../data/portSpecs';
+
+export interface EditDeviceModalProps {
+  isOpen: boolean;
+  device: Device | null;
+  onClose: () => void;
+  onMinimize?: () => void;
+  onSave: (deviceId: string, updates: Partial<Device>) => Promise<void>;
+  isLightMode?: boolean;
+}
+
+export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
+  isOpen,
+  device,
+  onClose,
+  onMinimize,
+  onSave,
+  isLightMode: propIsLightMode,
+}) => {
+  const { isRtl, isEn } = useLanguage();
+
+  const isLightMode = propIsLightMode ?? (typeof document !== 'undefined' && (
+    document.querySelector('.theme-light') !== null ||
+    document.documentElement.classList.contains('light') ||
+    localStorage.getItem('panel_theme') === 'light' ||
+    localStorage.getItem('theme_mode') === 'light'
+  ));
+
+  const [name, setName] = useState('');
+  const [ip, setIp] = useState('');
+  const [platform, setPlatform] = useState<DevicePlatform>('cisco_ios');
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>('ssh');
+  const [type, setType] = useState<DeviceType>('switch');
+  const [role, setRole] = useState('Access Switch');
+  const [model, setModel] = useState('');
+  const [building, setBuilding] = useState('');
+  const [floor, setFloor] = useState('');
+  const [unit, setUnit] = useState('');
+  const [rack, setRack] = useState('');
+  const [totalPorts, setTotalPorts] = useState(24);
+  const [isOnline, setIsOnline] = useState(true);
+  const [cdpEnabled, setCdpEnabled] = useState(true);
+  const [lldpEnabled, setLldpEnabled] = useState(true);
+  const [snmpCommunity, setSnmpCommunity] = useState('public');
+
+  // SSH / Telnet Credentials
+  const [connectionProtocol, setConnectionProtocol] = useState<'ssh' | 'telnet'>('ssh');
+  const [sshHost, setSshHost] = useState('');
+  const [sshPort, setSshPort] = useState(22);
+  const [sshUsername, setSshUsername] = useState('admin');
+  const [sshPassword, setSshPassword] = useState('');
+  const [enablePassword, setEnablePassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // States
+  const [discoveredPorts, setDiscoveredPorts] = useState<SwitchPort[]>([]);
+  const [isLockedByDiscovery, setIsLockedByDiscovery] = useState(false);
+  const [portViewMode, setPortViewMode] = useState<'grid' | 'table'>('grid');
+  const [isPortsExpanded, setIsPortsExpanded] = useState(false);
+  const [discoverySource, setDiscoverySource] = useState<string | null>(null);
+
+  const [isTestingSsh, setIsTestingSsh] = useState(false);
+  const [sshTestResult, setSshTestResult] = useState<{ success: boolean; message: string; latency_ms?: number } | null>(null);
+  const [isTestingPing, setIsTestingPing] = useState(false);
+  const [pingTestResult, setPingTestResult] = useState<{ success: boolean; message: string; latency_ms?: number } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sync state when device prop changes or modal opens
+  useEffect(() => {
+    if (!device || !isOpen) return;
+    setName(device.name || '');
+    setIp(device.ip || '');
+    setPlatform(device.platform || 'cisco_ios');
+    setConnectionMode(device.connection_mode || 'ssh');
+    setType(device.type || 'switch');
+    setRole(device.role || 'Access Switch');
+    setModel(device.model || '');
+    setBuilding(device.building || '');
+    setFloor(device.floor || '');
+    setUnit(device.unit || '');
+    setRack(device.rack || '');
+    setTotalPorts(device.total_ports || 24);
+    setIsOnline(Boolean(device.is_online));
+    setCdpEnabled(device.cdp_enabled ?? true);
+    setLldpEnabled(device.lldp_enabled ?? true);
+    setSnmpCommunity(device.snmp_community || 'public');
+
+    const devProto = (device.connection_protocol || device.connection?.protocol || 'ssh').toLowerCase() as 'ssh' | 'telnet';
+    setConnectionProtocol(devProto);
+    setSshHost(device.ssh_host || device.ip || '');
+    setSshPort(device.ssh_port || (devProto === 'telnet' ? 23 : 22));
+    setSshUsername(device.ssh_username || 'admin');
+    setSshPassword(device.ssh_password || '');
+    setEnablePassword(device.enable_password || '');
+
+    setSshTestResult(null);
+    setPingTestResult(null);
+    setError(null);
+    setIsLockedByDiscovery(false);
+    setDiscoverySource(null);
+
+    // Fetch existing ports for this device if configured
+    if (device.id) {
+      fetchDevicePorts(device.id)
+        .then((res) => {
+          if (res && res.ports && res.ports.length > 0) {
+            setDiscoveredPorts(res.ports);
+            if (res.ports.length > 0 && !device.total_ports) {
+              setTotalPorts(res.ports.length);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [device, isOpen]);
+
+  // Handle ESC key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !device) return null;
+
+  const handleProtocolChange = (proto: 'ssh' | 'telnet') => {
+    setConnectionProtocol(proto);
+    if (proto === 'telnet' && sshPort === 22) {
+      setSshPort(23);
+    } else if (proto === 'ssh' && sshPort === 23) {
+      setSshPort(22);
+    }
+  };
+
+  const handleTestSsh = async (forcedSimulate: boolean = false) => {
+    const targetHost = (sshHost.trim() || ip.trim());
+    if (!targetHost && !forcedSimulate) {
+      setError(isEn ? `Please enter a target host or IP for ${connectionProtocol.toUpperCase()} connection` : `لطفاً ابتدا آدرس IP تجهیز را وارد کنید`);
+      return;
+    }
+    try {
+      setIsTestingSsh(true);
+      setSshTestResult(null);
+      setError(null);
+      const res = await testDeviceConnection({
+        ip: targetHost || '192.168.1.1',
+        ssh_host: targetHost,
+        ssh_port: Number(sshPort) || (connectionProtocol === 'telnet' ? 23 : 22),
+        ssh_username: sshUsername.trim(),
+        ssh_password: sshPassword,
+        enable_password: enablePassword,
+        protocol: connectionProtocol,
+        connection_protocol: connectionProtocol,
+        platform,
+        connection_mode: connectionMode,
+        simulate: forcedSimulate || connectionMode === 'simulator',
+        lang: isEn ? 'en' : 'fa',
+      });
+
+      if (res.success) {
+        const hw = res.hardware;
+        const detectedHostname = hw?.hostname || res.hostname || '';
+        if (detectedHostname) {
+          setName(detectedHostname);
+        }
+        const detectedModel = hw?.model || res.model || '';
+        if (detectedModel) {
+          setModel(detectedModel);
+        }
+        const resolvedTotalPorts = res.total_ports || hw?.total_ports || (res.ports && res.ports.length > 0 ? res.ports.length : 24);
+        setTotalPorts(resolvedTotalPorts);
+
+        if (res.ports && res.ports.length > 0) {
+          setDiscoveredPorts(res.ports);
+          setIsPortsExpanded(true);
+        }
+        setIsLockedByDiscovery(true);
+        setDiscoverySource(res.simulated ? (isEn ? 'Simulator' : 'شبیه‌ساز') : 'SSH (show interface status)');
+
+        const successMsg = isEn
+          ? (res.message_en || (res.message && !/[\u0600-\u06FF]/.test(res.message) ? res.message : `SSH connection established and authenticated successfully. Discovered ${resolvedTotalPorts} ports, PSU specs & hardware telemetry.`))
+          : (res.message_fa || res.message || `ارتباط SSH با موفقیت برقرار و احراز هویت انجام شد. تعداد ${resolvedTotalPorts} پورت شناسایی گردید.`);
+
+        setSshTestResult({
+          success: true,
+          message: successMsg,
+          latency_ms: res.latency_ms,
+        });
+      } else {
+        const failMsg = isEn
+          ? (res.message_en || (res.message && !/[\u0600-\u06FF]/.test(res.message) ? res.message : `${connectionProtocol.toUpperCase()} connection failed: ${res.error || 'Device unreachable or credentials rejected'}`))
+          : (res.message_fa || res.message || (res.error || `اتصال ${connectionProtocol.toUpperCase()} ناموفق بود`));
+        setSshTestResult({
+          success: false,
+          message: failMsg,
+          latency_ms: res.latency_ms,
+        });
+      }
+    } catch (err: any) {
+      setSshTestResult({
+        success: false,
+        message: isEn
+          ? `Connection error: ${err.message || 'Failed to establish SSH session'}`
+          : `خطای برقراری ارتباط: ${err.message || 'اتصال ناموفق بود'}`,
+      });
+    } finally {
+      setIsTestingSsh(false);
+    }
+  };
+
+  const handleTestPing = async () => {
+    const targetIp = ip.trim();
+    if (!targetIp) {
+      setError(isEn ? 'Please enter an IP address to ping' : 'لطفاً آدرس IP را وارد کنید');
+      return;
+    }
+    try {
+      setIsTestingPing(true);
+      setPingTestResult(null);
+      setError(null);
+      const res = await pingDevice(device.id);
+      const online = Boolean(res.device.is_online);
+      setIsOnline(online);
+      setPingTestResult({
+        success: online,
+        message: online
+          ? (isEn ? `Host is reachable (Latency: ${res.device.latency_ms} ms)` : `میزبان در دسترس است (تاخیر: ${res.device.latency_ms} میلی‌ثانیه)`)
+          : (isEn ? 'Host did not respond to ICMP ping (Offline)' : 'تجهیز به پینگ ICMP پاسخ نداد (آفلاین)'),
+        latency_ms: res.device.latency_ms ?? undefined,
+      });
+    } catch (err: any) {
+      setPingTestResult({
+        success: false,
+        message: err.message || (isEn ? 'Ping test failed' : 'تست پینگ ناموفق بود'),
+      });
+    } finally {
+      setIsTestingPing(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError(isEn ? 'Device hostname cannot be empty' : 'نام یا شناسه تجهیز نمی‌تواند خالی باشد');
+      return;
+    }
+    if (!ip.trim() || !/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ip.trim())) {
+      setError(isEn ? 'Please enter a valid IP address (e.g. 192.168.1.50)' : 'لطفاً یک آدرس IP معتبر وارد کنید (مثال: 192.168.1.50)');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      await onSave(device.id, {
+        name: name.trim(),
+        ip: ip.trim(),
+        ssh_host: sshHost.trim() || ip.trim(),
+        connection_protocol: connectionProtocol,
+        type,
+        role: role.trim(),
+        platform,
+        connection_mode: connectionMode,
+        connection: {
+          protocol: connectionProtocol,
+          host: sshHost.trim() || ip.trim(),
+          port: Number(sshPort) || (connectionProtocol === 'telnet' ? 23 : 22),
+          username: sshUsername.trim() || 'admin',
+          password: sshPassword,
+          connection_timeout: 4000,
+        },
+        model: model.trim(),
+        building: building.trim(),
+        floor: floor.trim(),
+        unit: unit.trim(),
+        rack: rack.trim(),
+        total_ports: Number(totalPorts),
+        is_online: isOnline,
+        cdp_enabled: cdpEnabled,
+        lldp_enabled: lldpEnabled,
+        snmp_community: snmpCommunity.trim(),
+        ssh_port: Number(sshPort) || 22,
+        ssh_username: sshUsername.trim() || 'admin',
+        ssh_password: sshPassword,
+        enable_password: enablePassword,
+        ssh_status: sshTestResult?.success ? 'authenticated' : (device.ssh_status || 'configured'),
+        ports: discoveredPorts.length > 0 ? discoveredPorts : undefined,
+      } as any);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || (isEn ? 'Failed to update device' : 'خطا در به‌روزرسانی مشخصات تجهیز'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-2 sm:p-4 modal-backdrop-blur overflow-y-auto"
+      data-modal-backdrop="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      dir={isEn ? 'ltr' : 'rtl'}
+    >
+      <div
+        className={`border rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-auto max-h-[94vh] sm:max-h-[90vh] flex flex-col transition-colors duration-200 animate-fadeIn ${
+          isLightMode
+            ? 'bg-white border-slate-200 text-slate-900 shadow-slate-900/15'
+            : 'bg-slate-900 border-slate-700/80 text-slate-100 shadow-2xl'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className={`flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-2.5 border-b shrink-0 transition-colors ${
+          isLightMode ? 'border-slate-200 bg-slate-50/90' : 'border-slate-800 bg-slate-950/80'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <div className={`p-1.5 rounded-lg border ${
+              isLightMode ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-amber-500/20 border-amber-500/30 text-amber-400'
+            }`}>
+              <Edit3 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className={`text-sm font-bold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                  {isEn ? 'Edit Device Properties' : 'ویرایش مشخصات تجهیز شبکه'}
+                </h3>
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold border ${
+                  isLightMode
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                }`}>
+                  {device.name}
+                </span>
+              </div>
+              <p className={`text-[10px] sm:text-[11px] mt-0.5 ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                {isEn ? 'Update hardware, management IP, credentials and location metadata' : 'ویرایش نام، آدرس IP، مشخصات سخت‌افزاری، موقعیت مکانی و دسترسی SSH'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {onMinimize && (
+              <button
+                type="button"
+                onClick={onMinimize}
+                className={`p-1.5 rounded-lg transition cursor-pointer ${
+                  isLightMode
+                    ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                    : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800'
+                }`}
+                title={isEn ? 'Minimize' : 'مینیمایز به نوار پایین'}
+                aria-label={isEn ? 'Minimize' : 'مینیمایز'}
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className={`p-1.5 rounded-lg transition cursor-pointer ${
+                isLightMode
+                  ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Form Body */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5">
+            {error && (
+              <div className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
+                isLightMode
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+              }`}>
+                <AlertCircle className={`w-4 h-4 shrink-0 ${isLightMode ? 'text-rose-600' : 'text-rose-400'}`} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Top Row: Platform & OS Driver + Device Role & Category (Side-by-side compact layout) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {/* Platform & OS Driver Selector */}
+              <div className={`p-2.5 rounded-xl border space-y-2 ${
+                isLightMode ? 'bg-slate-50/80 border-slate-200' : 'bg-slate-800/40 border-slate-700/60'
+              }`}>
+                <div className="flex items-center justify-between gap-1">
+                  <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                    isLightMode ? 'text-indigo-600' : 'text-indigo-400'
+                  }`}>
+                    <Cpu className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{isEn ? 'Hardware Platform & OS:' : 'پلتفرم و سیستم‌عامل:'}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className={`text-[10px] hidden sm:inline ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {isEn ? 'Mode:' : 'حالت:'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setConnectionMode('ssh')}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                        connectionMode === 'ssh'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLightMode
+                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      SSH Live
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConnectionMode('simulator')}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                        connectionMode === 'simulator'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLightMode
+                          ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      Sim
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPlatform('cisco_ios')}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center text-center transition cursor-pointer ${
+                      platform === 'cisco_ios'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs ring-1 ring-indigo-500/20'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm ring-1 ring-indigo-500/30'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold font-mono">Cisco IOS</span>
+                    <span className={`text-[9px] truncate ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Catalyst 2960/3750</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPlatform('cisco_ios_xe')}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center text-center transition cursor-pointer ${
+                      platform === 'cisco_ios_xe'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs ring-1 ring-indigo-500/20'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm ring-1 ring-indigo-500/30'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold font-mono">Cisco IOS-XE</span>
+                    <span className={`text-[9px] truncate ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Cat 9300 / ISR 4k</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPlatform('mikrotik_routeros')}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center text-center transition cursor-pointer ${
+                      platform === 'mikrotik_routeros'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs ring-1 ring-indigo-500/20'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm ring-1 ring-indigo-500/30'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold font-mono">MikroTik RouterOS</span>
+                    <span className={`text-[9px] truncate ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>CRS / CCR / RB</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPlatform('generic_linux')}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center text-center transition cursor-pointer ${
+                      platform === 'generic_linux'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs ring-1 ring-indigo-500/20'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm ring-1 ring-indigo-500/30'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold font-mono">Generic Linux</span>
+                    <span className={`text-[9px] truncate ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Ubuntu / Server</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Device Role & Category */}
+              <div className={`p-2.5 rounded-xl border space-y-2 ${
+                isLightMode ? 'bg-slate-50/80 border-slate-200' : 'bg-slate-800/40 border-slate-700/60'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <label className={`block text-xs font-bold ${isLightMode ? 'text-indigo-600' : 'text-indigo-400'}`}>
+                    {isEn ? 'Device Role & Category:' : 'رده و نوع تجهیز:'}
+                  </label>
+                  <span className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {isEn ? 'Hardware Class' : 'کلاس تجهیز'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType('switch');
+                      if (role === 'Edge Gateway' || role === 'Wireless AP') setRole('Access Switch');
+                    }}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
+                      type === 'switch'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Server className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold truncate">{isEn ? 'Switch' : 'سوئیچ'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType('router');
+                      if (role !== 'Edge Gateway') setRole('Edge Gateway');
+                    }}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
+                      type === 'router'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <RouterIcon className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold truncate">{isEn ? 'Router' : 'روتر'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType('access_point');
+                      setRole('Wireless AP');
+                      setTotalPorts(2);
+                    }}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
+                      type === 'access_point'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Wifi className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold truncate">{isEn ? 'AP' : 'اکسس‌پوینت'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType('firewall');
+                      setRole('Security Appliance');
+                    }}
+                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
+                      type === 'firewall'
+                        ? isLightMode
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs'
+                          : 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm'
+                        : isLightMode
+                        ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold truncate">{isEn ? 'Firewall' : 'فایروال'}</span>
+                  </button>
+                </div>
+
+                <div>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className={`w-full px-2.5 py-1 rounded-lg border text-xs focus:outline-none transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                  >
+                    <option value="Core Switch">{isEn ? 'Core Switch (Backbone)' : 'Core Switch (سوئیچ اصلی و کر)'}</option>
+                    <option value="Distribution Switch">{isEn ? 'Distribution Switch (Aggregation)' : 'Distribution Switch (سوئیچ توزیع)'}</option>
+                    <option value="Access Switch">{isEn ? 'Access Switch (User Access)' : 'Access Switch (سوئیچ دسترسی کلاینت)'}</option>
+                    <option value="Edge Gateway">{isEn ? 'Edge Gateway / Router' : 'Edge Gateway / Router (مسیریاب مرزی)'}</option>
+                    <option value="Wireless AP">{isEn ? 'Wireless Access Point' : 'Wireless AP (اکسس‌پوینت وای‌فای)'}</option>
+                    <option value="Security Appliance">{isEn ? 'Security Appliance / Firewall' : 'فایروال و امنیت شبکه'}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Switch Ports Faceplate & Telemetry (show interface status) - Compact Banner */}
+            <div className={`p-2.5 rounded-xl border transition-all ${
+              isLightMode
+                ? 'bg-slate-50/90 border-indigo-200/80 shadow-xs'
+                : 'bg-slate-900/80 border-indigo-500/30 shadow-sm'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1 rounded-lg ${isLightMode ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-500/20 text-indigo-300'}`}>
+                    <Network className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-xs font-bold ${isLightMode ? 'text-slate-900' : 'text-slate-100'}`}>
+                      {isEn ? 'Switch Ports & Telemetry (show interface status)' : 'پورت‌های سوئیچ و تله‌متری (show interface status)'}
+                    </span>
+                    {discoverySource && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400 font-mono border border-indigo-500/30">
+                        {discoverySource}
+                      </span>
+                    )}
+                    {discoveredPorts.length > 0 ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+                        {discoveredPorts.length} Ports ({discoveredPorts.filter(p => p.status === 'up').length} Up)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        {isEn ? 'Not loaded (SSH Test discovers ports)' : 'پورت‌ها با تست SSH استخراج می‌شوند'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {discoveredPorts.length > 0 && (
+                    <div className={`inline-flex rounded-md p-0.5 border text-[10px] font-semibold ${
+                      isLightMode ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => setPortViewMode('grid')}
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                          portViewMode === 'grid'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : isLightMode ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isEn ? 'Grid' : 'نمای ماتریس'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPortViewMode('table')}
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
+                          portViewMode === 'table'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : isLightMode ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {isEn ? 'Table' : 'جدول'}
+                      </button>
+                    </div>
+                  )}
+
+                  {discoveredPorts.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleTestSsh(true)}
+                      className="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-200 dark:border-indigo-800 transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3 text-indigo-500" />
+                      <span>{isEn ? 'Lab Telemetry' : 'تله‌متری آزمایشگاهی'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPortsExpanded(!isPortsExpanded)}
+                    className={`p-1 rounded-md border transition cursor-pointer ${
+                      isLightMode ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                    }`}
+                    title={isPortsExpanded ? (isEn ? 'Collapse' : 'بستن') : (isEn ? 'Expand' : 'باز کردن')}
+                  >
+                    {isPortsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {isPortsExpanded && (
+                <div className="mt-2.5 pt-2.5 border-t border-slate-200/60 dark:border-slate-800">
+                  {/* Summary Metric Pills */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mb-2.5 text-xs">
+                    <div className={`p-1.5 rounded-lg border flex items-center justify-between ${
+                      isLightMode ? 'bg-white/80 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+                    }`}>
+                      <span className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {isEn ? 'Total Ports' : 'کل پورت‌ها'}
+                      </span>
+                      <span className="font-mono font-bold text-xs text-indigo-500">
+                        {discoveredPorts.length || totalPorts}
+                      </span>
+                    </div>
+
+                    <div className={`p-1.5 rounded-lg border flex items-center justify-between ${
+                      isLightMode ? 'bg-emerald-50/60 border-emerald-200 text-emerald-800' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    }`}>
+                      <span className="text-[10px] flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        {isEn ? 'Up' : 'متصل'}
+                      </span>
+                      <span className="font-mono font-bold text-xs">
+                        {discoveredPorts.filter(p => p.status === 'up').length}
+                      </span>
+                    </div>
+
+                    <div className={`p-1.5 rounded-lg border flex items-center justify-between ${
+                      isLightMode ? 'bg-slate-100/80 border-slate-200 text-slate-700' : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                    }`}>
+                      <span className="text-[10px] flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        {isEn ? 'Down' : 'قطع'}
+                      </span>
+                      <span className="font-mono font-bold text-xs">
+                        {discoveredPorts.filter(p => p.status !== 'up').length}
+                      </span>
+                    </div>
+
+                    <div className={`p-1.5 rounded-lg border flex items-center justify-between ${
+                      isLightMode ? 'bg-purple-50/60 border-purple-200 text-purple-800' : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                    }`}>
+                      <span className="text-[10px] font-semibold">{isEn ? 'Trunk' : 'ترانک'}</span>
+                      <span className="font-mono font-bold text-xs">
+                        {discoveredPorts.filter(p => p.mode === 'trunk').length}
+                      </span>
+                    </div>
+
+                    <div className={`p-1.5 rounded-lg border flex items-center justify-between ${
+                      isLightMode ? 'bg-cyan-50/60 border-cyan-200 text-cyan-800' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                    }`}>
+                      <span className="text-[10px] font-semibold">{isEn ? 'Access' : 'اکسس'}</span>
+                      <span className="font-mono font-bold text-xs">
+                        {discoveredPorts.filter(p => p.mode === 'access').length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Port Display: Grid Faceplate or Table */}
+                  {discoveredPorts.length > 0 ? (
+                    portViewMode === 'grid' ? (
+                      <div className={`p-2 rounded-xl border font-mono ${
+                        isLightMode ? 'bg-slate-900 text-slate-100 border-slate-800 shadow-inner' : 'bg-slate-950 text-slate-100 border-slate-800 shadow-inner'
+                      }`}>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 border-b border-slate-800 pb-1.5 mb-2">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            {name || 'Switch Faceplate'} • {model || 'Catalyst'} ({discoveredPorts.length} Ports)
+                          </span>
+                          <span className="text-[9px] text-slate-500">{isEn ? 'Faceplate' : 'نمای پورت‌ها'}</span>
+                        </div>
+
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                          {discoveredPorts.map((p) => {
+                            const isUp = p.status === 'up';
+                            const isTrunk = p.mode === 'trunk';
+                            return (
+                              <div
+                                key={p.id || p.name}
+                                className={`p-1 rounded-lg border text-center transition flex flex-col items-center justify-between min-h-[52px] ${
+                                  isUp
+                                    ? isTrunk
+                                      ? 'bg-purple-950/60 border-purple-600/60 hover:border-purple-400'
+                                      : 'bg-slate-800/90 border-emerald-600/50 hover:border-emerald-400'
+                                    : 'bg-slate-900/60 border-slate-800 opacity-65 hover:opacity-100'
+                                }`}
+                                title={`${p.name} (${p.description || 'No description'}) - ${p.status?.toUpperCase()} - ${p.mode?.toUpperCase()}${p.vlan ? ' VLAN ' + p.vlan : ''} - ${p.speed || 'Auto'}`}
+                              >
+                                <div className="flex items-center justify-between w-full text-[9px] leading-none mb-0.5">
+                                  <span className="font-bold truncate text-[9px] text-slate-200">
+                                    {p.name.replace(/^GigabitEthernet|^FastEthernet|^TenGigabitEthernet/, (m) => m.startsWith('G') ? 'Gi' : m.startsWith('F') ? 'Fa' : 'Te')}
+                                  </span>
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isUp ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-600'
+                                  }`}></span>
+                                </div>
+
+                                <div className="my-0.5">
+                                  {isTrunk ? (
+                                    <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-purple-500 text-white tracking-tight">
+                                      TRUNK
+                                    </span>
+                                  ) : (
+                                    <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-cyan-900/80 text-cyan-300 border border-cyan-700/50">
+                                      V{p.vlan || 1}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {p.description ? (
+                                  <span className="text-[8px] text-amber-300 truncate w-full text-center mt-0.5 px-0.5" title={p.description}>
+                                    {p.description}
+                                  </span>
+                                ) : (
+                                  <span className="text-[8px] text-slate-500 truncate w-full text-center mt-0.5">
+                                    {p.speed || '1G'}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                        <table className="w-full text-left font-mono">
+                          <thead className={`sticky top-0 text-[10px] ${isLightMode ? 'bg-slate-100 text-slate-700' : 'bg-slate-900 text-slate-300'}`}>
+                            <tr>
+                              <th className="p-1.5">{isEn ? 'Port' : 'پورت'}</th>
+                              <th className="p-1.5">{isEn ? 'Description' : 'دسکریپشن'}</th>
+                              <th className="p-1.5">{isEn ? 'Status' : 'وضعیت'}</th>
+                              <th className="p-1.5">{isEn ? 'Mode' : 'حالت'}</th>
+                              <th className="p-1.5">{isEn ? 'VLAN' : 'VLAN'}</th>
+                              <th className="p-1.5">{isEn ? 'Speed' : 'سرعت'}</th>
+                              <th className="p-1.5">{isEn ? 'Duplex' : 'دوبلکس'}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-[10px]">
+                            {discoveredPorts.map((p) => (
+                              <tr key={p.id || p.name} className={isLightMode ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
+                                <td className="p-1.5 font-bold">{p.name}</td>
+                                <td className="p-1.5 text-amber-600 dark:text-amber-400">{p.description || '-'}</td>
+                                <td className="p-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    p.status === 'up' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                  }`}>
+                                    {p.status?.toUpperCase()}
+                                  </span>
+                                </td>
+                                <td className="p-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    p.mode === 'trunk' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
+                                  }`}>
+                                    {p.mode?.toUpperCase()}
+                                  </span>
+                                </td>
+                                <td className="p-1.5">{p.vlan || '-'}</td>
+                                <td className="p-1.5">{p.speed || 'auto'}</td>
+                                <td className="p-1.5">{p.duplex || 'auto'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  ) : (
+                    <div className={`p-2.5 rounded-lg border border-dashed flex flex-col sm:flex-row items-center justify-between gap-2 text-xs ${
+                      isLightMode ? 'bg-slate-50/80 border-slate-300 text-slate-600' : 'bg-slate-900/40 border-slate-700 text-slate-400'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <Info className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                        <div>
+                          <p className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                            {isEn ? 'Switch telemetry not yet loaded' : 'اطلاعات تله‌متری پورت‌ها بارگذاری نشده'}
+                          </p>
+                          <p className="text-[10px] mt-0.5">
+                            {isEn
+                              ? 'Enter SSH credentials below and click "Test SSH" to discover ports via "show interface status".'
+                              : 'مشخصات SSH را در کادر زیر وارد و «تست اتصال SSH» را بزنید تا پورت‌ها دریافت شوند.'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleTestSsh(true)}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-200 dark:border-indigo-800 shrink-0 transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3 text-indigo-500" />
+                        <span>{isEn ? 'Load Lab Telemetry' : 'بارگذاری آزمایشگاهی'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Terminal Protocol & Credentials */}
+            <div className={`p-3 rounded-xl border space-y-2.5 transition ${
+              isLightMode ? 'bg-slate-50/90 border-slate-200' : 'bg-slate-800/80 border-slate-700'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className={`flex items-center gap-2 text-xs font-bold ${
+                  isLightMode ? 'text-indigo-600' : 'text-indigo-400'
+                }`}>
+                  <Terminal className={`w-4 h-4 ${isLightMode ? 'text-indigo-600' : 'text-indigo-400'}`} />
+                  <span>{isEn ? 'Terminal Protocol & Credentials:' : 'مشخصات اتصال ترمینال و دسترسی CLI:'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`inline-flex rounded-lg p-0.5 border text-[11px] font-semibold ${
+                    isLightMode ? 'bg-white border-slate-300' : 'bg-slate-900 border-slate-700'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => handleProtocolChange('ssh')}
+                      className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                        connectionProtocol === 'ssh'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLightMode
+                          ? 'text-slate-600 hover:text-slate-900'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      SSH
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleProtocolChange('telnet')}
+                      className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                        connectionProtocol === 'telnet'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isLightMode
+                          ? 'text-slate-600 hover:text-slate-900'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Telnet
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTestSsh(false)}
+                    disabled={isTestingSsh}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold transition shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {isTestingSsh ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>{isEn ? 'Testing & Discovering...' : 'اتصال و دریافت پورت‌ها...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Terminal className="w-3 h-3" />
+                        <span>{isEn ? `Test ${connectionProtocol.toUpperCase()}` : `تست اتصال ${connectionProtocol.toUpperCase()}`}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* SSH / Telnet Test Result Banner */}
+              {sshTestResult && (
+                <div
+                  className={`p-2.5 rounded-lg flex items-start gap-2 text-xs ${
+                    sshTestResult.success
+                      ? isLightMode
+                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                        : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                      : isLightMode
+                      ? 'bg-rose-50 border border-rose-200 text-rose-800'
+                      : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                  }`}
+                >
+                  {sshTestResult.success ? (
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 mt-0.5 ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                  ) : (
+                    <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isLightMode ? 'text-rose-600' : 'text-rose-400'}`} />
+                  )}
+                  <div className="flex-1">
+                    <div className="font-semibold">{sshTestResult.message}</div>
+                    {sshTestResult.latency_ms !== undefined && (
+                      <div className={`text-[11px] mt-0.5 font-mono ${isLightMode ? 'text-emerald-700' : 'text-emerald-400/80'}`}>
+                        {isEn ? 'Latency' : 'تاخیر اتصال'}: {sshTestResult.latency_ms} ms
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-8">
+                  <label className="block text-[11px] font-medium mb-1 flex items-center justify-between">
+                    <span className={`font-semibold ${isLightMode ? 'text-indigo-700' : 'text-indigo-300'}`}>
+                      {isEn ? `${connectionProtocol.toUpperCase()} Target Host / IP:` : `آدرس IP اتصال ${connectionProtocol.toUpperCase()}:`}
+                    </span>
+                    <span className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {isEn ? 'Terminal target IP' : 'آدرس مقصد برای کنسول'}
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={sshHost}
+                    onChange={(e) => setSshHost(e.target.value)}
+                    placeholder={ip || '192.168.1.50'}
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
+                      isLightMode
+                        ? 'bg-white border-indigo-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-indigo-500/40 text-white focus:border-indigo-400'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? `${connectionProtocol.toUpperCase()} Port:` : `پورت ${connectionProtocol.toUpperCase()}:`}
+                  </label>
+                  <input
+                    type="number"
+                    value={sshPort}
+                    onChange={(e) => setSshPort(Number(e.target.value))}
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? `${connectionProtocol.toUpperCase()} Username:` : `نام کاربری ${connectionProtocol.toUpperCase()}:`}
+                  </label>
+                  <input
+                    type="text"
+                    value={sshUsername}
+                    onChange={(e) => setSshUsername(e.target.value)}
+                    placeholder="admin"
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className={`block text-[11px] font-medium mb-1 flex items-center justify-between ${
+                    isLightMode ? 'text-slate-700' : 'text-slate-300'
+                  }`}>
+                    <span>{isEn ? `${connectionProtocol.toUpperCase()} Password:` : `رمز عبور ${connectionProtocol.toUpperCase()}:`}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className={`cursor-pointer ${isLightMode ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    </button>
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={sshPassword}
+                    onChange={(e) => setSshPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+
+                {platform !== 'mikrotik_routeros' && platform !== 'generic_linux' ? (
+                  <div className="sm:col-span-4">
+                    <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Enable Secret Password:' : 'رمز Enable (اختیاری):'}
+                    </label>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={enablePassword}
+                      onChange={(e) => setEnablePassword(e.target.value)}
+                      placeholder="cisco"
+                      className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
+                        isLightMode
+                          ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                          : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                      }`}
+                      dir="ltr"
+                    />
+                  </div>
+                ) : (
+                  <div className="sm:col-span-4 flex items-center">
+                    <div className={`p-2 rounded-lg border text-[11px] leading-relaxed ${
+                      isLightMode
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                    }`}>
+                      {isEn
+                        ? 'RouterOS / Linux uses direct user permissions; no enable secret required.'
+                        : 'سیستم‌عامل انتخابی نیازی به رمز Enable ندارد؛ سطح دسترسی مستقیماً از کاربر خوانده می‌شود.'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Device Hostname, Management IP, Hardware Model & Total Ports (Auto-populated and Locked by Discovery) */}
+            <div className={`p-3.5 rounded-xl border space-y-3 ${
+              isLightMode ? 'bg-slate-50/80 border-slate-200' : 'bg-slate-800/40 border-slate-700/60'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${isLightMode ? 'text-slate-800' : 'text-slate-200'}`}>
+                  {isEn ? 'Device Identifiers & Hardware Specs:' : 'شناسه‌های دستگاه و مشخصات سخت‌افزاری:'}
+                </span>
+                {isLockedByDiscovery && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <Lock className="w-3 h-3" />
+                      {isEn ? 'Auto-populated via SSH (Locked)' : 'تکمیل‌شده از طریق SSH (قفل‌شده)'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsLockedByDiscovery(false)}
+                      className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Unlock className="w-3 h-3" />
+                      <span>{isEn ? 'Unlock' : 'ویرایش دستی'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Device Hostname:' : 'نام یا شناسه تجهیز (Hostname):'}
+                    </label>
+                    {isLockedByDiscovery && (
+                      <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" />
+                        {isEn ? 'Read-only' : 'غیرقابل ویرایش'}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    disabled={isLockedByDiscovery}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="SW-ACC-BLDG-A-F2"
+                    className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none font-mono text-left transition ${
+                      isLockedByDiscovery
+                        ? isLightMode
+                          ? 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed border-dashed'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-400 cursor-not-allowed border-dashed'
+                        : isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 placeholder-slate-400 shadow-xs'
+                        : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {name
+                        ? (isEn ? `Extracted Hostname: "${name}"` : `نام استخراج‌شده از سوییچ: «${name}»`)
+                        : (isEn ? 'Device hostname will be automatically populated from SSH' : 'نام تجهیز به طور خودکار پس از استخراج از SSH ثبت خواهد شد')}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Management IP Address:' : 'آدرس آی‌پی مدیریتی (IP Address):'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleTestPing}
+                      disabled={isTestingPing}
+                      className={`text-[11px] flex items-center gap-1 cursor-pointer transition disabled:opacity-50 ${
+                        isLightMode ? 'text-cyan-700 hover:text-cyan-800' : 'text-cyan-400 hover:text-cyan-300'
+                      }`}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isTestingPing ? 'animate-spin' : ''}`} />
+                      <span>{isEn ? 'Ping Host' : 'تست پینگ'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={ip}
+                    onChange={(e) => setIp(e.target.value)}
+                    placeholder="192.168.1.32"
+                    className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none font-mono text-left transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 placeholder-slate-400 shadow-xs'
+                        : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              {/* Ping Result Banner */}
+              {pingTestResult && (
+                <div
+                  className={`p-2.5 rounded-xl flex items-center gap-2 text-xs ${
+                    pingTestResult.success
+                      ? isLightMode
+                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                        : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                      : isLightMode
+                      ? 'bg-rose-50 border border-rose-200 text-rose-800'
+                      : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                  }`}
+                >
+                  {pingTestResult.success ? (
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                  ) : (
+                    <AlertCircle className={`w-4 h-4 shrink-0 ${isLightMode ? 'text-rose-600' : 'text-rose-400'}`} />
+                  )}
+                  <span>{pingTestResult.message}</span>
+                </div>
+              )}
+
+              {/* Hardware Model & Total Ports */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Hardware Model:' : 'مدل سخت‌افزاری (Model):'}
+                    </label>
+                    {isLockedByDiscovery && (
+                      <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" />
+                        {isEn ? 'Read-only' : 'غیرقابل ویرایش'}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    disabled={isLockedByDiscovery}
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="Cisco Catalyst 9200L / MikroTik CCR"
+                    className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none font-mono text-left transition ${
+                      isLockedByDiscovery
+                        ? isLightMode
+                          ? 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed border-dashed'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-400 cursor-not-allowed border-dashed'
+                        : isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 placeholder-slate-400 shadow-xs'
+                        : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Total Ports Count:' : 'تعداد کل پورت‌ها:'}
+                    </label>
+                    {isLockedByDiscovery && (
+                      <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" />
+                        {isEn ? 'Read-only' : 'غیرقابل ویرایش'}
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    disabled={isLockedByDiscovery}
+                    value={totalPorts}
+                    onChange={(e) => setTotalPorts(Number(e.target.value))}
+                    className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none font-mono text-left transition ${
+                      isLockedByDiscovery
+                        ? isLightMode
+                          ? 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed border-dashed'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-400 cursor-not-allowed border-dashed'
+                        : isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  >
+                    <option value={2}>2 Ports ({isEn ? 'AP / Gateway' : 'برای AP یا گیت‌وی'})</option>
+                    <option value={4}>4 Ports ({isEn ? 'Router / Firewall' : 'روتر یا فایروال'})</option>
+                    <option value={8}>8 Ports ({isEn ? 'Router / Mini Switch' : 'روتر یا سوئیچ ۸ پورت'})</option>
+                    <option value={10}>10 Ports (8 Copper + 2 SFP+)</option>
+                    <option value={16}>16 Ports</option>
+                    <option value={24}>24 Ports ({isEn ? 'Standard 24-Port Switch' : 'سوئیچ استاندارد ۲۴ پورت'})</option>
+                    <option value={26}>26 Ports (24 Copper + 2 SFP)</option>
+                    <option value={28}>28 Ports (24 Copper + 4 SFP+)</option>
+                    <option value={48}>48 Ports ({isEn ? 'Standard 48-Port Switch' : 'سوئیچ استاندارد ۴۸ پورت'})</option>
+                    <option value={50}>50 Ports (48 Copper + 2 SFP)</option>
+                    <option value={52}>52 Ports (48 Copper + 4 SFP+)</option>
+                    {![2, 4, 8, 10, 16, 24, 26, 28, 48, 50, 52].includes(totalPorts) && (
+                      <option value={totalPorts}>{totalPorts} Ports ({isEn ? 'Detected Ports' : 'پورت‌های شناسایی‌شده'})</option>
+                    )}
+                  </select>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium leading-tight">
+                      {getDevicePortComment(totalPorts, model, type, isEn)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Operational & Reachability Status Toggle */}
+            <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition ${
+              isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/70 border-slate-700/80'
+            }`}>
+              <div>
+                <span className={`font-semibold ${isLightMode ? 'text-slate-800' : 'text-slate-200'}`}>
+                  {isEn ? 'Device Administrative Status:' : 'وضعیت پاسخ‌دهی و آنلاین بودن تجهیز:'}
+                </span>
+                <p className={`text-[11px] mt-0.5 ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {isEn ? 'Sets whether this node is considered active or unreachable in telemetry' : 'تعیین وضعیت فعال یا قطع بودن در پایش کلی مانیتورینگ'}
+                </p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isOnline}
+                  onChange={(e) => setIsOnline(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className={`w-11 h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 relative ${
+                  isLightMode ? 'bg-slate-300' : 'bg-slate-700'
+                }`}></div>
+                <span className={`text-xs font-mono font-bold ${
+                  isOnline
+                    ? isLightMode ? 'text-emerald-700' : 'text-emerald-400'
+                    : isLightMode ? 'text-slate-500' : 'text-slate-400'
+                }`}>
+                  {isOnline ? (isEn ? 'Online' : 'آنلاین') : (isEn ? 'Offline' : 'آفلاین')}
+                </span>
+              </label>
+            </div>
+
+            {/* Physical Location Hierarchy */}
+            <div className={`p-3.5 rounded-xl border space-y-2.5 transition ${
+              isLightMode ? 'bg-slate-50/90 border-slate-200' : 'bg-slate-800/80 border-slate-700'
+            }`}>
+              <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                isLightMode ? 'text-indigo-600' : 'text-indigo-400'
+              }`}>
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{isEn ? 'Physical Location & Rack Placement:' : 'موقعیت فیزیکی استقرار تجهیز (Location & Rack):'}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Building:' : 'نام ساختمان (Building):'}
+                  </label>
+                  <input
+                    type="text"
+                    value={building}
+                    onChange={(e) => setBuilding(e.target.value)}
+                    placeholder={isEn ? 'Central Building' : 'ساختمان مرکزی'}
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Floor:' : 'طبقه (Floor):'}
+                  </label>
+                  <input
+                    type="text"
+                    value={floor}
+                    onChange={(e) => setFloor(e.target.value)}
+                    placeholder={isEn ? 'Floor 2' : 'طبقه ۲'}
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Room / Unit:' : 'واحد یا اتاق (Unit / Room):'}
+                  </label>
+                  <input
+                    type="text"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder={isEn ? 'IT Server Room' : 'اتاق سرور'}
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-medium mb-1 ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Rack / Cabinet:' : 'شماره رک یا کابینت (Rack):'}
+                  </label>
+                  <input
+                    type="text"
+                    value={rack}
+                    onChange={(e) => setRack(e.target.value)}
+                    placeholder="Rack-B02"
+                    className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Discovery Protocols & SNMP */}
+            <div className={`p-3.5 rounded-xl border space-y-2.5 transition ${
+              isLightMode ? 'bg-slate-50/90 border-slate-200' : 'bg-slate-800/80 border-slate-700'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${isLightMode ? 'text-slate-800' : 'text-slate-200'}`}>
+                  {isEn ? 'Discovery Protocols & SNMP Management:' : 'پروتکل‌های کشف همسایگی و مدیریت SNMP:'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                <label className={`flex items-center gap-1.5 cursor-pointer transition ${
+                  isLightMode ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={cdpEnabled}
+                    onChange={(e) => setCdpEnabled(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>CDP (Cisco Discovery Protocol)</span>
+                </label>
+
+                <label className={`flex items-center gap-1.5 cursor-pointer transition ${
+                  isLightMode ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={lldpEnabled}
+                    onChange={(e) => setLldpEnabled(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>LLDP (IEEE 802.1AB)</span>
+                </label>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className={`text-[11px] font-mono ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                    SNMP Community:
+                  </span>
+                  <input
+                    type="text"
+                    value={snmpCommunity}
+                    onChange={(e) => setSnmpCommunity(e.target.value)}
+                    placeholder="public"
+                    className={`w-28 px-2 py-1 rounded border text-xs font-mono text-left transition ${
+                      isLightMode
+                        ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
+                        : 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                    }`}
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Actions Footer */}
+          <div className={`flex items-center justify-between px-5 py-3 border-t shrink-0 transition ${
+            isLightMode ? 'border-slate-200 bg-slate-50/90' : 'border-slate-800 bg-slate-950/80'
+          }`}>
+            <div className={`text-[11px] font-mono ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              ID: <span className={`font-bold ${isLightMode ? 'text-slate-800' : 'text-slate-300'}`}>{device.id}</span>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer border ${
+                  isLightMode
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+              >
+                {isEn ? 'Cancel' : 'انصراف'}
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{isEn ? 'Saving Changes...' : 'در حال ذخیره‌سازی...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{isEn ? 'Save Changes' : 'ذخیره تغییرات'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+};

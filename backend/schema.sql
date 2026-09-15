@@ -1,0 +1,216 @@
+-- ==============================================================================
+-- NetTopology Enterprise - PostgreSQL Complete Relational Schema
+-- Version: 1.47.0
+-- Handles Users, RBAC, Active Directory, Devices, Topology, Hierarchy, Custom Maps, Logs, Sessions
+-- ==============================================================================
+
+-- 1. Users Table (Local and Active Directory Accounts)
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(64) PRIMARY KEY,
+    username VARCHAR(64) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    password_salt VARCHAR(64) NOT NULL,
+    full_name VARCHAR(128) NOT NULL,
+    email VARCHAR(128) NOT NULL,
+    role VARCHAR(64) NOT NULL DEFAULT 'Super Administrator',
+    user_type VARCHAR(32) NOT NULL DEFAULT 'local', -- 'local' | 'ad'
+    status VARCHAR(32) NOT NULL DEFAULT 'active',   -- 'active' | 'disabled'
+    group_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    is_builtin BOOLEAN NOT NULL DEFAULT FALSE,
+    last_login TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+-- Ensure migration for users existing columns
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(128) DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(128) DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(64) DEFAULT 'Super Administrator';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(32) DEFAULT 'local';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'active';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS group_ids JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_builtin BOOLEAN DEFAULT FALSE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;
+
+-- 2. Local User Groups / Roles
+CREATE TABLE IF NOT EXISTS user_groups (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    color VARCHAR(32) DEFAULT 'indigo',
+    member_user_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    is_builtin BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Granular Access Policies (RBAC)
+CREATE TABLE IF NOT EXISTS access_policies (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    priority INT NOT NULL DEFAULT 100,
+    is_builtin BOOLEAN NOT NULL DEFAULT FALSE,
+    policy_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Network Devices
+CREATE TABLE IF NOT EXISTS devices (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    ip VARCHAR(64) NOT NULL,
+    type VARCHAR(64) NOT NULL DEFAULT 'switch',
+    model VARCHAR(128) DEFAULT 'Cisco Catalyst 2960X',
+    platform VARCHAR(64) DEFAULT 'cisco_ios_xe',
+    role VARCHAR(64) DEFAULT 'Access Switch',
+    connection_mode VARCHAR(32) DEFAULT 'ssh',
+    connection_protocol VARCHAR(32) DEFAULT 'ssh',
+    ssh_host VARCHAR(64),
+    ssh_port INT DEFAULT 22,
+    ssh_username VARCHAR(64) DEFAULT 'admin',
+    ssh_password VARCHAR(128),
+    enable_password VARCHAR(128),
+    connection_data JSONB DEFAULT '{}'::jsonb,
+    ports JSONB DEFAULT '[]'::jsonb,
+    is_online BOOLEAN DEFAULT TRUE,
+    latency_ms FLOAT DEFAULT 1.5,
+    mac_address VARCHAR(32),
+    serial_number VARCHAR(64),
+    uptime_str VARCHAR(64),
+    last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_devices_ip ON devices(ip);
+CREATE INDEX IF NOT EXISTS idx_devices_platform ON devices(platform);
+
+-- 5. Device Groups (E.g. Core, Helpdesk, Branch)
+CREATE TABLE IF NOT EXISTS device_groups (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    color VARCHAR(32) DEFAULT 'indigo',
+    icon VARCHAR(64) DEFAULT 'Server',
+    device_ids JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Custom Schematic & Physical Maps
+CREATE TABLE IF NOT EXISTS custom_maps (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    map_type VARCHAR(32) DEFAULT 'schematic',
+    building_id VARCHAR(64),
+    floor_id VARCHAR(64),
+    unit_id VARCHAR(64),
+    rack_id VARCHAR(64),
+    nodes JSONB DEFAULT '[]'::jsonb,
+    connections JSONB DEFAULT '[]'::jsonb,
+    viewport JSONB DEFAULT '{"zoom": 1, "pan": {"x": 0, "y": 0}}'::jsonb,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    visibility VARCHAR(32) DEFAULT 'public', -- 'public' | 'private' | 'restricted'
+    owner_id VARCHAR(64) DEFAULT 'user-admin',
+    owner_name VARCHAR(128) DEFAULT 'admin',
+    allowed_users JSONB DEFAULT '[]'::jsonb,
+    map_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ensure migration for custom_maps existing columns
+DO $$ BEGIN
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS map_type VARCHAR(32) DEFAULT 'schematic';
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS building_id VARCHAR(64);
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS floor_id VARCHAR(64);
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS unit_id VARCHAR(64);
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS rack_id VARCHAR(64);
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS nodes JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS connections JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS viewport JSONB DEFAULT '{"zoom": 1, "pan": {"x": 0, "y": 0}}'::jsonb;
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'public';
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS owner_id VARCHAR(64) DEFAULT 'user-admin';
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS owner_name VARCHAR(128) DEFAULT 'admin';
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS allowed_users JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS map_data JSONB DEFAULT '{}'::jsonb;
+    ALTER TABLE custom_maps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;
+
+-- 7. Topology Structural Hierarchy (Buildings, Floors, Units, Racks)
+CREATE TABLE IF NOT EXISTS topology_hierarchy (
+    id VARCHAR(64) PRIMARY KEY,
+    type VARCHAR(32) NOT NULL, -- 'building' | 'floor' | 'unit' | 'rack'
+    parent_id VARCHAR(64),
+    name VARCHAR(128) NOT NULL,
+    description TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_hierarchy_type ON topology_hierarchy(type);
+CREATE INDEX IF NOT EXISTS idx_hierarchy_parent ON topology_hierarchy(parent_id);
+
+-- 8. Node Positions on Canvas
+CREATE TABLE IF NOT EXISTS node_positions (
+    map_id VARCHAR(64) NOT NULL DEFAULT 'default',
+    node_id VARCHAR(64) NOT NULL,
+    x FLOAT NOT NULL,
+    y FLOAT NOT NULL,
+    PRIMARY KEY (map_id, node_id)
+);
+
+-- 9. Comprehensive Audit, Security, & Command Logs
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id VARCHAR(64) PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    user_name VARCHAR(64) NOT NULL,
+    action VARCHAR(128) NOT NULL,
+    category VARCHAR(64) DEFAULT 'security',
+    target VARCHAR(128),
+    status VARCHAR(32) DEFAULT 'success', -- 'success' | 'warning' | 'error' | 'info'
+    details TEXT,
+    ip_address VARCHAR(64),
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_name);
+
+-- 10. Active Directory Configuration
+CREATE TABLE IF NOT EXISTS ad_config (
+    id VARCHAR(32) PRIMARY KEY DEFAULT 'primary',
+    config_data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 11. User Auth Sessions & Revocation Tokens
+CREATE TABLE IF NOT EXISTS sessions (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) UNIQUE NOT NULL,
+    ip_address VARCHAR(64),
+    user_agent TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);

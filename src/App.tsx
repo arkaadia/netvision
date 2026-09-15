@@ -1,0 +1,1036 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Navbar, ThemeType } from './components/Navbar';
+import { Sidebar, ActiveTab } from './components/Sidebar';
+import { DashboardView } from './components/DashboardView';
+import { DeviceListView } from './components/DeviceListView';
+import { SchematicTopologyView } from './components/SchematicTopologyView';
+import { PortManagementView } from './components/PortManagementView';
+import { CdpLldpScannerView } from './components/CdpLldpScannerView';
+import { TemplateManagementView } from './components/TemplateManagementView';
+import { AddDeviceModal } from './components/AddDeviceModal';
+import { EditDeviceModal } from './components/EditDeviceModal';
+import { PortInspectorModal } from './components/PortInspectorModal';
+import { CiscoTerminalModal } from './components/CiscoTerminalModal';
+import { MikroTikTerminalModal } from './components/MikroTikTerminalModal';
+import { MikroTikDeviceManageModal } from './components/MikroTikDeviceManageModal';
+import { MultiTerminalWorkspace } from './components/terminal/MultiTerminalWorkspace';
+import { ApplyTemplateModal } from './components/ApplyTemplateModal';
+import { ReleaseNotesModal } from './components/ReleaseNotesModal';
+import { SettingsView } from './components/settings/SettingsView';
+import { AuditLogsView } from './components/logs/AuditLogsView';
+import { NetworkToolsMenu } from './components/tools/NetworkToolsMenu';
+import { ToolsDock, StandardModalId, MinimizedStandardModal } from './components/tools/ToolsDock';
+import { NetworkToolId, ActiveToolState } from './components/tools/types';
+import { IpSubnetModal } from './components/tools/IpSubnetModal';
+import { PasswordGeneratorModal } from './components/tools/PasswordGeneratorModal';
+import { PortScannerModal } from './components/tools/PortScannerModal';
+import { DnsUtilitiesModal } from './components/tools/DnsUtilitiesModal';
+import { TracerouteModal } from './components/tools/TracerouteModal';
+import { CertLookupModal } from './components/tools/CertLookupModal';
+import { HeaderAnalyzerModal } from './components/tools/HeaderAnalyzerModal';
+import { UpsCalculatorModal } from './components/tools/UpsCalculatorModal';
+import { HostCheckerModal } from './components/tools/HostCheckerModal';
+import { Wrench, ChevronUp } from 'lucide-react';
+import { APP_VERSION } from './version';
+import { Device, TopologyData, isMikroTikDevice } from './types';
+import {
+  fetchDevices,
+  fetchTopology,
+  addDevice,
+  updateDevice,
+  deleteDevice,
+  pingAllDevices,
+  pingDevice,
+  runCdpLldpScan,
+  resetDemoData,
+  writeMemory
+} from './services/api';
+import {
+  logDeviceAddition,
+  logDeviceDeletion,
+  logDeviceUpdate,
+  logDeviceCommand
+} from './services/auditLogger';
+import { useLanguage } from './i18n';
+import { useAuth } from './context/AuthContext';
+import { LoginPage } from './components/login/LoginPage';
+import { NetworkSocketLoader } from './components/common/NetworkSocketLoader';
+
+export default function App() {
+  const { t, isRtl, isEn } = useLanguage();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [topology, setTopology] = useState<TopologyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 5000);
+  }, []);
+
+  // Theme State (Default to obsidian cyber spatial glass)
+  const [panelTheme, setPanelTheme] = useState<ThemeType>(() => {
+    const saved = (localStorage.getItem('panel_theme') as ThemeType) || 'obsidian';
+    if (typeof document !== 'undefined') {
+      if (saved === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      }
+    }
+    return saved;
+  });
+
+  const changeTheme = (newTheme: ThemeType) => {
+    setPanelTheme(newTheme);
+    localStorage.setItem('panel_theme', newTheme);
+    localStorage.setItem('theme_mode', newTheme === 'light' ? 'light' : 'dark');
+    if (typeof document !== 'undefined') {
+      if (newTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      }
+    }
+  };
+
+  // Collapsible sidebar state with local storage persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [portInspectorDevice, setPortInspectorDevice] = useState<Device | null>(null);
+  const [activeTerminals, setActiveTerminals] = useState<(Device | null)[]>([]);
+  const [applyTemplateDevice, setApplyTemplateDevice] = useState<Device | null>(null);
+  const [applyPreselectedTemplateId, setApplyPreselectedTemplateId] = useState<string | undefined>(undefined);
+  const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
+
+  // Network Tools Suite State
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const [activeTools, setActiveTools] = useState<ActiveToolState[]>([]);
+
+  const handleOpenTool = (id: NetworkToolId) => {
+    setActiveTools((prev) => {
+      const existing = prev.find((t) => t.id === id);
+      if (existing) {
+        return prev.map((t) => (t.id === id ? { ...t, isMinimized: false } : t));
+      }
+      const labelMap: Record<NetworkToolId, { en: string; fa: string; badge?: string }> = {
+        ip_subnetting: { en: 'IP Subnetting', fa: 'ساب‌نتینگ آی‌پی', badge: 'IPv4/v6' },
+        password_gen: { en: 'Password Gen', fa: 'تولید پسورد', badge: 'Crypto' },
+        port_scanner: { en: 'Port Scanner', fa: 'اسکنر پورت', badge: 'TCP' },
+        net_utils: { en: 'DNS & Ping', fa: 'ابزارهای DNS و پینگ', badge: 'DNS' },
+        trace_tools: { en: 'Traceroute', fa: 'ردیابی مسیر', badge: 'Trace' },
+        cert_lookup: { en: 'SSL Inspector', fa: 'بررسی گواهی', badge: 'TLS' },
+        header_analyzer: { en: 'Header Analyzer', fa: 'تحلیل هدرها', badge: 'HTTP' },
+        ups_calculator: { en: 'UPS & Battery Sizing', fa: 'محاسبه‌گر باتری یوپی‌اس', badge: 'Power' },
+        host_checker: { en: 'Global Host Checker', fa: 'هاست چکر بین‌المللی', badge: 'Multi-Country' }
+      };
+      const meta = labelMap[id];
+      return [
+        ...prev,
+        {
+          id,
+          isMinimized: false,
+          labelEn: meta.en,
+          labelFa: meta.fa,
+          badge: meta.badge
+        }
+      ];
+    });
+  };
+
+  const handleMinimizeTool = (id: NetworkToolId) => {
+    setActiveTools((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, isMinimized: true } : t))
+    );
+  };
+
+  const handleCloseTool = (id: NetworkToolId) => {
+    setActiveTools((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const isToolOpen = (id: NetworkToolId) => {
+    const tool = activeTools.find((t) => t.id === id);
+    return !!tool && !tool.isMinimized;
+  };
+
+  // Standard Modals Minimized State
+  const [minimizedModals, setMinimizedModals] = useState<MinimizedStandardModal[]>([]);
+  const [attentionModalId, setAttentionModalId] = useState<string | null>(null);
+  const attentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerDockAttention = useCallback((modalId: string, messageEn: string, messageFa: string) => {
+    setAttentionModalId(modalId);
+    showToast(isEn ? messageEn : messageFa);
+    if (attentionTimerRef.current) {
+      clearTimeout(attentionTimerRef.current);
+    }
+    attentionTimerRef.current = setTimeout(() => {
+      setAttentionModalId(null);
+    }, 4500);
+  }, [isEn, showToast]);
+
+  const handleClearAttention = useCallback(() => {
+    setAttentionModalId(null);
+    if (attentionTimerRef.current) {
+      clearTimeout(attentionTimerRef.current);
+    }
+  }, []);
+
+  const handleMinimizeStandardModal = (modal: MinimizedStandardModal) => {
+    setMinimizedModals((prev) => {
+      if (prev.some((m) => m.id === modal.id)) return prev;
+      return [...prev, modal];
+    });
+  };
+
+  const handleRestoreStandardModal = (id: StandardModalId) => {
+    setMinimizedModals((prev) => prev.filter((m) => m.id !== id));
+    if (id === 'add_device') setIsAddModalOpen(true);
+    if (id === 'release_notes') setIsReleaseNotesOpen(true);
+    handleClearAttention();
+  };
+
+  const handleCloseStandardModal = (id: StandardModalId) => {
+    setMinimizedModals((prev) => prev.filter((m) => m.id !== id));
+    if (id === 'add_device') setIsAddModalOpen(false);
+    if (id === 'edit_device') setEditingDevice(null);
+    if (id === 'port_inspector') setPortInspectorDevice(null);
+    if (id === 'terminal') setActiveTerminals([]);
+    if (id === 'apply_template') {
+      setApplyTemplateDevice(null);
+      setApplyPreselectedTemplateId(undefined);
+    }
+    if (id === 'release_notes') setIsReleaseNotesOpen(false);
+    handleClearAttention();
+  };
+
+  const handleCloseAllMinimized = useCallback(() => {
+    setMinimizedModals([]);
+    setActiveTools((prev) => prev.filter((t) => !t.isMinimized));
+    setIsAddModalOpen(false);
+    setEditingDevice(null);
+    setPortInspectorDevice(null);
+    setActiveTerminals([]);
+    setApplyTemplateDevice(null);
+    setApplyPreselectedTemplateId(undefined);
+    setIsReleaseNotesOpen(false);
+    handleClearAttention();
+  }, [handleClearAttention]);
+
+  const handleRestoreAllMinimized = useCallback(() => {
+    const modalIds = minimizedModals.map((m) => m.id);
+    setMinimizedModals([]);
+    if (modalIds.includes('add_device')) setIsAddModalOpen(true);
+    if (modalIds.includes('release_notes')) setIsReleaseNotesOpen(true);
+    setActiveTools((prev) => prev.map((t) => ({ ...t, isMinimized: false })));
+    handleClearAttention();
+  }, [minimizedModals, handleClearAttention]);
+
+  const isModalMinimized = useCallback(
+    (id: StandardModalId) => minimizedModals.some((m) => m.id === id),
+    [minimizedModals]
+  );
+
+  // Safe Modal Opening Handlers with Attention Trigger when modal already exists (Issue 5)
+  const handleOpenAddModal = useCallback(() => {
+    if (isModalMinimized('add_device')) {
+      triggerDockAttention(
+        'add_device',
+        'Add Device window is already minimized in the dock. Click to restore.',
+        'پنجره افزودن تجهیز در نوار پایین باز است. جهت بازگشت روی آن کلیک کنید.'
+      );
+      return;
+    }
+    setIsAddModalOpen(true);
+  }, [isModalMinimized, triggerDockAttention]);
+
+  const handleOpenEditDevice = useCallback((dev: Device) => {
+    if (isModalMinimized('edit_device')) {
+      const name = editingDevice?.name || (isEn ? 'Device' : 'تجهیز');
+      triggerDockAttention(
+        'edit_device',
+        `Edit modal for ${name} is already open in the dock.`,
+        `پنجره ویرایش برای ${name} در نوار پایین باز است.`
+      );
+      return;
+    }
+    setEditingDevice(dev);
+  }, [isModalMinimized, editingDevice, isEn, triggerDockAttention]);
+
+  const handleInspectPorts = useCallback((dev: Device) => {
+    if (isModalMinimized('port_inspector')) {
+      const currentName = portInspectorDevice ? portInspectorDevice.name : (isEn ? 'Device' : 'تجهیز');
+      triggerDockAttention(
+        'port_inspector',
+        `Port Inspector for ${currentName} is already minimized in the dock. Click to restore or close it.`,
+        `پنجره مدیریت پورت (${currentName}) در نوار پایین باز است. لطفاً ابتدا روی آن کلیک کنید یا آن را ببندید.`
+      );
+      return;
+    }
+    setPortInspectorDevice(dev);
+  }, [isModalMinimized, portInspectorDevice, isEn, triggerDockAttention]);
+
+  const openTerminal = useCallback((dev: Device | null) => {
+    if (!dev) {
+      setActiveTerminals([]);
+      return;
+    }
+    if (isModalMinimized('terminal')) {
+      triggerDockAttention(
+        'terminal',
+        'A Terminal workspace is already minimized in the dock. Click to restore or close it.',
+        'محیط ترمینال در نوار پایین باز است. لطفاً ابتدا روی آن کلیک کنید یا آن را ببندید.'
+      );
+      return;
+    }
+    setActiveTerminals([dev]);
+  }, [isModalMinimized, triggerDockAttention]);
+
+  const handleOpenApplyTemplate = useCallback((dev: Device, templateId?: string) => {
+    if (isModalMinimized('apply_template')) {
+      triggerDockAttention(
+        'apply_template',
+        'Apply Template modal is already open in the dock.',
+        'پنجره اعمال تمپلت در نوار پایین باز است.'
+      );
+      return;
+    }
+    setApplyTemplateDevice(dev);
+    setApplyPreselectedTemplateId(templateId);
+  }, [isModalMinimized, triggerDockAttention]);
+
+  const handleOpenReleaseNotes = useCallback(() => {
+    if (isModalMinimized('release_notes')) {
+      triggerDockAttention(
+        'release_notes',
+        'Release Notes modal is already open in the dock.',
+        'پنجره گزارش تغییرات در نوار پایین باز است.'
+      );
+      return;
+    }
+    setIsReleaseNotesOpen(true);
+  }, [isModalMinimized, triggerDockAttention]);
+
+  // Fullscreen Topology Mode (Hides Navbar header, sidebar, and footer for 100% canvas view)
+  const [isTopologyFullscreen, setIsTopologyFullscreen] = useState(false);
+
+  const toggleTopologyFullscreen = useCallback(() => {
+    setIsTopologyFullscreen((prev) => {
+      const next = !prev;
+      if (next) {
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  // Listen for Escape key and browser fullscreen changes
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isTopologyFullscreen) {
+        setIsTopologyFullscreen(false);
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isTopologyFullscreen) {
+        setIsTopologyFullscreen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [isTopologyFullscreen]);
+
+  // Initial load
+  const loadData = useCallback(async () => {
+    try {
+      const [devRes, topoRes] = await Promise.all([
+        fetchDevices(),
+        fetchTopology(),
+      ]);
+      setDevices(devRes.devices);
+      setTopology(topoRes);
+    } catch (err) {
+      console.error('Failed to load initial data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Periodic reachability polling every 30s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      refreshStatusesQuietly();
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const refreshStatusesQuietly = async () => {
+    try {
+      const devRes = await fetchDevices();
+      setDevices(devRes.devices);
+    } catch (e) {
+      // Quiet fail on periodic ping
+    }
+  };
+
+  // Full manual refresh
+  const handleRefreshAll = async () => {
+    try {
+      setIsRefreshing(true);
+      await pingAllDevices();
+      await loadData();
+      showToast(t('toast_refresh_success'));
+    } catch (err: any) {
+      showToast(t('toast_refresh_error', { error: err.message }));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Ping single device
+  const handlePingDevice = async (id: string) => {
+    try {
+      const res = await pingDevice(id);
+      setDevices((prev) => prev.map((d) => (d.id === id ? res.device : d)));
+      const statusLabel = res.device.is_online ? (isEn ? 'Online' : 'آنلاین') : (isEn ? 'Offline' : 'آفلاین');
+      showToast(
+        t('toast_ping_result', {
+          name: res.device.name,
+          status: statusLabel,
+          latency: res.device.latency_ms ?? 0,
+        })
+      );
+    } catch (err: any) {
+      showToast(t('toast_ping_error', { error: err.message }));
+    }
+  };
+
+  // Run CDP/LLDP scan
+  const handleRunScan = async () => {
+    try {
+      setIsScanning(true);
+      const res = await runCdpLldpScan();
+      await loadData();
+      showToast(isEn ? ((res as any).message_en || t('toast_scan_done')) : (res.message || t('toast_scan_done')));
+    } catch (err: any) {
+      showToast(t('toast_scan_error', { error: err.message }));
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Add new device
+  const handleAddDevice = async (newDev: Partial<Device>) => {
+    const res = await addDevice(newDev);
+    await loadData();
+    if (res.device) {
+      logDeviceAddition(res.device);
+    }
+    showToast(t('toast_device_added', { name: newDev.name || '' }));
+    return res.device;
+  };
+
+  // Update existing device
+  const handleUpdateDevice = async (id: string, updates: Partial<Device>) => {
+    try {
+      const oldDev = devices.find((d) => d.id === id);
+      const res = await updateDevice(id, updates);
+      await loadData();
+      if (res.device) {
+        logDeviceUpdate(id, oldDev, res.device);
+      }
+      showToast(isEn ? `Device "${res.device.name}" updated successfully.` : `مشخصات تجهیز «${res.device.name}» با موفقیت ویرایش و ذخیره شد.`);
+      return res.device;
+    } catch (err: any) {
+      showToast(isEn ? `Error updating device: ${err.message}` : `خطا در به‌روزرسانی مشخصات تجهیز: ${err.message}`);
+      throw err;
+    }
+  };
+
+  // Delete device
+  const handleDeleteDevice = async (id: string) => {
+    try {
+      const targetDev = devices.find((d) => d.id === id);
+      if (targetDev) {
+        logDeviceDeletion(targetDev);
+      }
+      await deleteDevice(id);
+      await loadData();
+      showToast(t('toast_device_deleted'));
+    } catch (err: any) {
+      showToast(t('toast_device_delete_error', { error: err.message }));
+    }
+  };
+
+  // Reset to corporate seed
+  const handleResetDemo = async () => {
+    if (window.confirm(t('toast_reset_confirm'))) {
+      try {
+        await resetDemoData();
+        await loadData();
+        showToast(t('toast_reset_done'));
+      } catch (err: any) {
+        showToast(t('toast_reset_error', { error: err.message }));
+      }
+    }
+  };
+
+  // Write running-config to startup-config (NVRAM)
+  const handleWriteMemory = async (deviceId: string) => {
+    try {
+      const dev = devices.find((d) => d.id === deviceId);
+      const res = await writeMemory(deviceId);
+      await loadData();
+      if (dev) {
+        logDeviceCommand({
+          deviceId: dev.id,
+          deviceName: dev.name,
+          deviceIp: dev.ip,
+          deviceVendor: dev.model.toLowerCase().includes('mikrotik') ? 'mikrotik' : 'cisco',
+          deviceModel: dev.model,
+          deviceLocation: [dev.building, dev.floor, dev.unit, dev.rack ? `رک ${dev.rack}` : ''].filter(Boolean).join(' > '),
+          channel: 'port_context_menu',
+          command: 'write memory',
+          riskLevel: 'medium',
+          status: 'success',
+          outputSummary: 'Building configuration...\n[OK]',
+          notes: 'ذخیره Running-Config در Startup-Config از طریق کنترل پنل پورتال',
+        });
+      }
+      showToast(isEn ? ((res as any).message_en || t('toast_write_mem_success')) : (res.message || t('toast_write_mem_success')));
+    } catch (err: any) {
+      showToast(t('toast_write_mem_error', { error: err.message }));
+    }
+  };
+
+  const onlineCount = devices.filter((d) => d.is_online).length;
+  const offlineCount = devices.filter((d) => !d.is_online).length;
+
+  if (isAuthLoading) {
+    return (
+      <div className="h-screen w-screen bg-[#060911] flex flex-col items-center justify-center text-slate-300 font-sans select-none overflow-hidden">
+        <NetworkSocketLoader
+          isEn={isEn}
+          message={isEn ? 'Loading Page...' : 'در حال بارگذاری صفحه...'}
+          subMessage={isEn ? 'Please wait, checking session and loading workspace' : 'لطفاً شکیبا باشید، در حال بررسی نشست و بارگذاری سامانه'}
+        />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage currentTheme={panelTheme} onThemeChange={changeTheme} />;
+  }
+
+  return (
+    <div
+      className={`h-screen min-h-screen max-h-screen relative flex flex-col justify-between theme-${panelTheme} ${
+        isRtl ? 'dir-rtl text-right' : 'dir-ltr text-left'
+      } font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-300 overflow-hidden`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      {/* Dynamic Ambient Glow Background */}
+      <div className="ambient-glow-background" />
+
+      {/* Navbar Header (Hidden in Full Mode) */}
+      {!isTopologyFullscreen && (
+        <Navbar
+          onRefreshAll={handleRefreshAll}
+          isRefreshing={isRefreshing}
+          onQuickScan={handleRunScan}
+          isScanning={isScanning}
+          onResetDemo={handleResetDemo}
+          onlineCount={onlineCount}
+          totalDevices={devices.length}
+          panelTheme={panelTheme}
+          onChangeTheme={changeTheme}
+          onOpenReleaseNotes={handleOpenReleaseNotes}
+          onOpenSettings={() => setActiveTab('settings')}
+        />
+      )}
+
+      {/* Main Layout (Sidebar + Content View) */}
+      <div className={`flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0 ${isTopologyFullscreen ? 'z-50 h-full w-full p-0 m-0' : 'z-10'}`}>
+        {/* Sidebar (Hidden in Full Mode) */}
+        {!isTopologyFullscreen && (
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={(tab) => {
+              setIsTopologyFullscreen(false);
+              setActiveTab(tab);
+            }}
+            devicesCount={devices.length}
+            offlineCount={offlineCount}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={toggleSidebarCollapse}
+            onOpenReleaseNotes={handleOpenReleaseNotes}
+          />
+        )}
+
+        {/* View Port */}
+        <main className={`flex-1 min-h-0 min-w-0 ${isTopologyFullscreen ? 'overflow-hidden h-full w-full p-0 m-0' : 'overflow-y-auto'}`}>
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              devices={devices}
+              topology={topology}
+              onNavigate={(tab) => setActiveTab(tab)}
+              onOpenAddModal={handleOpenAddModal}
+              onScanCdpLldp={handleRunScan}
+              isScanning={isScanning}
+              onInspectPorts={handleInspectPorts}
+              onRefreshAll={handleRefreshAll}
+              isRefreshing={isRefreshing}
+            />
+          )}
+
+          {activeTab === 'devices' && (
+            <DeviceListView
+              devices={devices}
+              onOpenAddModal={handleOpenAddModal}
+              onPingDevice={handlePingDevice}
+              onDeleteDevice={handleDeleteDevice}
+              onEditDevice={handleOpenEditDevice}
+              onInspectPorts={handleInspectPorts}
+              onConnectTerminal={openTerminal}
+              onApplyTemplate={handleOpenApplyTemplate}
+              onWriteMemory={handleWriteMemory}
+              onRefreshAll={handleRefreshAll}
+              isRefreshing={isRefreshing}
+            />
+          )}
+
+          {activeTab === 'templates' && (
+            <TemplateManagementView
+              devices={devices}
+              onDeviceUpdated={loadData}
+              onOpenTerminal={openTerminal}
+            />
+          )}
+
+          {activeTab === 'schematic' && (
+            <SchematicTopologyView
+              topology={topology}
+              inventoryDevices={devices}
+              loading={loading}
+              onRefresh={loadData}
+              onScanCdpLldp={handleRunScan}
+              isScanning={isScanning}
+              onInspectDevice={handleInspectPorts}
+              onInspectPorts={handleInspectPorts}
+              onConnectTerminal={openTerminal}
+              isFullMode={isTopologyFullscreen}
+              onToggleFullMode={toggleTopologyFullscreen}
+              panelTheme={panelTheme}
+            />
+          )}
+
+          {activeTab === 'ports' && <PortManagementView devices={devices} />}
+
+          {activeTab === 'scanner' && (
+            <CdpLldpScannerView onNavigateToTopology={() => setActiveTab('schematic')} />
+          )}
+
+          {activeTab === 'logs' && <AuditLogsView />}
+
+          {(activeTab === 'settings' ||
+            activeTab === 'settings-groups' ||
+            activeTab === 'settings-users' ||
+            activeTab === 'settings-ad' ||
+            activeTab === 'settings-rbac' ||
+            activeTab === 'settings-backup') && (
+            <SettingsView
+              devices={devices}
+              activeSubTab={
+                activeTab === 'settings-users'
+                  ? 'users'
+                  : activeTab === 'settings-ad'
+                  ? 'ad'
+                  : activeTab === 'settings-rbac'
+                  ? 'rbac'
+                  : activeTab === 'settings-backup'
+                  ? 'backup'
+                  : 'groups'
+              }
+              onSelectSubTab={(sub) => {
+                setActiveTab(
+                  sub === 'users'
+                    ? 'settings-users'
+                    : sub === 'ad'
+                    ? 'settings-ad'
+                    : sub === 'rbac'
+                    ? 'settings-rbac'
+                    : sub === 'backup'
+                    ? 'settings-backup'
+                    : 'settings-groups'
+                );
+              }}
+              onRefreshAllData={loadData}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* High Density Cyber Spatial Footer Status Bar (Hidden in Full Mode) */}
+      {!isTopologyFullscreen && (
+        <footer className="h-8 spatial-glass text-slate-300 flex items-center px-4 lg:px-6 shrink-0 justify-between text-[11px] border-t border-white/10 select-none relative z-[1200] backdrop-blur-xl">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"></span>
+              {t('footer_network_status')} <b className="text-emerald-400 font-mono font-bold">{t('footer_status_nominal')}</b>
+            </span>
+            <span className="hidden sm:inline text-slate-400">
+              {t('footer_core_latency')} <b className="text-cyan-400 font-mono">1.2ms</b>
+            </span>
+            <span>
+              {t('footer_connected_devices')} <b className="text-indigo-400 font-mono font-bold">{onlineCount}</b>/{devices.length}
+            </span>
+            <span className="hidden md:inline text-slate-400">
+              {t('footer_neighbor_engine')} <b className="text-purple-400 font-mono">CDP v2 / LLDP Matrix</b>
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Tools Menu Button */}
+            <div className="relative">
+              <button
+                id="footer-tools-menu-button"
+                onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
+                className={`px-2 py-0.5 rounded flex items-center gap-1.5 font-mono text-[11px] transition cursor-pointer border ${
+                  isToolsMenuOpen
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-cyan-300 border-white/10'
+                }`}
+                title={isEn ? 'Network Engineering Tools Suite' : 'مجموعه ابزارهای کمکی شبکه'}
+              >
+                <Wrench className="w-3 h-3 text-cyan-400" />
+                <span className="font-bold tracking-wide">tools</span>
+                <ChevronUp className={`w-3 h-3 transition-transform duration-200 ${isToolsMenuOpen ? 'rotate-180 text-cyan-300' : 'text-slate-400'}`} />
+              </button>
+
+              <NetworkToolsMenu
+                isOpen={isToolsMenuOpen}
+                onClose={() => setIsToolsMenuOpen(false)}
+                onSelectTool={handleOpenTool}
+                isEn={isEn}
+                isLightMode={panelTheme === 'light'}
+              />
+            </div>
+
+            <button
+              onClick={() => setIsReleaseNotesOpen(true)}
+              className="font-mono text-slate-400 hover:text-cyan-300 text-[10px] hidden sm:flex items-center gap-1.5 transition cursor-pointer"
+              title={t('footer_view_release')}
+            >
+              <span>NetTopology OS</span>
+              <span className="text-cyan-400 font-bold bg-white/5 hover:bg-white/10 px-1.5 py-0.2 rounded border border-white/10">
+                v{APP_VERSION}
+              </span>
+            </button>
+          </div>
+        </footer>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className={`fixed bottom-10 ${isRtl ? 'left-6' : 'right-6'} z-50 spatial-glass border border-indigo-500/50 text-indigo-100 px-4 py-2.5 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.4)] text-xs flex items-center gap-3 backdrop-blur-2xl animate-fadeIn`}>
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white mr-2 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Add Device Modal */}
+      <AddDeviceModal
+        isOpen={isAddModalOpen && !isModalMinimized('add_device')}
+        onClose={() => handleCloseStandardModal('add_device')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'add_device',
+            labelEn: 'Add Device',
+            labelFa: 'افزودن تجهیز جدید',
+            badge: 'Hardware',
+            category: 'device',
+          })
+        }
+        onAdd={handleAddDevice}
+        onDeviceCreatedWithTemplate={(createdDevice, templateId) => {
+          setApplyTemplateDevice(createdDevice);
+          setApplyPreselectedTemplateId(templateId);
+        }}
+      />
+
+      {/* Edit Device Modal */}
+      {editingDevice && (
+        <EditDeviceModal
+          isOpen={!!editingDevice && !isModalMinimized('edit_device')}
+          device={editingDevice}
+          onClose={() => handleCloseStandardModal('edit_device')}
+          onMinimize={() =>
+            handleMinimizeStandardModal({
+              id: 'edit_device',
+              labelEn: `Edit ${editingDevice.name}`,
+              labelFa: `ویرایش ${editingDevice.name}`,
+              badge: editingDevice.ip || 'Config',
+              category: 'device',
+            })
+          }
+          onSave={async (deviceId, updates) => {
+            await handleUpdateDevice(deviceId, updates);
+            setEditingDevice(null);
+          }}
+        />
+      )}
+
+      {/* Apply Template Interactive Modal */}
+      <ApplyTemplateModal
+        isOpen={!!applyTemplateDevice && !isModalMinimized('apply_template')}
+        onClose={() => handleCloseStandardModal('apply_template')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'apply_template',
+            labelEn: applyTemplateDevice ? `Template (${applyTemplateDevice.name})` : 'Apply Template',
+            labelFa: applyTemplateDevice ? `تمپلت (${applyTemplateDevice.name})` : 'اعمال تمپلت',
+            badge: 'CLI',
+            category: 'config',
+          })
+        }
+        targetDevice={applyTemplateDevice}
+        allDevices={devices}
+        preselectedTemplateId={applyPreselectedTemplateId}
+        onApplied={(updatedDevice) => {
+          loadData();
+          showToast(t('toast_template_applied', { name: updatedDevice.name }));
+        }}
+      />
+
+      {/* Port Inspector Modal (Cisco & Generic devices) */}
+      <PortInspectorModal
+        device={portInspectorDevice}
+        isOpen={!!portInspectorDevice && !isMikroTikDevice(portInspectorDevice) && !isModalMinimized('port_inspector')}
+        onClose={() => handleCloseStandardModal('port_inspector')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'port_inspector',
+            labelEn: portInspectorDevice ? `Ports (${portInspectorDevice.name})` : 'Port Inspector',
+            labelFa: portInspectorDevice ? `پورت‌های ${portInspectorDevice.name}` : 'مدیریت پورت‌ها',
+            badge: portInspectorDevice?.ip || 'Ports',
+            category: 'device',
+          })
+        }
+        onPortUpdated={loadData}
+        onConnectTerminal={(dev) => openTerminal(dev)}
+        onWriteMemory={handleWriteMemory}
+      />
+
+      {/* MikroTik Device & Port Inspector Modal */}
+      <MikroTikDeviceManageModal
+        device={portInspectorDevice}
+        isOpen={!!portInspectorDevice && isMikroTikDevice(portInspectorDevice) && !isModalMinimized('port_inspector')}
+        onClose={() => handleCloseStandardModal('port_inspector')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'port_inspector',
+            labelEn: portInspectorDevice ? `RouterOS (${portInspectorDevice.name})` : 'RouterOS Port Inspector',
+            labelFa: portInspectorDevice ? `میکروتیک (${portInspectorDevice.name})` : 'مدیریت روتربورد',
+            badge: 'RouterOS',
+            category: 'device',
+          })
+        }
+        onPortUpdated={loadData}
+        onConnectTerminal={(dev) => openTerminal(dev)}
+        onDeviceUpdated={loadData}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* Multi-Terminal Workspace & Split CLI System (Cisco & MikroTik) */}
+      <MultiTerminalWorkspace
+        activeTerminalDevices={activeTerminals}
+        isOpen={activeTerminals.length > 0 && !isModalMinimized('terminal')}
+        onClose={() => handleCloseStandardModal('terminal')}
+        onMinimize={() => {
+          const firstDev = activeTerminals.find((d) => d !== null);
+          const devName = firstDev ? firstDev.name : 'Device';
+          handleMinimizeStandardModal({
+            id: 'terminal',
+            labelEn: activeTerminals.length > 1 ? `Terminal (${activeTerminals.length} panes)` : `CLI (${devName})`,
+            labelFa: activeTerminals.length > 1 ? `ترمینال (${activeTerminals.length} پنل)` : `ترمینال (${devName})`,
+            badge: firstDev?.ip || 'CLI',
+            category: 'terminal',
+          });
+        }}
+        onDevicesChange={setActiveTerminals}
+        allDevices={topology?.devices || devices}
+        onDeviceUpdated={loadData}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* Release Notes & Version History Modal */}
+      <ReleaseNotesModal
+        isOpen={isReleaseNotesOpen && !isModalMinimized('release_notes')}
+        onClose={() => handleCloseStandardModal('release_notes')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'release_notes',
+            labelEn: `Release Notes v${APP_VERSION}`,
+            labelFa: `گزارش تغییرات v${APP_VERSION}`,
+            badge: `v${APP_VERSION}`,
+            category: 'system',
+          })
+        }
+      />
+
+      {/* Minimized Tools & Modals Dock (Shows all minimized tool & modal pills at bottom) */}
+      <ToolsDock
+        activeTools={activeTools}
+        onRestoreTool={handleOpenTool}
+        onCloseTool={handleCloseTool}
+        minimizedModals={minimizedModals}
+        onRestoreModal={handleRestoreStandardModal}
+        onCloseModal={handleCloseStandardModal}
+        onRestoreAll={handleRestoreAllMinimized}
+        onCloseAll={handleCloseAllMinimized}
+        attentionModalId={attentionModalId}
+        onClearAttention={handleClearAttention}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+        isRtl={isRtl}
+      />
+
+      {/* 1. IP Subnetting & VLSM Calculator Modal */}
+      <IpSubnetModal
+        isOpen={isToolOpen('ip_subnetting')}
+        onClose={() => handleCloseTool('ip_subnetting')}
+        onMinimize={() => handleMinimizeTool('ip_subnetting')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 2. Device Password Generator Modal */}
+      <PasswordGeneratorModal
+        isOpen={isToolOpen('password_gen')}
+        onClose={() => handleCloseTool('password_gen')}
+        onMinimize={() => handleMinimizeTool('password_gen')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 3. TCP Port Scanner Modal */}
+      <PortScannerModal
+        isOpen={isToolOpen('port_scanner')}
+        onClose={() => handleCloseTool('port_scanner')}
+        onMinimize={() => handleMinimizeTool('port_scanner')}
+        allDevices={devices}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 4. DNS & Ping Utilities Modal */}
+      <DnsUtilitiesModal
+        isOpen={isToolOpen('net_utils')}
+        onClose={() => handleCloseTool('net_utils')}
+        onMinimize={() => handleMinimizeTool('net_utils')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 5. Traceroute & Hop Analysis Modal */}
+      <TracerouteModal
+        isOpen={isToolOpen('trace_tools')}
+        onClose={() => handleCloseTool('trace_tools')}
+        onMinimize={() => handleMinimizeTool('trace_tools')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 6. SSL / TLS Certificate Inspector Modal */}
+      <CertLookupModal
+        isOpen={isToolOpen('cert_lookup')}
+        onClose={() => handleCloseTool('cert_lookup')}
+        onMinimize={() => handleMinimizeTool('cert_lookup')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 7. HTTP Header & Security Analyzer Modal */}
+      <HeaderAnalyzerModal
+        isOpen={isToolOpen('header_analyzer')}
+        onClose={() => handleCloseTool('header_analyzer')}
+        onMinimize={() => handleMinimizeTool('header_analyzer')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* 8. UPS Capacity & Battery Bank Sizing Modal */}
+      <UpsCalculatorModal
+        isOpen={isToolOpen('ups_calculator')}
+        onClose={() => handleCloseTool('ups_calculator')}
+        onMinimize={() => handleMinimizeTool('ups_calculator')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+        devices={devices}
+      />
+
+      {/* 9. Global Host Checker Modal */}
+      <HostCheckerModal
+        isOpen={isToolOpen('host_checker')}
+        onClose={() => handleCloseTool('host_checker')}
+        onMinimize={() => handleMinimizeTool('host_checker')}
+        isEn={isEn}
+        isLightMode={panelTheme === 'light'}
+        devices={devices}
+      />
+    </div>
+  );
+}

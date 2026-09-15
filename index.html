@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NetTopology & Device Manager</title>
+    <meta name="description" content="پنل مدیریت تجهیزات شبکه، مانیتورینگ لحظه‌ای، اسکن همسایگی CDP/LLDP، نقشه شماتیک توپولوژی و بررسی وضعیت پورت‌ها و VLAN با بک‌اند پایتون" />
+    <meta property="og:title" content="NetTopology & Device Manager" />
+    <meta property="og:description" content="پنل مدیریت تجهیزات شبکه، مانیتورینگ لحظه‌ای، اسکن همسایگی CDP/LLDP، نقشه شماتیک توپولوژی و بررسی وضعیت پورت‌ها و VLAN با بک‌اند پایتون" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #060911;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif;
+      overflow: hidden;
+    }
+    #initial-loader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 45%, #0f172a 0%, #060911 75%);
+      z-index: 99999;
+      user-select: none;
+    }
+    .net-pulse-glow {
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.18) 0%, rgba(99, 102, 241, 0.05) 50%, transparent 70%);
+      animation: netPulseRing 2.2s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes netPulseRing {
+      0% { transform: scale(0.85); opacity: 0.3; }
+      50% { transform: scale(1.15); opacity: 0.8; }
+      100% { transform: scale(0.85); opacity: 0.3; }
+    }
+    /* Ethernet RJ45 Port Outer Shield */
+    .rj45-socket-casing {
+      position: relative;
+      width: 140px;
+      height: 120px;
+      background: linear-gradient(180deg, #334155 0%, #1e293b 45%, #0f172a 100%);
+      border-radius: 14px;
+      border: 1.5px solid #475569;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.85), inset 0 1px 1px rgba(255,255,255,0.25), 0 0 25px rgba(14,165,233,0.18);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      z-index: 2;
+    }
+    /* Port Header: LNK & ACT LEDs */
+    .rj45-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px 4px 4px;
+    }
+    .rj45-led-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .rj45-led-label {
+      font-size: 8px;
+      font-family: monospace;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .led-link {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 10px #10b981, 0 0 16px #34d399;
+      animation: linkGlow 2s infinite ease-in-out;
+    }
+    @keyframes linkGlow {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); filter: brightness(1.2); }
+    }
+    /* Blinking Data / Activity LED */
+    .led-act {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #f59e0b;
+      box-shadow: 0 0 12px #f59e0b, 0 0 20px #fbbf24;
+      animation: actDataBlink 0.75s steps(2, start) infinite;
+    }
+    @keyframes actDataBlink {
+      0%, 15%, 35%, 65%, 85% {
+        opacity: 1;
+        transform: scale(1.15);
+        box-shadow: 0 0 12px #f59e0b, 0 0 20px #fbbf24;
+      }
+      20%, 45%, 75%, 95% {
+        opacity: 0.2;
+        transform: scale(0.9);
+        box-shadow: none;
+      }
+    }
+    /* Receptacle Cavity */
+    .rj45-cavity {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      background: linear-gradient(180deg, #050811 0%, #0a0e1a 50%, #04060a 100%);
+      border-radius: 9px;
+      border: 1.5px solid #1e293b;
+      box-shadow: inset 0 4px 12px rgba(0,0,0,0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    /* Latch Notch */
+    .rj45-latch {
+      width: 44px;
+      height: 6px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      border-radius: 0 0 4px 4px;
+      margin-top: -6px;
+    }
+    /* 8 Gold Pins */
+    .rj45-pins {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 100%;
+      margin: auto 0;
+    }
+    .rj45-pin {
+      width: 4px;
+      height: 24px;
+      background: linear-gradient(180deg, #fef08a 0%, #f59e0b 60%, #b45309 100%);
+      border-radius: 1.5px;
+      box-shadow: 0 0 5px rgba(245, 158, 11, 0.65);
+      position: relative;
+    }
+    .rj45-pin::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: #ffffff;
+      opacity: 0.6;
+      border-radius: 1px;
+    }
+    /* Inner Data Rail */
+    .rj45-rails {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .rj45-rail-dot {
+      width: 6px;
+      height: 3px;
+      background: #334155;
+      border-radius: 1px;
+    }
+    .rj45-rail-line {
+      flex: 1;
+      height: 2px;
+      background: rgba(14, 165, 233, 0.3);
+      margin: 0 6px;
+      border-radius: 1px;
+      position: relative;
+      overflow: hidden;
+    }
+    .rj45-rail-line::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+      animation: dataStream 1.5s infinite linear;
+    }
+    @keyframes dataStream {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    /* Bottom Ground Clips */
+    .rj45-clips {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+      margin-bottom: -2px;
+    }
+    .rj45-clip {
+      width: 10px;
+      height: 2px;
+      background: #475569;
+      border-radius: 1px;
+    }
+    /* Text */
+    .net-title {
+      margin-top: 24px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #f1f5f9;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .net-status {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #94a3b8;
+      font-family: monospace;
+      letter-spacing: 0.3px;
+    }
+    .net-badge {
+      margin-top: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      font-size: 10px;
+      font-family: monospace;
+      color: #64748b;
+    }
+  </style>
+  <body>
+    <div id="root">
+      <div id="initial-loader">
+        <div class="net-pulse-glow"></div>
+        
+        <!-- Medium Sized Realistic Ethernet RJ45 Socket -->
+        <div class="rj45-socket-casing">
+          <!-- Port Header: LNK & ACT LEDs -->
+          <div class="rj45-header">
+            <div class="rj45-led-group">
+              <div class="led-link"></div>
+              <span class="rj45-led-label" style="color: #34d399;">LNK</span>
+            </div>
+            <span class="rj45-led-label" style="color: #64748b;">10G-PORT</span>
+            <div class="rj45-led-group">
+              <span class="rj45-led-label" style="color: #fbbf24;">ACT</span>
+              <div class="led-act"></div>
+            </div>
+          </div>
+
+          <!-- Socket Cavity -->
+          <div class="rj45-cavity">
+            <div class="rj45-latch"></div>
+
+            <!-- 8 Gold Pins -->
+            <div class="rj45-pins">
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+              <div class="rj45-pin"></div>
+            </div>
+
+            <!-- Inner Data Rail -->
+            <div class="rj45-rails">
+              <div class="rj45-rail-dot"></div>
+              <div class="rj45-rail-line"></div>
+              <div class="rj45-rail-dot"></div>
+            </div>
+          </div>
+
+          <!-- Metal Ground Clips -->
+          <div class="rj45-clips">
+            <div class="rj45-clip"></div>
+            <div class="rj45-clip"></div>
+          </div>
+        </div>
+
+        <div class="net-title" id="init-loader-title">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#38bdf8;"></span>
+          <span id="init-loader-title-text">Loading Page...</span>
+        </div>
+        <div class="net-status" id="init-loader-status">Please wait, loading system data and workspace...</div>
+        <div class="net-badge">
+          <span id="init-loader-phy" style="color:#10b981;">● PHY: 1000Base-T</span>
+          <span>|</span>
+          <span id="init-loader-tx" style="color:#f59e0b;">● Data Stream Active</span>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function() {
+        try {
+          var lang = localStorage.getItem('app_language') || localStorage.getItem('nettopology_lang') || 'en';
+          var isFa = (lang === 'fa');
+          var loaderEl = document.getElementById('initial-loader');
+          var titleEl = document.getElementById('init-loader-title-text');
+          var statusEl = document.getElementById('init-loader-status');
+          var phyEl = document.getElementById('init-loader-phy');
+          var txEl = document.getElementById('init-loader-tx');
+
+          if (isFa) {
+            if (loaderEl) loaderEl.setAttribute('dir', 'rtl');
+            if (titleEl) titleEl.textContent = 'در حال بارگذاری صفحه...';
+            if (statusEl) statusEl.textContent = 'لطفاً شکیبا باشید، در حال آماده‌سازی و دریافت اطلاعات سامانه...';
+            if (phyEl) phyEl.textContent = '● پورت: ۱۰۰۰Base-T';
+            if (txEl) txEl.textContent = '● جریان فعال داده';
+          } else {
+            if (loaderEl) loaderEl.setAttribute('dir', 'ltr');
+            if (titleEl) titleEl.textContent = 'Loading Page...';
+            if (statusEl) statusEl.textContent = 'Please wait, loading system data and workspace...';
+            if (phyEl) phyEl.textContent = '● PHY: 1000Base-T';
+            if (txEl) txEl.textContent = '● Data Stream Active';
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
