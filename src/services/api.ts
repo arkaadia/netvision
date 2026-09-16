@@ -516,6 +516,7 @@ export async function sshConnect(params: {
 }
 
 export async function sshExecute(params: {
+  deviceId?: string;
   host?: string;
   port?: number;
   username?: string;

@@ -90,15 +90,13 @@ class CiscoDriver(NetworkDeviceDriver):
     def get_interface_query_commands(self) -> List[str]:
         return [
             "terminal length 0",
-            "show interfaces status"
+            "show interfaces status",
+            "show ip interface brief"
         ]
 
     def parse_interfaces(self, raw_output: str) -> List[Dict[str, Any]]:
         """
-        Parses standard Cisco 'show interfaces status' output table:
-        Port      Name               Status       Vlan       Duplex  Speed Type
-        Gi1/0/1   Uplink-Core        connected    trunk        a-full a-1000 10/100/1000BaseTX
-        Gi1/0/2                      notconnect   10           auto   auto 10/100/1000BaseTX
+        Parses standard Cisco 'show interfaces status' output table or 'show ip interface brief'.
         """
         ports = []
         seen_ports = set()
@@ -175,6 +173,50 @@ class CiscoDriver(NetworkDeviceDriver):
                     "connected_device": desc or ("Active Link" if is_connected else "Disconnected"),
                     "connected_type": "Host" if is_connected else "None",
                     "type": port_type,
+                    "port_security_enabled": False,
+                })
+
+        if ports:
+            return ports
+
+        # Fallback: Parse 'show ip interface brief' table
+        for line in lines:
+            line_str = line.strip()
+            if not line_str or line_str.startswith("--") or "Interface" in line_str:
+                continue
+            m_ip = re.match(
+                r'^([A-Za-z0-9/._-]+)\s+(\S+)\s+(?:YES|NO)\s+\S+\s+(up|down|administratively down)\s+(up|down)$',
+                line_str,
+                re.IGNORECASE
+            )
+            if m_ip:
+                port_id = m_ip.group(1)
+                ip_addr = m_ip.group(2)
+                status_raw = m_ip.group(3).lower()
+                proto_raw = m_ip.group(4).lower()
+
+                canon_id = port_id.lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
+                if canon_id in seen_ports:
+                    continue
+                seen_ports.add(canon_id)
+
+                is_up = status_raw == "up" and proto_raw == "up"
+                is_admin_down = "down" in status_raw and "admin" in status_raw
+
+                ports.append({
+                    "port_id": port_id,
+                    "name": port_id,
+                    "description": f"IP: {ip_addr}" if ip_addr != "unassigned" else "",
+                    "status": "up" if is_up else "down",
+                    "admin_status": "disabled" if is_admin_down else "enabled",
+                    "mode": "routed" if ip_addr != "unassigned" else "access",
+                    "vlan": 1,
+                    "allowed_vlans": "1",
+                    "speed": "1 Gbps",
+                    "duplex": "Full",
+                    "connected_device": f"Link ({ip_addr})" if is_up else "Disconnected",
+                    "connected_type": "Router/L3" if is_up else "None",
+                    "type": "10/100/1000BaseTX",
                     "port_security_enabled": False,
                 })
 

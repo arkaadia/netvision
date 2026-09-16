@@ -10,9 +10,45 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.7';
+export const APP_VERSION = '1.61.9';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.9',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'رفع خطای ایمپورت در پکیج امنیتی پایتون و فعال‌سازی مجدد سرویس بک‌اند',
+    title_en: 'Fix Security Package Import Error and Restore Python Backend Service',
+    changes: [
+      'ایجاد فایل اولیه پکیج امنیتی backend/security/__init__.py جهت اکسپورت صحیح تابع decrypt_credential و توابع رمزنگاری اعتبارسنجی.',
+      'اصلاح ایمپورت‌های ماژول ssh_manager به صورت ماژولار و با فالبک چندگانه جهت جلوگیری از کرش سرویس پایتون در زمان راه‌اندازی.',
+      'رفع خطای اتصال پروکسی اکسپرس (ECONNREFUSED 127.0.0.1:5001) و بازیابی تبادل داده‌های اولیه JSON با فرانت‌اند.'
+    ],
+    changes_en: [
+      'Created package initialization file backend/security/__init__.py to properly export decrypt_credential and related credential cryptography utilities.',
+      'Added fallback imports for crypto utilities in ssh_manager to prevent Python server boot crashes.',
+      'Resolved Express API proxy connection error (ECONNREFUSED 127.0.0.1:5001) and restored initial JSON data loading in frontend.'
+    ]
+  },
+  {
+    version: '1.61.8',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'ارسال مستقیم و قطعی تمامی دستورات ترمینال به سوئیچ واقعی سیسکو و به‌روزرسانی زنده اینترفیس‌ها',
+    title_en: 'Direct Real Hardware Execution for Cisco Terminal Commands and Live Port Synchronization',
+    changes: [
+      'اصلاح خط لوله اجرای دستورات در ترمینال سیسکو به نحوی که تمامی دستورات بدون هیچ‌گونه شبیه‌سازی یا مداخله داخلی، مستقیماً از طریق تانل زنده SSH به سخت‌افزار واقعی سوئیچ سیسکو ارسال شوند.',
+      'پشتیبانی از اجرای شل تعاملی (Interactive Shell) برای سوئیچ‌های سیسکو در بک‌اند جهت حفظ استیت مودهای پیکربندی سراسری (configure terminal) و اینترفیس و رفع خطای عدم پشتیبانی از دستورات غیرتعاملی.',
+      'رمزگشایی خودکار اعتبارسنجی‌ها (کلمه عبور و enable secret) و افزودن پشتیبانی از سایفرها و الگوریتم‌های تبادل کلید سوئیچ‌های نسل قبل سیسکو در اتصال SSH بک‌اند.',
+      'به‌روزرسانی خودکار و بلادرنگ وضعیت پورت‌ها و توضیحات اینترفیس‌ها در پنل و نمای فیس‌پلیت از سخت‌افزار واقعی سوئیچ پس از اعمال تغییرات پیکربندی (مانند description، shutdown، vlan و غیره).'
+    ],
+    changes_en: [
+      'Fixed the Cisco terminal command execution pipeline to ensure all commands are sent directly to the real Cisco hardware via the active SSH tunnel, bypassing simulated/mock CLI intercepts.',
+      'Enabled interactive shell channel execution in the backend for Cisco devices to maintain configuration mode context (configure terminal, interface config) and resolve non-interactive exec errors.',
+      'Integrated automated credential decryption (password and enable secret) and legacy Cisco key exchange / cipher algorithm negotiation in the backend SSH manager.',
+      'Added live port state and description synchronization to the faceplate and UI immediately following configuration changes (description, shutdown, vlan, etc.) executed on the physical switch.'
+    ]
+  },
   {
     version: '1.61.7',
     releaseDate: '2026-09-16',

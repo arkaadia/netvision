@@ -334,7 +334,7 @@ class NetworkTerminalSession:
         try:
             if self.is_cisco and self._ssh_channel:
                 time.sleep(0.1)
-                self._ssh_channel.send("terminal length 0\r\nterminal width 512\r\n".encode("utf-8"))
+                self._ssh_channel.send("terminal length 0\r\n".encode("utf-8"))
             elif self.is_mikrotik and self._ssh_channel:
                 time.sleep(0.1)
                 self._ssh_channel.send("/console/set terminal=vt100\r\n".encode("utf-8"))
@@ -631,6 +631,15 @@ class TerminalSessionManager:
     def get_session(self, session_id: str) -> Optional[NetworkTerminalSession]:
         with self.lock:
             return self.active_sessions.get(session_id)
+
+    def get_session_by_device(self, device_id: str) -> Optional[NetworkTerminalSession]:
+        with self.lock:
+            sess_id = self.device_to_session.get(device_id)
+            if sess_id:
+                sess = self.active_sessions.get(sess_id)
+                if sess and sess.status in ("CONNECTED", "ACTIVE"):
+                    return sess
+            return None
 
     def close_session(self, session_id: str):
         with self.lock:

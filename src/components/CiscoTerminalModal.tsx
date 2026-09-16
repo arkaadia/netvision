@@ -515,6 +515,9 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     try {
       const res = await syncDevicePorts(curDev.id);
       if (res && res.ports && res.ports.length > 0) {
+        if (sshSessionMode === 'real_ssh' && res.sync_source === 'simulator' && !res.is_live && ports.length > 0) {
+          return;
+        }
         const rawPorts = res.ports || [];
         const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
           ...p,
@@ -998,41 +1001,80 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         cmdLower.startsWith('sh int stat') ||
         cmdLower.startsWith('show int') ||
         cmdLower === 'sh run' ||
-        cmdLower === 'show running-config'
+        cmdLower === 'show running-config' ||
+        cmdLower === 'write memory' ||
+        cmdLower === 'wr' ||
+        cmdLower.startsWith('copy run') ||
+        cmdLower.startsWith('description ') ||
+        cmdLower.startsWith('desc ') ||
+        cmdLower === 'shutdown' ||
+        cmdLower === 'shut' ||
+        cmdLower === 'no shutdown' ||
+        cmdLower === 'no shut' ||
+        cmdLower.startsWith('switchport') ||
+        cmdLower.startsWith('vlan ') ||
+        cmdLower === 'exit' ||
+        cmdLower === 'end'
       ) {
-        setTimeout(() => handleSyncPorts(true), 1200);
+        setTimeout(() => handleSyncPorts(true), 1500);
       }
       return;
     }
 
-    // Direct hardware CLI execution via Paramiko SSH engine
-    try {
-      const res = await sshExecute({
-        host: targetHost,
-        port: sshPort,
-        username: device?.ssh_username || 'admin',
-        password: device?.ssh_password || '',
-        command: trimmed,
-        sessionId: activeSessionIdRef.current || undefined,
-      });
-      if (res.success && res.output !== undefined) {
+    // Direct hardware CLI execution via live SSH API if WebSocket is not open
+    if (sshSessionMode === 'real_ssh') {
+      try {
+        const res = await sshExecute({
+          deviceId: fullDev?.id || device?.id,
+          host: targetHost,
+          port: sshPort,
+          username: device?.ssh_username || 'admin',
+          password: device?.ssh_password || '',
+          command: trimmed,
+          sessionId: activeSessionIdRef.current || undefined,
+        });
+        if (res.success && res.output !== undefined) {
+          appendLines([
+            inputLine,
+            { id: String(Date.now() + 1), type: 'output', text: res.output || '(Command executed on device)' },
+          ]);
+          if (
+            cmdLower.startsWith('sh ip int') ||
+            cmdLower.startsWith('show ip int') ||
+            cmdLower.startsWith('sh int stat') ||
+            cmdLower.startsWith('show int') ||
+            cmdLower === 'sh run' ||
+            cmdLower === 'show running-config' ||
+            cmdLower === 'write memory' ||
+            cmdLower === 'wr' ||
+            cmdLower.startsWith('copy run') ||
+            cmdLower.startsWith('description ') ||
+            cmdLower.startsWith('desc ') ||
+            cmdLower === 'shutdown' ||
+            cmdLower === 'shut' ||
+            cmdLower === 'no shutdown' ||
+            cmdLower === 'no shut' ||
+            cmdLower.startsWith('switchport') ||
+            cmdLower.startsWith('vlan ') ||
+            cmdLower === 'exit' ||
+            cmdLower === 'end'
+          ) {
+            setTimeout(() => handleSyncPorts(true), 1200);
+          }
+        } else {
+          appendLines([
+            inputLine,
+            { id: String(Date.now() + 1), type: 'error', text: `% Error executing on device: ${res.error || 'Execution failed'}` },
+          ]);
+        }
+        return;
+      } catch (err: any) {
         appendLines([
           inputLine,
-          { id: String(Date.now() + 1), type: 'output', text: res.output || '(Command executed on device)' },
+          { id: String(Date.now() + 1), type: 'error', text: `% Hardware execution error: ${err.message}` },
         ]);
-      } else {
-        appendLines([
-          inputLine,
-          { id: String(Date.now() + 1), type: 'error', text: `% Error executing on device: ${res.error || 'Execution failed'}` },
-        ]);
+        return;
       }
-      return;
-    } catch (err: any) {
-      appendLines([
-        inputLine,
-        { id: String(Date.now() + 1), type: 'error', text: `% Hardware execution error: ${err.message}` },
-      ]);
-      return;
     }
 
     // 2. Help
