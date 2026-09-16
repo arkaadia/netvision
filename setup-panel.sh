@@ -30,7 +30,7 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-PANEL_VERSION="1.52.1"
+PANEL_VERSION="1.61.10"
 
 # ==============================================================================
 # Enterprise Package Manager & DPKG Lock Guard
@@ -131,6 +131,65 @@ cleanup_apt_timers() {
   systemctl start apt-daily-upgrade.timer 2>/dev/null || true
 }
 trap cleanup_apt_timers EXIT
+
+# ==============================================================================
+# Enterprise Memory & Swap Guard
+# Prevents "Bus error (core dumped)" and OOM crashes during Vite & esbuild builds
+# on VPS with low physical RAM (e.g. 1GB / 2GB) without adequate swap.
+# ==============================================================================
+ensure_system_swap() {
+  log_info "Verifying system memory & swap allocation..."
+  local total_swap_mb=0
+  local total_ram_mb=0
+
+  if [ -f /proc/meminfo ]; then
+    total_swap_mb=$(grep -i SwapTotal /proc/meminfo | awk '{print int($2/1024)}')
+    total_ram_mb=$(grep -i MemTotal /proc/meminfo | awk '{print int($2/1024)}')
+  elif command -v free &>/dev/null; then
+    total_swap_mb=$(free -m 2>/dev/null | awk '/Swap:/ {print $2}')
+    total_ram_mb=$(free -m 2>/dev/null | awk '/Mem:/ {print $2}')
+  fi
+
+  total_swap_mb=${total_swap_mb:-0}
+  total_ram_mb=${total_ram_mb:-0}
+  log_info "Detected: ${total_ram_mb}MB RAM | ${total_swap_mb}MB Swap"
+
+  if [ "$total_swap_mb" -lt 1500 ]; then
+    log_warning "Swap memory is low or absent (${total_swap_mb}MB). Low memory causes 'Bus error (core dumped)' during Vite/esbuild bundle compilation."
+    log_info "Provisioning a 2GB dedicated swap file (/swapfile) for reliable build stability..."
+
+    if [ -f /swapfile ] && [ "$total_swap_mb" -eq 0 ]; then
+      swapoff /swapfile 2>/dev/null || true
+      rm -f /swapfile 2>/dev/null || true
+    fi
+
+    local swap_created=false
+    if [ ! -f /swapfile ]; then
+      if command -v fallocate &>/dev/null && fallocate -l 2G /swapfile 2>/dev/null; then
+        swap_created=true
+      elif dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null; then
+        swap_created=true
+      fi
+
+      if [ "$swap_created" = true ]; then
+        chmod 600 /swapfile
+        mkswap /swapfile >/dev/null 2>&1 || true
+        swapon /swapfile >/dev/null 2>&1 || true
+
+        if ! grep -q "/swapfile" /etc/fstab 2>/dev/null; then
+          echo "/swapfile swap swap defaults 0 0" >> /etc/fstab 2>/dev/null || true
+        fi
+
+        local active_swap=$(free -m 2>/dev/null | awk '/Swap:/ {print $2}' || echo "2048")
+        log_success "Swapfile activated successfully! Total Swap now: ${active_swap}MB"
+      else
+        log_warning "Could not create /swapfile (restricted virtualized container or read-only filesystem). Proceeding with memory-conservative flags."
+      fi
+    else
+      swapon /swapfile 2>/dev/null || true
+    fi
+  fi
+}
 
 # ==============================================================================
 # Enterprise DevOps Architecture: Reliable TTY & Pipe Mode Execution
@@ -516,10 +575,18 @@ fi
 # ------------------------------------------------------------------------------
 # 5. Dependency Installation & Production Build
 # ------------------------------------------------------------------------------
+# Guard memory and allocate swap to prevent 'Bus error (core dumped)' on VPS
+ensure_system_swap
+
 log_step "Installing NPM dependencies..."
 npm config set fetch-retry-maxtimeout 180000
 npm config set fetch-retry-mintimeout 30000
 npm config set fetch-retries 10
+
+# Safe environment configuration for Node/V8 memory management
+export NODE_OPTIONS="--max-old-space-size=2048"
+export TMPDIR="${TMPDIR:-/tmp}"
+mkdir -p "$TMPDIR" 2>/dev/null || true
 
 if ! npm install; then
   log_warning "Standard npm install failed. Retrying with mirror registry (registry.npmmirror.com)..."
@@ -529,7 +596,44 @@ if ! npm install; then
 fi
 
 log_step "Compiling NetTopology Production Build (Vite + TypeScript Backend)..."
-npm run build
+
+# Clear any broken or corrupt caches from prior interrupted builds
+rm -rf dist node_modules/.vite /tmp/esbuild* 2>/dev/null || true
+
+BUILD_SUCCESS=false
+
+# Attempt 1: Standard Build with Node memory flags
+if npm run build; then
+  BUILD_SUCCESS=true
+else
+  log_warning "Standard build encountered resource constraints or memory limits. Attempting staged low-memory compilation..."
+  export NODE_OPTIONS="--max-old-space-size=1536"
+  rm -rf dist node_modules/.vite 2>/dev/null || true
+
+  # Stage 1: Vite Frontend Compilation
+  log_info "Stage 1/2: Compiling React & Vite frontend bundle..."
+  if npx vite build --emptyOutDir; then
+    log_success "Frontend assets compiled successfully."
+
+    # Stage 2: Backend esbuild Bundle
+    log_info "Stage 2/2: Bundling Express & TypeScript backend (server.ts)..."
+    if npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs; then
+      log_success "Backend server bundled successfully."
+      BUILD_SUCCESS=true
+    else
+      log_error "Backend esbuild bundle failed."
+    fi
+  else
+    log_error "Vite frontend compilation failed."
+  fi
+fi
+
+if [ "$BUILD_SUCCESS" = false ]; then
+  log_error "NetTopology compilation failed. Please verify that the server has at least 1GB of RAM and sufficient disk space."
+  exit 1
+fi
+
+log_success "NetTopology production build compiled successfully."
 
 # Ensure scripts and backend have execute permissions
 chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null || true

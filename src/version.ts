@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.9';
+export const APP_VERSION = '1.61.10';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.10',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'رفع خطای Bus error (core dumped) و بهینه‌سازی مصرف حافظه رم در اسکریپت‌های نصب سرور',
+    title_en: 'Fix Bus error (core dumped) and Optimize Memory in Server Installation Scripts',
+    changes: [
+      'تجهیز اسکریپت‌های setup-panel.sh و install.sh به ماژول مدیریت حافظه و تخصیص خودکار Swap (فایل /swapfile به حجم ۲ گیگابایت) جهت جلوگیری از افتادن سرورهای با رم پایین در خطای Bus error و OOM.',
+      'افزودن فلگ‌های بهینه‌سازی حافظه V8 (NODE_OPTIONS="--max-old-space-size=2048") و ایجاد مسیر موقت ایمن (TMPDIR) در زمان کامپایل پکیج‌ها.',
+      'پیاده‌سازی پایپ‌لاین کامپایل دومرحله‌ای همراه با فالبک خودکار کم‌مصرف در صورت بروز محدودیت منابع فیزیکی در سرور یا VPS.',
+      'بهینه‌سازی تنظیمات Vite و شکستن چانک‌های سنگین جاوااسکریپت (Vendor Manual Chunks) جهت کاهش شدید مصرف رم در هنگام کامپایل Rollup.'
+    ],
+    changes_en: [
+      'Equipped setup-panel.sh and install.sh with an automated swap allocator (creating a 2GB swapfile) to eliminate Bus error (core dumped) and OOM faults on resource-constrained servers.',
+      'Configured V8 memory ceiling flags (NODE_OPTIONS="--max-old-space-size=2048") and verified safe TMPDIR isolation during compilation.',
+      'Implemented a staged, low-memory build pipeline with automated fallback when encountering physical memory limits on small VPS instances.',
+      'Optimized Vite rollupOptions with manual chunk splitting for vendor modules, dramatically reducing peak build memory.'
+    ]
+  },
   {
     version: '1.61.9',
     releaseDate: '2026-09-16',

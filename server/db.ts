@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { hashPassword } from './auth';
 
-const currentDir = typeof __dirname !== 'undefined' ? __dirname : (import.meta.url ? path.dirname(fileURLToPath(import.meta.url)) : process.cwd());
+const currentDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
 // Load environment variables from candidate paths
 const candidateEnvPaths = [

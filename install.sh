@@ -76,6 +76,52 @@ prompt_input() {
   eval "$var_name=\"\${user_input:-\$default_val}\""
 }
 
+ensure_system_swap() {
+  local total_swap_mb=0
+  local total_ram_mb=0
+
+  if [ -f /proc/meminfo ]; then
+    total_swap_mb=$(grep -i SwapTotal /proc/meminfo | awk '{print int($2/1024)}')
+    total_ram_mb=$(grep -i MemTotal /proc/meminfo | awk '{print int($2/1024)}')
+  elif command -v free &>/dev/null; then
+    total_swap_mb=$(free -m 2>/dev/null | awk '/Swap:/ {print $2}')
+    total_ram_mb=$(free -m 2>/dev/null | awk '/Mem:/ {print $2}')
+  fi
+
+  total_swap_mb=${total_swap_mb:-0}
+  total_ram_mb=${total_ram_mb:-0}
+
+  if [ "$total_swap_mb" -lt 1500 ]; then
+    echo -e "${YELLOW}فضای Swap حافظه ناکافی است (${total_swap_mb}MB). جهت جلوگیری از خطای Bus error و کمبود رم در زمان کامپایل، ۲ گیگابایت Swap موقت ایجاد می‌شود...${NC}"
+
+    if [ -f /swapfile ] && [ "$total_swap_mb" -eq 0 ]; then
+      swapoff /swapfile 2>/dev/null || true
+      rm -f /swapfile 2>/dev/null || true
+    fi
+
+    local swap_created=false
+    if [ ! -f /swapfile ]; then
+      if command -v fallocate &>/dev/null && fallocate -l 2G /swapfile 2>/dev/null; then
+        swap_created=true
+      elif dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null; then
+        swap_created=true
+      fi
+
+      if [ "$swap_created" = true ]; then
+        chmod 600 /swapfile
+        mkswap /swapfile >/dev/null 2>&1 || true
+        swapon /swapfile >/dev/null 2>&1 || true
+        if ! grep -q "/swapfile" /etc/fstab 2>/dev/null; then
+          echo "/swapfile swap swap defaults 0 0" >> /etc/fstab 2>/dev/null || true
+        fi
+        echo -e "${GREEN}✓ فایل Swap فعال شد. فضای Swap فعال: $(free -m 2>/dev/null | awk '/Swap:/ {print $2}')MB${NC}"
+      fi
+    else
+      swapon /swapfile 2>/dev/null || true
+    fi
+  fi
+}
+
 # Color definitions for output
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -91,7 +137,7 @@ echo -e "${CYAN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║                                                                  ║"
 echo "║     🌐  NetTopology - Enterprise Network Management Panel        ║"
-echo "║     🚀  Version: 1.52.1 (Production Stable)                      ║"
+echo "║     🚀  Version: 1.61.10 (Production Stable)                     ║"
 echo "║     🛡️  Cisco Port Security & CDP/LLDP Topology Visualizer       ║"
 echo "║     🎨  Spatial Cyber Neon & Multi-Theme Network Studio          ║"
 echo "║                                                                  ║"
@@ -325,16 +371,48 @@ fi
 echo ""
 echo -e "${BLUE}[4/6]${NC} ${BOLD}نصب وابستگی‌های پروژه و بیلد نهایی پنل (Building NetTopology)...${NC}"
 
+# Ensure system has enough swap and memory to prevent Bus error / OOM
+ensure_system_swap
+
 # Ensure correct permissions
 chown -R "$SUDO_USER:$SUDO_USER" "$APP_DIR" 2>/dev/null || true
 
-# Run npm install as normal user if sudo was used
+export NODE_OPTIONS="--max-old-space-size=2048"
+export TMPDIR="${TMPDIR:-/tmp}"
+mkdir -p "$TMPDIR" 2>/dev/null || true
+rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* 2>/dev/null || true
+
+# Run npm install
 if [ -n "$SUDO_USER" ]; then
   su - "$SUDO_USER" -c "cd '$APP_DIR' && npm install"
-  su - "$SUDO_USER" -c "cd '$APP_DIR' && npm run build"
 else
   npm install
-  npm run build
+fi
+
+BUILD_OK=false
+if [ -n "$SUDO_USER" ]; then
+  if su - "$SUDO_USER" -c "cd '$APP_DIR' && export NODE_OPTIONS='--max-old-space-size=2048' && npm run build"; then
+    BUILD_OK=true
+  fi
+else
+  if npm run build; then
+    BUILD_OK=true
+  fi
+fi
+
+if [ "$BUILD_OK" = false ]; then
+  echo -e "${YELLOW}کامپایل اولیه به دلیل محدودیت رم با مشکل مواجه شد. در حال اجرای بیلد دومرحله‌ای سبک...${NC}"
+  export NODE_OPTIONS="--max-old-space-size=1536"
+  rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" 2>/dev/null || true
+  
+  if npx vite build --emptyOutDir && npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs; then
+    BUILD_OK=true
+  fi
+fi
+
+if [ "$BUILD_OK" = false ]; then
+  echo -e "${RED}خطا: کامپایل پروژه ناموفق بود. لطفاً از وجود حداقل ۱ گیگابایت حافظه اطمینان حاصل کنید.${NC}"
+  exit 1
 fi
 
 echo -e "${GREEN}✓ کامپایل و بیلد پروژه با موفقیت انجام شد.${NC}"
