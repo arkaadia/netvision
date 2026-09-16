@@ -16,9 +16,21 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
 }) => {
   if (!port) return null;
 
-  const isUp = (port.status || 'down').toLowerCase() === 'up';
-  const isDisabled = (port.admin_status || 'enabled').toLowerCase() === 'disabled';
-  const isTrunk = (port.mode || 'access').toLowerCase() === 'trunk';
+  const rawStatus = String(port.status || '').toLowerCase().trim();
+  const rawAdmin = String(port.admin_status || '').toLowerCase().trim();
+
+  const isDisabled =
+    rawAdmin === 'disabled' ||
+    rawAdmin === 'shutdown' ||
+    rawStatus === 'disabled' ||
+    rawStatus === 'err-disabled' ||
+    rawStatus === 'administratively down';
+
+  const isUp =
+    !isDisabled &&
+    (rawStatus === 'up' || rawStatus === 'connected' || rawStatus === 'active' || rawStatus === 'running');
+
+  const isTrunk = String(port.mode || 'access').toLowerCase().trim() === 'trunk';
   const rawPortId = port.port_id || port.name || 'Port';
   const shortName = rawPortId
     .replace('GigabitEthernet', 'Gi')
@@ -28,13 +40,30 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
     .replace('1/0/', '')
     .replace('0/', '');
 
-  const statusDisplay = (port.status || (isDisabled ? 'disabled' : isUp ? 'up' : 'down')).toUpperCase();
-  const modeDisplay = (port.mode || 'access').toUpperCase();
+  const statusDisplay = isDisabled ? 'DISABLED' : isUp ? 'UP' : 'DOWN';
+  const modeDisplay = isTrunk ? 'TRUNK' : 'ACCESS';
   const vlanDisplay = port.vlan ?? 1;
 
   // LED color and glow
-  const ledColor = isDisabled ? '#f59e0b' : isUp ? '#10b981' : '#475569';
+  const ledColor = isDisabled ? '#f59e0b' : isUp ? '#10b981' : '#334155';
   const ledGlow = isUp ? 'drop-shadow(0 0 3px #34d399)' : isDisabled ? 'drop-shadow(0 0 2px #f59e0b)' : 'none';
+
+  let statusClasses = 'bg-slate-900/60 border border-slate-700/60 hover:border-slate-500 hover:bg-slate-800/60 opacity-80 hover:opacity-100'; // Down
+  let bezelStroke = '#475569'; // Down
+
+  if (isSelected) {
+    statusClasses = 'bg-indigo-950/90 border-2 border-indigo-400 ring-2 ring-indigo-500/40 shadow-lg scale-105 z-10';
+    bezelStroke = '#818cf8';
+  } else if (isDisabled) {
+    statusClasses = 'bg-amber-500/20 border border-amber-500/60 hover:border-amber-400 hover:bg-amber-500/30';
+    bezelStroke = '#f59e0b';
+  } else if (isUp && isTrunk) {
+    statusClasses = 'bg-purple-950/60 border border-purple-500/70 hover:border-purple-400 hover:bg-purple-900/60 shadow-[0_0_8px_rgba(168,85,247,0.2)]';
+    bezelStroke = '#a855f7';
+  } else if (isUp) {
+    statusClasses = 'bg-slate-900/90 border border-emerald-500/60 hover:border-emerald-400 hover:bg-slate-800/90 shadow-[0_0_8px_rgba(16,185,129,0.15)]';
+    bezelStroke = '#10b981';
+  }
 
   return (
     <button
@@ -46,15 +75,7 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
           onContextMenu(e);
         }
       }}
-      className={`group relative flex flex-col items-center p-1 rounded-lg transition-all select-none ${
-        isSelected
-          ? 'bg-indigo-950/90 border-2 border-indigo-400 ring-2 ring-indigo-500/40 shadow-lg scale-105 z-10'
-          : isDisabled
-          ? 'bg-amber-500/20 border border-amber-500/60 hover:border-amber-400 hover:bg-amber-500/30'
-          : isUp
-          ? 'bg-slate-900/90 border border-slate-700/80 hover:border-indigo-400 hover:bg-slate-800/90'
-          : 'bg-rose-500/20 border border-rose-500/50 hover:border-rose-400 hover:bg-rose-500/30'
-      }`}
+      className={`group relative flex flex-col items-center p-1 rounded-lg transition-all select-none ${statusClasses}`}
       title={`${port.name || rawPortId} (${rawPortId}) - ${statusDisplay} - Mode: ${modeDisplay} - VLAN ${vlanDisplay}${port.connected_device ? ` - ${port.connected_device}` : ''}${port.description ? ` [Description: ${port.description}]` : ''}`}
       style={{ width: '56px' }}
     >
@@ -96,7 +117,7 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
           height="34"
           rx="3"
           fill="#1e293b"
-          stroke={isSelected ? '#818cf8' : isDisabled ? '#f59e0b' : isUp ? '#475569' : '#f43f5e'}
+          stroke={bezelStroke}
           strokeWidth="1.5"
         />
         

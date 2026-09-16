@@ -107,48 +107,74 @@ class CiscoDriver(NetworkDeviceDriver):
 
         for line in lines:
             line_str = line.strip()
-            if not line_str:
+            if not line_str or line_str.startswith("--"):
                 continue
-            if "Port" in line_str and "Status" in line_str and "Vlan" in line_str:
+            if re.search(r'\bPort\b', line_str, re.I) and (re.search(r'\bStatus\b', line_str, re.I) or re.search(r'\bVlan\b', line_str, re.I)):
                 header_found = True
                 continue
             if not header_found:
                 continue
 
-            # Tokenize row
-            parts = line_str.split()
-            if len(parts) >= 6:
-                port_id = parts[0]
+            # Match standard Cisco switch interface status row
+            m = re.match(
+                r'^([A-Za-z0-9/._-]+)\s+(?:(.*?)\s+)?(connected|notconnect|disabled|err-disabled|inactive|monitoring|suspended|up|down|administratively\s+down)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(.*))?$',
+                line_str,
+                re.IGNORECASE
+            )
+            if m:
+                port_id = m.group(1)
+                desc = (m.group(2) or "").strip()
+                status_raw = m.group(3).lower()
+                vlan_raw = m.group(4)
+                duplex_raw = m.group(5)
+                speed_raw = m.group(6)
+                port_type = (m.group(7) or "10/100/1000BaseTX").strip()
+
                 canon_id = port_id.lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
                 if canon_id in seen_ports:
                     continue
                 seen_ports.add(canon_id)
 
-                status_raw = parts[2] if len(parts) >= 6 else parts[1]
-                vlan_raw = parts[3] if len(parts) >= 6 else "1"
-
-                is_connected = "connect" in status_raw and "notconnect" not in status_raw and "disabled" not in status_raw
-                is_disabled = "disabled" in status_raw or "err-disabled" in status_raw
+                is_connected = status_raw in ("connected", "up")
+                is_disabled = "disabled" in status_raw or "administratively" in status_raw
 
                 mode = "trunk" if "trunk" in vlan_raw.lower() else "access"
                 vlan_num = 1
                 try:
-                    vlan_num = int(vlan_raw) if mode == "access" else 1
+                    vlan_num = int(vlan_raw) if mode == "access" and vlan_raw.isdigit() else 1
                 except ValueError:
                     vlan_num = 1
+
+                speed_clean = speed_raw.replace("a-", "").strip()
+                if speed_clean == "1000":
+                    speed_display = "1 Gbps"
+                elif speed_clean in ("10000", "10G"):
+                    speed_display = "10 Gbps"
+                elif speed_clean == "100":
+                    speed_display = "100 Mbps"
+                elif speed_clean == "10":
+                    speed_display = "10 Mbps"
+                elif speed_clean.lower() == "auto":
+                    speed_display = "Auto (1 Gbps)"
+                else:
+                    speed_display = speed_clean
+
+                duplex_clean = duplex_raw.replace("a-", "").capitalize()
 
                 ports.append({
                     "port_id": port_id,
                     "name": port_id,
+                    "description": desc,
                     "status": "up" if is_connected else "down",
                     "admin_status": "disabled" if is_disabled else "enabled",
                     "mode": mode,
                     "vlan": vlan_num,
                     "allowed_vlans": "1-4094" if mode == "trunk" else str(vlan_num),
-                    "speed": "1 Gbps",
-                    "duplex": "Full",
-                    "connected_device": "Active Link" if is_connected else "Disconnected",
+                    "speed": speed_display,
+                    "duplex": duplex_clean,
+                    "connected_device": desc or ("Active Link" if is_connected else "Disconnected"),
                     "connected_type": "Host" if is_connected else "None",
+                    "type": port_type,
                     "port_security_enabled": False,
                 })
 

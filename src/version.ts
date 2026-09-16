@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.0';
+export const APP_VERSION = '1.61.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.1',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'اصلاح کدگذاری رنگی پورت‌های گرافیکی (رفع نمایش سراسری رنگ قرمز و تفکیک دقیق وضعیت‌های پورت)',
+    title_en: 'Fix Graphical Port Color-Coding & Accurate Interface Status Parsing (Resolve False Red State)',
+    changes: [
+      'اصلاح الگوریتم تشخیص وضعیت پورت‌های سوییچ از خروجی دستور show interfaces status و برطرف کردن نمایش کاذب رنگ قرمز برای کلیه پورت‌ها.',
+      'تفکیک دقیق وضعیت‌های گرافیکی پورت: فعال Trunk (بنفش نورانی با نشانگر TRK)، فعال Access (سبز درخشان)، غیرفعال/Shutdown (کهربایی/Amber)، و قطع/Down (طوسی تیره متالیک).',
+      'بهبود رجکس پارس خروجی CLI سوییچ‌های سیسکو برای پشتیبانی از نام‌های پورت چندکلمه‌ای و خالی بدون برهم‌خوردن ستون وضعیت و VLAN.',
+      'اعمال رنگ‌بندی دقیق در هر دو مودال مدیریت پورت (Port Modal) و ترمینال کنسول (Terminal Modal).'
+    ],
+    changes_en: [
+      'Fixed switch port status parsing from show interfaces status CLI outputs, resolving the issue where all ports were mistakenly shown in red.',
+      'Accurately differentiated graphical port color-coding: Up Trunk (illuminated purple with TRK badge), Up Access (emerald green), Disabled/Shutdown (amber), and Down/Disconnected (dark metallic slate).',
+      'Enhanced Cisco CLI interface parser regex to handle empty or multi-word port descriptions without shifting status, vlan, or duplex columns.',
+      'Synchronized color-coding logic across both Port Inspector Modal and Terminal Faceplate.'
+    ]
+  },
   {
     version: '1.61.0',
     releaseDate: '2026-09-16',

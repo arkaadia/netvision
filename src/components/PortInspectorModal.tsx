@@ -261,10 +261,19 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       setError(null);
       const res = await fetchDevicePorts(device.id);
       const rawPorts = res.ports || [];
-      const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
-        ...p,
-        port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
-      }));
+      const normalizedPorts = rawPorts.map((p: any, idx: number) => {
+        const rawStat = String(p.status || '').toLowerCase().trim();
+        const rawAdmin = String(p.admin_status || '').toLowerCase().trim();
+        const isDis = rawAdmin === 'disabled' || rawAdmin === 'shutdown' || rawStat === 'disabled' || rawStat === 'err-disabled' || rawStat === 'administratively down';
+        const isConn = !isDis && (rawStat === 'up' || rawStat === 'connected' || rawStat === 'active' || rawStat === 'running');
+        return {
+          ...p,
+          port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+          status: isConn ? 'up' : 'down',
+          admin_status: isDis ? 'disabled' : 'enabled',
+          mode: String(p.mode || 'access').toLowerCase().trim() === 'trunk' ? 'trunk' : 'access',
+        };
+      });
       setPorts(normalizedPorts);
       if (normalizedPorts.length > 0) {
         const firstPort = normalizedPorts[0];

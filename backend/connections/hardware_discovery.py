@@ -287,7 +287,10 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
             speed = m.group(6)
             port_type = (m.group(7) or "10/100/1000BaseTX").strip()
             
-            clean_status = "connected" if status_raw == "connected" else ("disabled" if status_raw in ["disabled", "err-disabled"] else "notconnect")
+            is_conn = status_raw in ["connected", "up"]
+            is_dis = status_raw in ["disabled", "err-disabled"] or "administratively" in status_raw
+            clean_status = "up" if is_conn else "down"
+            admin_status = "disabled" if is_dis else "enabled"
             
             canon = port_name.lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
             if canon in seen_ports:
@@ -300,7 +303,7 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
                 "name": port_name,
                 "description": desc,
                 "status": clean_status,
-                "admin_status": "disabled" if clean_status == "disabled" else "enabled",
+                "admin_status": admin_status,
                 "mode": "trunk" if (vlan and "trunk" in str(vlan).lower()) else "access",
                 "vlan": int(vlan) if (vlan and str(vlan).isdigit()) else 1,
                 "duplex": duplex,

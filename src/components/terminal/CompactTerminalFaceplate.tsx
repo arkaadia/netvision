@@ -66,10 +66,22 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
     return null;
   }
 
-  const upCount = ports.filter((p) => p.status === 'up').length;
-  const downCount = ports.filter((p) => p.status !== 'up' && p.admin_status !== 'disabled').length;
-  const disabledCount = ports.filter((p) => p.admin_status === 'disabled').length;
-  const trunkCount = ports.filter((p) => p.mode === 'trunk').length;
+  const isPortUp = (p: SwitchPort) => {
+    const s = String(p.status || '').toLowerCase().trim();
+    const a = String(p.admin_status || '').toLowerCase().trim();
+    const isDis = a === 'disabled' || a === 'shutdown' || s === 'disabled' || s === 'err-disabled' || s === 'administratively down';
+    return !isDis && (s === 'up' || s === 'connected' || s === 'active' || s === 'running');
+  };
+  const isPortDisabled = (p: SwitchPort) => {
+    const s = String(p.status || '').toLowerCase().trim();
+    const a = String(p.admin_status || '').toLowerCase().trim();
+    return a === 'disabled' || a === 'shutdown' || s === 'disabled' || s === 'err-disabled' || s === 'administratively down';
+  };
+
+  const upCount = ports.filter(isPortUp).length;
+  const disabledCount = ports.filter(isPortDisabled).length;
+  const downCount = ports.filter((p) => !isPortUp(p) && !isPortDisabled(p)).length;
+  const trunkCount = ports.filter((p) => String(p.mode || '').toLowerCase().trim() === 'trunk').length;
 
   const currentSelectedPort = selectedPortId
     ? ports.find((p) => (p.port_id || (p as any).port || p.name) === selectedPortId)

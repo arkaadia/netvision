@@ -1055,8 +1055,14 @@ def normalize_port_list(port_list):
             p_copy["name"] = p_copy["port_id"]
         if not p_copy.get("mode"):
             p_copy["mode"] = "access"
-        if not p_copy.get("admin_status"):
-            p_copy["admin_status"] = "disabled" if p_copy.get("status") == "disabled" else "enabled"
+        
+        stat = str(p_copy.get("status", "down")).strip().lower()
+        admin_stat = str(p_copy.get("admin_status", "")).strip().lower()
+        is_disabled = admin_stat in ("disabled", "shutdown") or stat in ("disabled", "err-disabled", "administratively down", "shutdown")
+        is_up = not is_disabled and stat in ("up", "connected", "active", "running")
+
+        p_copy["status"] = "up" if is_up else "down"
+        p_copy["admin_status"] = "disabled" if is_disabled else "enabled"
 
         canon_id = str(p_copy["port_id"]).strip().lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
         if canon_id in seen:
