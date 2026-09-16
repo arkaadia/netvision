@@ -1187,7 +1187,7 @@ export const HardwareSvgRenderer: React.FC<HardwareSvgRendererProps> = ({
             <rect x="90" y="2" width="6" height={h - 4} rx="1" fill={accentColor} />
             <g transform={`translate(105, ${h / 2 - 4})`}>
               <text x="0" y="4" fill="#0f172a" fontSize="6.5" fontWeight="bold" fontFamily="sans-serif">
-                {device.brand.toUpperCase()}
+                {(device.brand || 'GENERIC').toUpperCase()}
               </text>
               <text x="0" y="9.5" fill="#475569" fontSize="4.2" fontWeight="bold" fontFamily="monospace">
                 {truncate(device.model, 26)}

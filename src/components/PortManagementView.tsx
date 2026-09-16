@@ -1143,12 +1143,12 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
                     <span
                       data-badge={port.mode === 'trunk' ? 'port-mode-trunk' : 'port-mode-access'}
                       className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono text-white shadow-xs ${
-                        port.mode === 'trunk'
+                        (port.mode || 'access') === 'trunk'
                           ? 'port-mode-badge-trunk bg-purple-600 border border-purple-500'
                           : 'port-mode-badge-access bg-indigo-600 border border-indigo-500'
                       }`}
                     >
-                      {port.mode.toUpperCase()}
+                      {(port.mode || 'access').toUpperCase()}
                     </span>
                   </td>
                   <td className="p-3.5 font-bold text-indigo-300">VLAN {port.vlan}</td>

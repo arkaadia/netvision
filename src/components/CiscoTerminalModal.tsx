@@ -485,30 +485,30 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       const curDev = device;
       activeDevIdRef.current = curDev.id;
       const fullDev = allDevices?.find((d) => d.id === curDev.id || (d.name && d.name.toLowerCase() === curDev.name?.toLowerCase())) || curDev;
-      const connProtocol = (fullDev.connection_protocol || fullDev.connection?.protocol || curDev.connection_protocol || curDev.connection?.protocol || 'ssh').toLowerCase() as 'ssh' | 'telnet';
-      const devHost = (fullDev.name || curDev.name).toUpperCase();
+      const connProtocol = (fullDev?.connection_protocol || fullDev?.connection?.protocol || curDev?.connection_protocol || curDev?.connection?.protocol || 'ssh').toLowerCase() as 'ssh' | 'telnet';
+      const devHost = (fullDev?.name || curDev?.name || 'SWITCH').toUpperCase();
       const targetHost = (
-        fullDev.ssh_host ||
-        fullDev.connection?.host ||
-        fullDev.ip ||
-        (fullDev.connection as any)?.ip ||
-        curDev.ssh_host ||
-        curDev.connection?.host ||
-        curDev.ip ||
+        fullDev?.ssh_host ||
+        fullDev?.connection?.host ||
+        fullDev?.ip ||
+        (fullDev?.connection as any)?.ip ||
+        curDev?.ssh_host ||
+        curDev?.connection?.host ||
+        curDev?.ip ||
         ''
       ).trim();
       const sshPort = Number(
-        fullDev.ssh_port ||
-        fullDev.connection?.port ||
-        curDev.ssh_port ||
-        curDev.connection?.port ||
+        fullDev?.ssh_port ||
+        fullDev?.connection?.port ||
+        curDev?.ssh_port ||
+        curDev?.connection?.port ||
         (connProtocol === 'telnet' ? 23 : 22)
       );
       const sshUser = (
-        fullDev.ssh_username ||
-        fullDev.connection?.username ||
-        curDev.ssh_username ||
-        curDev.connection?.username ||
+        fullDev?.ssh_username ||
+        fullDev?.connection?.username ||
+        curDev?.ssh_username ||
+        curDev?.connection?.username ||
         'admin'
       ).trim();
 
@@ -521,18 +521,19 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       loadPortsAndVlans(curDev.id);
 
       const hostDisplay = targetHost || (isEn ? 'No IP Configured' : 'بدون آی‌پی');
+      const protoUpper = (connProtocol || 'ssh').toUpperCase();
       setLines([
         {
           id: 'sys-init-1',
           type: 'system',
           text: isEn
-            ? `[${connProtocol.toUpperCase()} CLIENT v2.5] Initiating persistent direct ${connProtocol.toUpperCase()} socket connection to ${curDev.name} (${hostDisplay}:${sshPort})...`
-            : `[کلاینت ${connProtocol.toUpperCase()} نسخه ۲.۵] برقراری ارتباط سوکت مستقیم و پایدار ${connProtocol.toUpperCase()} با ${curDev.name} (${hostDisplay}:${sshPort})...`,
+            ? `[${protoUpper} CLIENT v2.5] Initiating persistent direct ${protoUpper} socket connection to ${curDev?.name || 'Device'} (${hostDisplay}:${sshPort})...`
+            : `[کلاینت ${protoUpper} نسخه ۲.۵] برقراری ارتباط سوکت مستقیم و پایدار ${protoUpper} با ${curDev?.name || 'تجهیز'} (${hostDisplay}:${sshPort})...`,
         },
         {
           id: 'sys-init-2',
           type: 'system',
-          text: `[CREDENTIALS] Target User: '${sshUser}' | Target Host: '${targetHost || (isEn ? 'Unassigned' : 'تنظیم نشده')}' | Protocol: ${connProtocol.toUpperCase()}`,
+          text: `[CREDENTIALS] Target User: '${sshUser}' | Target Host: '${targetHost || (isEn ? 'Unassigned' : 'تنظیم نشده')}' | Protocol: ${protoUpper}`,
         },
       ]);
 
@@ -599,8 +600,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
                       id: 'sys-ssh-ok-' + Date.now(),
                       type: 'success',
                       text: isEn
-                        ? `[LIVE ${connProtocol.toUpperCase()} ESTABLISHED] Connected to ${targetHost}:${sshPort} in ${msg.latency_ms || 2}ms.\nSession: Persistent WebSocket SSH Tunnel Active. Commands execute directly on hardware.`
-                        : `[اتصال زنده ${connProtocol.toUpperCase()} برقرار شد] اتصال به ${targetHost}:${sshPort} در ${msg.latency_ms || 2} میلی‌ثانیه برقرار شد.\nنشست: تانل پایدار سوکت فعال است و دستورات مستقیماً روی سخت‌افزار اجرا می‌شوند.`,
+                        ? `[LIVE ${(connProtocol || 'ssh').toUpperCase()} ESTABLISHED] Connected to ${targetHost}:${sshPort} in ${msg.latency_ms || 2}ms.\nSession: Persistent WebSocket SSH Tunnel Active. Commands execute directly on hardware.`
+                        : `[اتصال زنده ${(connProtocol || 'ssh').toUpperCase()} برقرار شد] اتصال به ${targetHost}:${sshPort} در ${msg.latency_ms || 2} میلی‌ثانیه برقرار شد.\nنشست: تانل پایدار سوکت فعال است و دستورات مستقیماً روی سخت‌افزار اجرا می‌شوند.`,
                     },
                   ]);
                 } else {
@@ -2819,12 +2820,12 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
                           <div className="flex items-center gap-1 text-[10px] font-mono shrink-0">
                             <span
                               className={`px-1.5 py-0.5 rounded font-bold text-white ${
-                                p.mode === 'trunk'
+                                (p.mode || 'access') === 'trunk'
                                   ? 'bg-purple-600 border border-purple-500'
                                   : 'bg-indigo-600 border border-indigo-500'
                               }`}
                             >
-                              {p.mode.toUpperCase()}
+                              {(p.mode || 'access').toUpperCase()}
                             </span>
                             <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 font-semibold">
                               VLAN {p.vlan}

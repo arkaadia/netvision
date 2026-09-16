@@ -362,7 +362,7 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
       {
         id: '2',
         type: 'system',
-        text: `Initiating persistent ${connProtocol.toUpperCase()} connection to ${targetHost}:${targetPort} (${curDev.model || 'CCR2004'})...`
+        text: `Initiating persistent ${(connProtocol || 'ssh').toUpperCase()} connection to ${targetHost}:${targetPort} (${curDev.model || 'CCR2004'})...`
       }
     ];
     setLines(banner);
@@ -424,8 +424,8 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
                     id: 'sys-mtk-live-' + Date.now(),
                     type: 'system',
                     text: isEn
-                      ? `[REAL ${connProtocol.toUpperCase()} ESTABLISHED] Connected to ${targetHost}:${targetPort} in ${msg.latency_ms || 2}ms.\nSession: Persistent WebSocket SSH Tunnel Active.`
-                      : `[اتصال زنده ${connProtocol.toUpperCase()} برقرار شد] اتصال به ${targetHost}:${targetPort} در ${msg.latency_ms || 2} میلی‌ثانیه برقرار شد.\nنشست: تانل پایدار سوکت فعال است.`,
+                      ? `[REAL ${(connProtocol || 'ssh').toUpperCase()} ESTABLISHED] Connected to ${targetHost}:${targetPort} in ${msg.latency_ms || 2}ms.\nSession: Persistent WebSocket SSH Tunnel Active.`
+                      : `[اتصال زنده ${(connProtocol || 'ssh').toUpperCase()} برقرار شد] اتصال به ${targetHost}:${targetPort} در ${msg.latency_ms || 2} میلی‌ثانیه برقرار شد.\nنشست: تانل پایدار سوکت فعال است.`,
                   },
                 ]);
               } else {
@@ -663,11 +663,11 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
               {sshSessionMode === 'real_ssh' ? (
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  LIVE {connProtocol.toUpperCase()} ({sshLatency ? `${sshLatency}ms` : 'Active'})
+                  LIVE {(connProtocol || 'ssh').toUpperCase()} ({sshLatency ? `${sshLatency}ms` : 'Active'})
                 </span>
               ) : sshSessionMode === 'connecting' ? (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1 bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                  Connecting {connProtocol.toUpperCase()}...
+                  Connecting {(connProtocol || 'ssh').toUpperCase()}...
                 </span>
               ) : (
                 <span
@@ -1261,12 +1261,12 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
                           <div className="flex items-center gap-1 text-[10px] font-mono shrink-0">
                             <span
                               className={`px-1.5 py-0.5 rounded font-bold text-white ${
-                                p.mode === 'trunk'
+                                (p.mode || 'access') === 'trunk'
                                   ? 'bg-purple-600 border border-purple-500'
                                   : 'bg-cyan-600 border border-cyan-500'
                               }`}
                             >
-                              {p.mode.toUpperCase()}
+                              {(p.mode || 'access').toUpperCase()}
                             </span>
                             <span
                               className={`px-1.5 py-0.5 rounded font-semibold border ${

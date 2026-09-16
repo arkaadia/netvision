@@ -14,16 +14,23 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
   onClick,
   onContextMenu,
 }) => {
-  const isUp = port.status === 'up';
-  const isDisabled = port.admin_status === 'disabled';
-  const isTrunk = port.mode === 'trunk';
-  const shortName = port.port_id
+  if (!port) return null;
+
+  const isUp = (port.status || 'down').toLowerCase() === 'up';
+  const isDisabled = (port.admin_status || 'enabled').toLowerCase() === 'disabled';
+  const isTrunk = (port.mode || 'access').toLowerCase() === 'trunk';
+  const rawPortId = port.port_id || port.name || 'Port';
+  const shortName = rawPortId
     .replace('GigabitEthernet', 'Gi')
     .replace('TenGigabitEthernet', 'Te')
     .replace('FastEthernet', 'Fa')
     .replace('Ethernet', 'Eth')
     .replace('1/0/', '')
     .replace('0/', '');
+
+  const statusDisplay = (port.status || (isDisabled ? 'disabled' : isUp ? 'up' : 'down')).toUpperCase();
+  const modeDisplay = (port.mode || 'access').toUpperCase();
+  const vlanDisplay = port.vlan ?? 1;
 
   // LED color and glow
   const ledColor = isDisabled ? '#f59e0b' : isUp ? '#10b981' : '#475569';
@@ -48,7 +55,7 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
           ? 'bg-slate-900/90 border border-slate-700/80 hover:border-indigo-400 hover:bg-slate-800/90'
           : 'bg-rose-500/20 border border-rose-500/50 hover:border-rose-400 hover:bg-rose-500/30'
       }`}
-      title={`${port.name} (${port.port_id}) - ${port.status.toUpperCase()} - Mode: ${port.mode.toUpperCase()} - VLAN ${port.vlan}${port.connected_device ? ` - ${port.connected_device}` : ''}${port.description ? ` [Description: ${port.description}]` : ''}`}
+      title={`${port.name || rawPortId} (${rawPortId}) - ${statusDisplay} - Mode: ${modeDisplay} - VLAN ${vlanDisplay}${port.connected_device ? ` - ${port.connected_device}` : ''}${port.description ? ` [Description: ${port.description}]` : ''}`}
       style={{ width: '56px' }}
     >
       {/* Top Header: Link Status LED & Mode Indicator */}
@@ -150,14 +157,14 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
           className={`font-mono text-[9px] font-bold px-1.5 py-0.2 rounded tracking-tight shadow-xs ${
             isTrunk
               ? 'bg-purple-600 text-white font-bold border border-purple-400'
-              : port.vlan === 1
+              : vlanDisplay === 1
               ? 'bg-slate-800 text-cyan-300 border border-cyan-500/40'
               : 'bg-indigo-900/90 text-amber-300 border border-amber-500/40'
           }`}
           style={isTrunk ? { color: '#ffffff', fontWeight: 700 } : undefined}
-          title={`VLAN ${port.vlan}`}
+          title={`VLAN ${vlanDisplay}`}
         >
-          v{port.vlan}
+          v{vlanDisplay}
         </span>
       </div>
     </button>

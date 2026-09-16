@@ -5,13 +5,16 @@ import './index.css';
 import { LanguageProvider } from './i18n';
 import { UpdateProvider } from './context/UpdateContext';
 import { AuthProvider } from './context/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LanguageProvider>
       <UpdateProvider>
         <AuthProvider>
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </AuthProvider>
       </UpdateProvider>
     </LanguageProvider>

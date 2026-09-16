@@ -195,7 +195,7 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
               <span className={isLightMode ? 'text-slate-300' : 'text-slate-600'}>•</span>
               <span
                 className={`font-bold ${
-                  displayPort.status === 'up'
+                  (displayPort.status || '').toLowerCase() === 'up'
                     ? isLightMode
                       ? 'text-emerald-700'
                       : 'text-emerald-400'
@@ -204,11 +204,11 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
                     : 'text-rose-400'
                 }`}
               >
-                {displayPort.status.toUpperCase()}
+                {(displayPort.status || 'down').toUpperCase()}
               </span>
               <span className={isLightMode ? 'text-slate-300' : 'text-slate-600'}>•</span>
               <span className={`font-semibold ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
-                VLAN {displayPort.vlan} ({displayPort.mode.toUpperCase()})
+                VLAN {displayPort.vlan ?? 1} ({((displayPort.mode || 'access')).toUpperCase()})
               </span>
               {displayPort.connected_device && displayPort.connected_device !== 'Disconnected' && (
                 <>
@@ -349,21 +349,23 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
             <div className="relative z-10 flex items-center gap-2 font-bold">
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
-                  activeHoverPort.status === 'up'
+                  (activeHoverPort.status || '').toLowerCase() === 'up'
                     ? 'bg-emerald-400 shadow-xs shadow-emerald-400'
                     : 'bg-rose-400'
                 }`}
               />
-              <span className="text-cyan-300 font-bold">{activeHoverPort.port_id}</span>
-              <span className="text-slate-400 text-[10px]">({activeHoverPort.name})</span>
+              <span className="text-cyan-300 font-bold">{activeHoverPort.port_id || activeHoverPort.name || 'Port'}</span>
+              {activeHoverPort.name && activeHoverPort.name !== activeHoverPort.port_id && (
+                <span className="text-slate-400 text-[10px]">({activeHoverPort.name})</span>
+              )}
               <span className="opacity-40">•</span>
-              <span className={activeHoverPort.status === 'up' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                {activeHoverPort.status.toUpperCase()}
+              <span className={(activeHoverPort.status || '').toLowerCase() === 'up' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                {(activeHoverPort.status || 'down').toUpperCase()}
               </span>
               <span className="opacity-40">•</span>
-              <span className="text-amber-300">VLAN {activeHoverPort.vlan}</span>
+              <span className="text-amber-300">VLAN {activeHoverPort.vlan ?? 1}</span>
               <span className="opacity-40">•</span>
-              <span className="text-purple-300">{activeHoverPort.mode.toUpperCase()}</span>
+              <span className="text-purple-300">{(activeHoverPort.mode || 'access').toUpperCase()}</span>
             </div>
 
             {activeHoverPort.connected_device && activeHoverPort.connected_device !== 'Disconnected' && (

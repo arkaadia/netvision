@@ -780,7 +780,7 @@ export const MikroTikVPNSuite: React.FC<MikroTikVPNSuiteProps> = ({
                               }`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-emerald-400' : isStandby ? 'bg-amber-400' : 'bg-rose-400'}`} />
-                              {item.status.toUpperCase()}
+                              {(item.status || 'unknown').toUpperCase()}
                             </span>
                           </td>
                           <td className="py-3 px-3 font-medium text-slate-100 font-mono">
@@ -1467,7 +1467,7 @@ export const MikroTikVPNSuite: React.FC<MikroTikVPNSuiteProps> = ({
                       <span className="text-[10px] text-slate-400 uppercase font-semibold">{isEn ? 'Operational Status' : 'وضعیت عملیاتی'}</span>
                       <p className="text-sm font-bold font-mono text-emerald-400 mt-1 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        {verifyResult.operational_status.toUpperCase()}
+                        {(verifyResult.operational_status || 'UNKNOWN').toUpperCase()}
                       </p>
                     </div>
 

@@ -71,7 +71,7 @@ export const VPNInspectModal: React.FC<VPNInspectModalProps> = ({
             </div>
             <div className={`p-2.5 rounded border ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
               <span className="text-[10px] text-slate-400 uppercase">{isEn ? 'Protocol' : 'پروتکل'}</span>
-              <p className="font-bold text-cyan-400">{vpn.type.toUpperCase()}</p>
+              <p className="font-bold text-cyan-400">{(vpn.type || 'VPN').toUpperCase()}</p>
             </div>
           </div>
 

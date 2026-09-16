@@ -953,7 +953,7 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
                                   : 'bg-slate-800 text-slate-400'
                               }`}
                             >
-                              {p.status.toUpperCase()}
+                              {(p.status || 'down').toUpperCase()}
                             </span>
                           </td>
                         </tr>

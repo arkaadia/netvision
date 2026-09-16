@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.60.1';
+export const APP_VERSION = '1.60.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.60.2',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'رفع مشکل صفحه مشکی در ترمینال مستقیم SSH و بازرس پورت‌ها، اعمال گارد دفاعی کامل بر روی فیلدهای پورت و افزودن ErrorBoundary سراسری',
+    title_en: 'Fix Black Screen Crash on Direct SSH Console & Port Inspector, Complete Defensive Guards on Port Properties & Global React ErrorBoundary',
+    changes: [
+      'برطرف‌سازی ریشه‌ای خطای شکست اجرای برنامه (TypeError: Cannot read properties of undefined reading toUpperCase) که باعث مشکی شدن صفحه هنگام کلیک روی ترمینال مستقیم SSH یا بازرس پورت‌ها می‌شد.',
+      'افزودن گاردها و فالبک‌های پیشگیرانه در تمامی ماژول‌های بصری پورت‌ها شامل NetworkPortSvg، CompactTerminalFaceplate، PortInspectorModal، CiscoTerminalModal، MikroTikTerminalModal، MikroTikDeviceManageModal، HardwareSvgRenderer و PortManagementView.',
+      'پیاده‌سازی کامپوننت سراسری ErrorBoundary در ریشه نرم‌افزار جهت محافظت کامل در برابر خطاهای رندرینگ غیرمنتظره و جلوگیری از سفید یا مشکی شدن صفحه همراه با امکان تلاش مجدد بدون نیاز به رفرش دستی.',
+      'افزودن ویژگی‌های استاندارد autoComplete به فیلدهای فرم افزودن و ویرایش تجهیزات جهت برطرف‌سازی هشدارهای کنسول مرورگر.',
+      'رعایت صددرصدی استاندارد بین‌المللی‌سازی و عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization Rule).'
+    ],
+    changes_en: [
+      'Fundamentally resolved the crash defect (TypeError: Cannot read properties of undefined reading toUpperCase) that caused a black screen when launching the direct SSH console or inspecting device ports.',
+      'Applied comprehensive defensive null-coalescing guards and fallbacks across all port rendering components: NetworkPortSvg, CompactTerminalFaceplate, PortInspectorModal, CiscoTerminalModal, MikroTikTerminalModal, MikroTikDeviceManageModal, HardwareSvgRenderer, and PortManagementView.',
+      'Implemented an enterprise-grade React ErrorBoundary component at the application root to capture unexpected UI exceptions and prevent blank/black screens, with built-in retry and reload controls.',
+      'Added standard autoComplete attributes to SSH and device credential input fields in Add and Edit device modals to eliminate browser console DOM warnings.',
+      'Enforced 100% strict localization compliance with complete Persian/English symmetry and zero untranslated content in English mode.'
+    ]
+  },
   {
     version: '1.60.1',
     releaseDate: '2026-09-16',

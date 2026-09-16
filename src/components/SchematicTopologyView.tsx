@@ -7556,7 +7556,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                     {t('topology_physical_rename_modal_title')}
                   </h3>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    {renameModal.type.toUpperCase()}: {renameModal.currentName}
+                    {(renameModal.type || '').toUpperCase()}: {renameModal.currentName}
                   </p>
                 </div>
               </div>
@@ -7633,7 +7633,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                     {t('topology_physical_delete_modal_title')}
                   </h3>
                   <p className="text-[11px] text-rose-300/80 font-mono">
-                    {deleteModal.type.toUpperCase()}: {deleteModal.item || deleteModal.building}
+                    {(deleteModal.type || '').toUpperCase()}: {deleteModal.item || deleteModal.building}
                   </p>
                 </div>
               </div>

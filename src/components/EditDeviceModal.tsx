@@ -1046,6 +1046,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                     value={sshHost}
                     onChange={(e) => setSshHost(e.target.value)}
                     placeholder={ip || '192.168.1.50'}
+                    autoComplete="off"
                     className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
                       isLightMode
                         ? 'bg-white border-indigo-300 text-slate-900 focus:border-indigo-600 shadow-xs'
@@ -1063,6 +1064,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                     type="number"
                     value={sshPort}
                     onChange={(e) => setSshPort(Number(e.target.value))}
+                    autoComplete="off"
                     className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
                       isLightMode
                         ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
@@ -1081,6 +1083,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                     value={sshUsername}
                     onChange={(e) => setSshUsername(e.target.value)}
                     placeholder="admin"
+                    autoComplete="username"
                     className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
                       isLightMode
                         ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
@@ -1108,6 +1111,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                     value={sshPassword}
                     onChange={(e) => setSshPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
                       isLightMode
                         ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
@@ -1127,6 +1131,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                       value={enablePassword}
                       onChange={(e) => setEnablePassword(e.target.value)}
                       placeholder="cisco"
+                      autoComplete="off"
                       className={`w-full px-3 py-1.5 rounded-lg border text-xs focus:outline-none font-mono text-left transition ${
                         isLightMode
                           ? 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 shadow-xs'
