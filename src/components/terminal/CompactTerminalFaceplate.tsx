@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Layers, CheckCircle2, AlertCircle, Shield, Cable, RefreshCw } from 'lucide-react';
 import { Device, SwitchPort } from '../../types';
 import { NetworkPortSvg } from '../NetworkPortSvg';
@@ -88,6 +88,14 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
     : undefined;
   const displayPort = activeHoverPort || currentSelectedPort;
   const multiSelectedCount = Array.isArray(selectedPortIds) ? selectedPortIds.length : 0;
+
+  const portRows = useMemo(() => {
+    const rows: SwitchPort[][] = [];
+    for (let i = 0; i < ports.length; i += 12) {
+      rows.push(ports.slice(i, i + 12));
+    }
+    return rows;
+  }, [ports]);
 
   return (
     <div
@@ -272,76 +280,81 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
                 : 'bg-slate-900/90 border-slate-800'
             }`}
           >
-            <div className="flex items-center gap-1.5 min-w-max py-0.5">
-              {ports.map((port, pIdx) => {
-                const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
-                const isSelected = Boolean(
-                  pId && (
-                    (selectedPortId && selectedPortId === pId) ||
-                    (Array.isArray(selectedPortIds) && selectedPortIds.length > 0 && selectedPortIds.includes(pId))
-                  )
-                );
-                const isHovered = Boolean(
-                  activeHoverPort &&
-                  (activeHoverPort.port_id || (activeHoverPort as any).port || activeHoverPort.name) === pId
-                );
+            <div className="flex flex-col gap-2 min-w-max py-0.5">
+              {portRows.map((row, rowIdx) => (
+                <div key={rowIdx} className="flex items-center gap-1.5">
+                  {row.map((port, pIdx) => {
+                    const globalIdx = rowIdx * 12 + pIdx;
+                    const pId = port.port_id || (port as any).port || port.name || `port-${globalIdx + 1}`;
+                    const isSelected = Boolean(
+                      pId && (
+                        (selectedPortId && selectedPortId === pId) ||
+                        (Array.isArray(selectedPortIds) && selectedPortIds.length > 0 && selectedPortIds.includes(pId))
+                      )
+                    );
+                    const isHovered = Boolean(
+                      activeHoverPort &&
+                      (activeHoverPort.port_id || (activeHoverPort as any).port || activeHoverPort.name) === pId
+                    );
 
-                return (
-                  <div
-                    key={pId}
-                    onClick={(e) => onPortClick?.(port, e)}
-                    onMouseEnter={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setHoverCoords({ x: rect.left + rect.width / 2, y: rect.bottom + 8 });
-                      setActiveHoverPort(port);
-                    }}
-                    onMouseLeave={() => {
-                      setActiveHoverPort((cur) => {
-                        if (!cur) return null;
-                        const curId = cur.port_id || (cur as any).port || cur.name;
-                        return curId === pId ? null : cur;
-                      });
-                      setHoverCoords(null);
-                    }}
-                    className={`cursor-pointer shrink-0 rounded transition-shadow ${
-                      isSelected
-                        ? isMikroTik
-                          ? 'ring-2 ring-cyan-400 z-20 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
-                          : 'ring-2 ring-indigo-400 z-20 shadow-[0_0_8px_rgba(129,140,248,0.6)]'
-                        : isHovered
-                        ? 'ring-2 ring-slate-400/80 z-10'
-                        : 'hover:ring-1 hover:ring-slate-500/60'
-                    }`}
-                    style={{
-                      width: '28px',
-                      height: isMikroTik ? '42px' : '40px',
-                      position: 'relative',
-                    }}
-                  >
-                    <div
-                      style={{
-                        transform: 'scale(0.5)',
-                        transformOrigin: 'top left',
-                        width: '56px',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      {isMikroTik ? (
-                        <MikroTikPortSvg
-                          port={port}
-                          isSelected={isSelected}
-                          isLightMode={isLightMode}
-                        />
-                      ) : (
-                        <NetworkPortSvg
-                          port={port}
-                          isSelected={isSelected}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                    return (
+                      <div
+                        key={pId}
+                        onClick={(e) => onPortClick?.(port, e)}
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoverCoords({ x: rect.left + rect.width / 2, y: rect.bottom + 8 });
+                          setActiveHoverPort(port);
+                        }}
+                        onMouseLeave={() => {
+                          setActiveHoverPort((cur) => {
+                            if (!cur) return null;
+                            const curId = cur.port_id || (cur as any).port || cur.name;
+                            return curId === pId ? null : cur;
+                          });
+                          setHoverCoords(null);
+                        }}
+                        className={`cursor-pointer shrink-0 rounded transition-shadow ${
+                          isSelected
+                            ? isMikroTik
+                              ? 'ring-2 ring-cyan-400 z-20 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
+                              : 'ring-2 ring-indigo-400 z-20 shadow-[0_0_8px_rgba(129,140,248,0.6)]'
+                            : isHovered
+                            ? 'ring-2 ring-slate-400/80 z-10'
+                            : 'hover:ring-1 hover:ring-slate-500/60'
+                        }`}
+                        style={{
+                          width: '28px',
+                          height: isMikroTik ? '42px' : '40px',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          style={{
+                            transform: 'scale(0.5)',
+                            transformOrigin: 'top left',
+                            width: '56px',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {isMikroTik ? (
+                            <MikroTikPortSvg
+                              port={port}
+                              isSelected={isSelected}
+                              isLightMode={isLightMode}
+                            />
+                          ) : (
+                            <NetworkPortSvg
+                              port={port}
+                              isSelected={isSelected}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -10,9 +10,24 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.3';
+export const APP_VERSION = '1.61.4';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.4',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'شکستن چیدمان پورت‌های فیس‌پلیت گرافیکی ترمینال در سطرهای ۱۲تایی',
+    title_en: 'Wrap Graphical Port Layout in Terminal Modal into 12 Ports per Line',
+    changes: [
+      'اصلاح ساختار چیدمان پورت‌های گرافیکی فیس‌پلیت در مودال ترمینال (CompactTerminalFaceplate) به طوری که در دسته‌های ۱۲تایی به خط بعد می‌شکنند (۱۲ پورت در هر سطر).',
+      'بهینه‌سازی فضای بصری و عدم نیاز به اسکرول افقی عریض روی دیوایس‌های ۲۴، ۴۸ یا ۵۲ پورتی.'
+    ],
+    changes_en: [
+      'Restructured the graphical port faceplate in the Terminal Modal (CompactTerminalFaceplate) to automatically wrap ports into rows of 12 interfaces per line.',
+      'Optimized viewport ergonomics by eliminating excessive horizontal scrolling on 24, 48, and 52-port switches.'
+    ]
+  },
   {
     version: '1.61.3',
     releaseDate: '2026-09-16',
