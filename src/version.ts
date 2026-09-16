@@ -10,9 +10,24 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.5';
+export const APP_VERSION = '1.61.6';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.6',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'افزودن دکمه قفل پس‌زمینه به مودال ثبت تجهیز جدید شبکه (قفل پیش‌فرض)',
+    title_en: 'Add Lock Toggle for Register New Network Device Modal (Locked by Default)',
+    changes: [
+      'افزودن دکمه قفل پس‌زمینه (Lock/Unlock) در هدر مودال ثبت تجهیز جدید شبکه (و ویرایش تجهیز) همگام با سایر مودال‌های سیستم.',
+      'فعال بودن قفل به صورت پیش‌فرض با باز شدن مودال جهت جلوگیری از بسته شدن ناخواسته فرم با کلیک روی بک‌دراپ بیرون پنجره.'
+    ],
+    changes_en: [
+      'Added a backdrop lock toggle (Lock/Unlock) in the header of the Register New Network Device modal (and Edit Device modal) aligned with other panel modals.',
+      'Enabled the lock toggle by default whenever the modal opens to prevent accidental closure when clicking outside on the overlay.'
+    ]
+  },
   {
     version: '1.61.5',
     releaseDate: '2026-09-16',

@@ -119,6 +119,13 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Lock toggle: prevent backdrop click from closing modal (enabled by default)
+  const [preventBackdropClose, setPreventBackdropClose] = useState<boolean>(true);
+
+  const togglePreventBackdropClose = () => {
+    setPreventBackdropClose((prev) => !prev);
+  };
+
   // Duplicate device detection (non-blocking warning)
   const duplicateDevice = React.useMemo(() => {
     const cleanIp = ip.trim();
@@ -171,6 +178,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     setPingTestResult(null);
     setError(null);
     setSelectedTemplateId('');
+    setPreventBackdropClose(true);
 
     // Fetch templates
     fetchTemplates()
@@ -582,7 +590,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       className="fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-2 sm:p-4 modal-backdrop-blur overflow-y-auto"
       data-modal-backdrop="true"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !preventBackdropClose) onClose();
       }}
       dir={isEn ? 'ltr' : 'rtl'}
     >
@@ -623,6 +631,31 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Lock Modal Backdrop Close Toggle Button */}
+            <button
+              type="button"
+              onClick={togglePreventBackdropClose}
+              className={`p-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition font-medium cursor-pointer ${
+                preventBackdropClose
+                  ? 'bg-amber-500/20 text-amber-500 dark:text-amber-300 border-amber-500/50 shadow-xs'
+                  : isLightMode
+                    ? 'bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 border-slate-300'
+                    : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border-slate-700'
+              }`}
+              title={
+                preventBackdropClose
+                  ? (isEn ? 'Modal Locked: Clicking outside will NOT close it (Click to unlock)' : 'مودال قفل است: کلیک بیرون پنجره آن را نمی‌بندد (جهت باز کردن کلیک کنید)')
+                  : (isEn ? 'Lock Modal: Prevent closing when clicking outside' : 'قفل مودال: جلوگیری از بسته شدن با کلیک بیرون پنجره')
+              }
+              aria-label={
+                preventBackdropClose
+                  ? (isEn ? 'Unlock modal backdrop' : 'باز کردن قفل مودال')
+                  : (isEn ? 'Lock modal backdrop' : 'قفل کردن مودال')
+              }
+            >
+              {preventBackdropClose ? <Lock className="w-4 h-4 text-amber-500 dark:text-amber-400" /> : <Unlock className="w-4 h-4" />}
+            </button>
+
             {onMinimize && (
               <button
                 type="button"
