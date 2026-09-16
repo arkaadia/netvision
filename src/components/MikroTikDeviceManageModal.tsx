@@ -642,7 +642,7 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
                         )}
                       </div>
                       <span className={`text-xs font-mono ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                        MAC: {selectedPort.mac_address || device.mac || '48:8F:5A:xx:xx:xx'}
+                        MAC: {(selectedPort as any)?.mac_address || device.mac || '48:8F:5A:xx:xx:xx'}
                       </span>
                     </div>
 

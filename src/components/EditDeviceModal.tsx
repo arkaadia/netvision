@@ -821,7 +821,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                             const isTrunk = p.mode === 'trunk';
                             return (
                               <div
-                                key={p.id || p.name}
+                                key={p.port_id || p.name}
                                 className={`p-1 rounded-lg border text-center transition flex flex-col items-center justify-between min-h-[52px] ${
                                   isUp
                                     ? isTrunk
@@ -882,7 +882,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                           </thead>
                           <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-[10px]">
                             {discoveredPorts.map((p) => (
-                              <tr key={p.id || p.name} className={isLightMode ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
+                              <tr key={p.port_id || p.name} className={isLightMode ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
                                 <td className="p-1.5 font-bold">{p.name}</td>
                                 <td className="p-1.5 text-amber-600 dark:text-amber-400">{p.description || '-'}</td>
                                 <td className="p-1.5">

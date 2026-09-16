@@ -69,13 +69,13 @@ export const RackElevationInspectorModal: React.FC<RackElevationInspectorModalPr
 
   if (!isOpen || !rack) return null;
 
-  const safeRack = {
+  const safeRack: CustomTopologyRack = {
     ...rack,
     id: rack.id || 'rack-default',
     name: rack.name || 'Rack Cabinet',
     devices: Array.isArray(rack.devices) ? rack.devices : [],
-    units: Number(rack.units) || 42,
-    depth: Number(rack.depth) || 100,
+    units: (Number(rack.units) || 42) as any,
+    depth: (Number(rack.depth) || 100) as any,
     viewMode: (rack.viewMode === 'rear' ? 'rear' : 'front') as RackViewMode,
   };
 

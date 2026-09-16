@@ -219,7 +219,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
   });
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [isWritingMemory, setIsWritingMemory] = useState(false);
-  const [sshSessionMode, setSshSessionMode] = useState<'connecting' | 'real_ssh' | 'failed'>('connecting');
+  const [sshSessionMode, setSshSessionMode] = useState<'connecting' | 'real_ssh' | 'simulated' | 'failed'>('connecting');
   const [sshLatency, setSshLatency] = useState<number | null>(null);
   const [isSyncingPorts, setIsSyncingPorts] = useState<boolean>(false);
   const lastSyncTimeRef = useRef<number>(0);

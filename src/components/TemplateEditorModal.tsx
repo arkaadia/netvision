@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   CopyPlus
 } from 'lucide-react';
-import { ConfigTemplate, TemplateVariable } from '../types';
+import { ConfigTemplate, TemplateVariable, TemplateTargetType } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface TemplateEditorModalProps {
@@ -24,7 +24,7 @@ interface TemplateEditorModalProps {
   onClose: () => void;
   templateToEdit?: ConfigTemplate | null;
   onSave: (template: Partial<ConfigTemplate>) => Promise<void>;
-  onSaveAsClone?: (template: Partial<ConfigTemplate>) => Promise<void>;
+  onSaveAsClone?: (template: Partial<ConfigTemplate>) => Promise<any>;
 }
 
 const COMMON_VARS: { name: string; label: string; labelEn: string; default_value: string; type: TemplateVariable['type'] }[] = [
@@ -54,10 +54,10 @@ export const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
   const { t, isEn } = useLanguage();
   const [name, setName] = useState('');
   const [vendor, setVendor] = useState<'cisco' | 'mikrotik' | 'generic'>('cisco');
-  const [targetType, setTargetType] = useState<'switch' | 'router' | 'all'>('switch');
+  const [targetType, setTargetType] = useState<TemplateTargetType>('switch');
   const [role, setRole] = useState('Access Switch');
   const [description, setDescription] = useState('');
-  const [defaultCliMode, setDefaultCliMode] = useState<'GLOBAL_CONFIG' | 'PRIVILEGED_EXEC' | 'ROUTEROS'>('GLOBAL_CONFIG');
+  const [defaultCliMode, setDefaultCliMode] = useState<string>('GLOBAL_CONFIG');
   const [commands, setCommands] = useState('');
   const [variables, setVariables] = useState<TemplateVariable[]>([]);
   const [showPreview, setShowPreview] = useState(false);

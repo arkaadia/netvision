@@ -90,8 +90,7 @@ class CiscoDriver(NetworkDeviceDriver):
     def get_interface_query_commands(self) -> List[str]:
         return [
             "terminal length 0",
-            "show interfaces status",
-            "show ip interface brief"
+            "show interfaces status"
         ]
 
     def parse_interfaces(self, raw_output: str) -> List[Dict[str, Any]]:
@@ -102,6 +101,7 @@ class CiscoDriver(NetworkDeviceDriver):
         Gi1/0/2                      notconnect   10           auto   auto 10/100/1000BaseTX
         """
         ports = []
+        seen_ports = set()
         lines = raw_output.splitlines()
         header_found = False
 
@@ -119,6 +119,11 @@ class CiscoDriver(NetworkDeviceDriver):
             parts = line_str.split()
             if len(parts) >= 6:
                 port_id = parts[0]
+                canon_id = port_id.lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
+                if canon_id in seen_ports:
+                    continue
+                seen_ports.add(canon_id)
+
                 status_raw = parts[2] if len(parts) >= 6 else parts[1]
                 vlan_raw = parts[3] if len(parts) >= 6 else "1"
 

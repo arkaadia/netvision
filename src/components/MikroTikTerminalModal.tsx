@@ -113,7 +113,7 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
   const lastInsertedPortTextRef = useRef<string | null>(null);
 
   // Real SSH / Telnet Session State
-  const [sshSessionMode, setSshSessionMode] = useState<'connecting' | 'real_ssh' | 'failed'>('connecting');
+  const [sshSessionMode, setSshSessionMode] = useState<'connecting' | 'real_ssh' | 'simulated' | 'failed'>('connecting');
   const [sshLatency, setSshLatency] = useState<number | null>(null);
   const [isSyncingPorts, setIsSyncingPorts] = useState<boolean>(false);
   const lastSyncTimeRef = useRef<number>(0);

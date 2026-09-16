@@ -68,7 +68,8 @@ import {
   DeviceCanvasDisplayMode,
   CustomTopologyTower,
   MountedTowerDevice,
-  TowerType
+  TowerType,
+  ThemeType
 } from '../types';
 import { useLanguage } from '../i18n';
 import { useAuth } from '../context/AuthContext';
@@ -104,7 +105,7 @@ interface SchematicTopologyViewProps {
   onConnectTerminal?: (device: Device) => void;
   isFullMode?: boolean;
   onToggleFullMode?: () => void;
-  panelTheme?: 'obsidian' | 'light' | 'matrix';
+  panelTheme?: ThemeType;
 }
 
 // Helper to separate and curve overlapping parallel cables between devices
@@ -4707,54 +4708,44 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                   <span>{t('topology_tool_add_device')}</span>
                 </button>
 
-                {/* Add Rack Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (globalDeviceViewMode === 'card') {
-                      setGlobalDeviceViewMode('physical');
-                    }
-                    setIsAddRackOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
-                  title={isEn ? "Add standard datacenter rack (16U to 44U)" : "افزودن رک استاندارد دیتا سنتر (16U تا 44U)"}
-                >
-                  <Box className="w-3.5 h-3.5" />
-                  <span>{isEn ? 'Add Rack' : 'افزودن رک (Rack)'}</span>
-                </button>
+                {/* Physical View Exclusive Buttons: Add Rack, Add Tower, Install Hardware in Rack */}
+                {globalDeviceViewMode === 'physical' && (
+                  <>
+                    {/* Add Rack Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsAddRackOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
+                      title={isEn ? "Add standard datacenter rack (16U to 44U)" : "افزودن رک استاندارد دیتا سنتر (16U تا 44U)"}
+                    >
+                      <Box className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Add Rack' : 'افزودن رک (Rack)'}</span>
+                    </button>
 
-                {/* Add Tower Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (globalDeviceViewMode === 'card') {
-                      setGlobalDeviceViewMode('physical');
-                    }
-                    setIsAddTowerOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
-                  title={isEn ? "Add telecom tower or mast (6m to 60m)" : "افزودن دکل مهاری یا خودایستا مخابراتی (۶ تا ۶۰ متر)"}
-                >
-                  <Radio className="w-3.5 h-3.5" />
-                  <span>{isEn ? 'Add Tower' : 'افزودن دکل (Tower)'}</span>
-                </button>
+                    {/* Add Tower Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsAddTowerOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
+                      title={isEn ? "Add telecom tower or mast (6m to 60m)" : "افزودن دکل مهاری یا خودایستا مخابراتی (۶ تا ۶۰ متر)"}
+                    >
+                      <Radio className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Add Tower' : 'افزودن دکل (Tower)'}</span>
+                    </button>
 
-                {/* Install Hardware in Rack Button (shown if any racks exist) */}
-                {(currentCustomMap.racks?.length || 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (globalDeviceViewMode === 'card') {
-                        setGlobalDeviceViewMode('physical');
-                      }
-                      handleOpenAddHardware();
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
-                    title={isEn ? "Install HPE/Asus/Cisco server, switch, router, storage, patch panel in rack" : "نصب سرور HPE/Asus/Cisco، سوییچ، روتر، استوریج، پچ پنل و کیبل منیجمنت در رک"}
-                  >
-                    <Server className="w-3.5 h-3.5" />
-                    <span>{isEn ? 'Install Hardware' : 'نصب سخت‌افزار'}</span>
-                  </button>
+                    {/* Install Hardware in Rack Button (shown if any racks exist) */}
+                    {(currentCustomMap.racks?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAddHardware()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
+                        title={isEn ? "Install HPE/Asus/Cisco server, switch, router, storage, patch panel in rack" : "نصب سرور HPE/Asus/Cisco، سوییچ، روتر، استوریج، پچ پنل و کیبل منیجمنت در رک"}
+                      >
+                        <Server className="w-3.5 h-3.5" />
+                        <span>{isEn ? 'Install Hardware' : 'نصب سخت‌افزار'}</span>
+                      </button>
+                    )}
+                  </>
                 )}
 
                 {/* Global Device Display Mode: Card (Cabling) vs Physical (Chassis/Rackmount) */}
@@ -5493,28 +5484,26 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                         <Plus className="w-4 h-4" />
                         <span>{t('topology_tool_add_device')}</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGlobalDeviceViewMode('physical');
-                          setIsAddRackOpen(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95"
-                      >
-                        <Box className="w-4 h-4" />
-                        <span>{isEn ? 'Add Server Rack' : 'افزودن رک سرور (Rack)'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGlobalDeviceViewMode('physical');
-                          setIsAddTowerOpen(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-lg transition active:scale-95"
-                      >
-                        <Radio className="w-4 h-4" />
-                        <span>{isEn ? 'Add Telecom Tower' : 'افزودن دکل مخابراتی (Tower)'}</span>
-                      </button>
+                      {globalDeviceViewMode === 'physical' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddRackOpen(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95"
+                          >
+                            <Box className="w-4 h-4" />
+                            <span>{isEn ? 'Add Server Rack' : 'افزودن رک سرور (Rack)'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddTowerOpen(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-lg transition active:scale-95"
+                          >
+                            <Radio className="w-4 h-4" />
+                            <span>{isEn ? 'Add Telecom Tower' : 'افزودن دکل مخابراتی (Tower)'}</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </foreignObject>

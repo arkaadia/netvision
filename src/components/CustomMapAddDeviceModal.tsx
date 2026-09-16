@@ -107,42 +107,44 @@ export const CustomMapAddDeviceModal: React.FC<CustomMapAddDeviceModalProps> = (
           </div>
         </div>
 
-        {/* Representation Mode Switcher Banner */}
-        <div className="px-4 py-2.5 bg-indigo-50/70 dark:bg-indigo-950/30 border-b border-indigo-100 dark:border-indigo-900/40 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              {isEn ? 'Default Representation:' : 'حالت نمایش پیش‌فرض تجهیز:'}
-            </span>
-          </div>
+        {/* Representation Mode Switcher Banner - Only shown when in Physical view mode or mode is not predetermined */}
+        {initialDisplayMode !== 'card' && (
+          <div className="px-4 py-2.5 bg-indigo-50/70 dark:bg-indigo-950/30 border-b border-indigo-100 dark:border-indigo-900/40 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                {isEn ? 'Default Representation:' : 'حالت نمایش پیش‌فرض تجهیز:'}
+              </span>
+            </div>
 
-          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-indigo-200 dark:border-indigo-800/80 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setSelectedDisplayMode('card')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                selectedDisplayMode === 'card'
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>{isEn ? 'Card View (Cabling & Ports)' : 'نمای کارت (کابل‌کشی و ارتباط پورت‌ها)'}</span>
-            </button>
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-indigo-200 dark:border-indigo-800/80 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setSelectedDisplayMode('card')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  selectedDisplayMode === 'card'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>{isEn ? 'Card View (Cabling & Ports)' : 'نمای کارت (کابل‌کشی و ارتباط پورت‌ها)'}</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setSelectedDisplayMode('physical')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                selectedDisplayMode === 'physical'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Server className="w-3.5 h-3.5" />
-              <span>{isEn ? 'Physical Chassis (Rackmount)' : 'نمای فیزیکی شاسی (رکمونت و جانمایی در رک)'}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDisplayMode('physical')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  selectedDisplayMode === 'physical'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Server className="w-3.5 h-3.5" />
+                <span>{isEn ? 'Physical Chassis (Rackmount)' : 'نمای فیزیکی شاسی (رکمونت و جانمایی در رک)'}</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Search & Filters */}
         <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">

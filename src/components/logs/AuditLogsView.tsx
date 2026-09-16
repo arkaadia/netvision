@@ -248,7 +248,7 @@ export const AuditLogsView: React.FC = () => {
         deviceId: string;
         deviceName: string;
         deviceIp: string;
-        deviceVendor: 'cisco' | 'mikrotik' | 'linux';
+        deviceVendor: 'cisco' | 'mikrotik' | 'linux' | 'generic';
         deviceModel?: string;
         deviceLocation?: string;
         totalCommands: number;
@@ -351,7 +351,7 @@ export const AuditLogsView: React.FC = () => {
             deviceId: string;
             deviceName: string;
             deviceIp: string;
-            deviceVendor: 'cisco' | 'mikrotik' | 'linux';
+            deviceVendor: 'cisco' | 'mikrotik' | 'linux' | 'generic';
             deviceModel?: string;
             deviceLocation?: string;
             commands: DeviceCommandLogEntry[];

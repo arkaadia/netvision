@@ -113,8 +113,25 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   const [hierarchyUnits, setHierarchyUnits] = useState<string[]>([]);
   const [hierarchyRacks, setHierarchyRacks] = useState<string[]>([]);
 
+  // Existing devices for duplicate IP / Connection target warnings
+  const [existingDevices, setExistingDevices] = useState<Device[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Duplicate device detection (non-blocking warning)
+  const duplicateDevice = React.useMemo(() => {
+    const cleanIp = ip.trim();
+    const cleanHost = sshHost.trim();
+    if (!cleanIp && !cleanHost) return null;
+    return existingDevices.find((d) => {
+      const dIp = (d.ip || '').trim();
+      const dHost = ((d.connection as any)?.host || d.ssh_host || '').trim();
+      if (cleanIp && (dIp === cleanIp || dHost === cleanIp)) return true;
+      if (cleanHost && (dIp === cleanHost || dHost === cleanHost)) return true;
+      return false;
+    }) || null;
+  }, [existingDevices, ip, sshHost]);
 
   // Reset and populate defaults on modal open
   useEffect(() => {
@@ -186,6 +203,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
 
         const devRes = await fetchDevices().catch(() => ({ devices: [] }));
         const liveDevices = devRes?.devices || [];
+        setExistingDevices(liveDevices);
 
         const bldgsSet = new Set<string>(savedBuildings);
         const floorsSet = new Set<string>();
@@ -305,6 +323,12 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         const hw = res.hardware;
         const pwr = res.power;
 
+        // Auto-fill Management IP Address based on SSH test result / target host
+        const effectiveIp = ((res as any).ip || (hw as any)?.ip || targetHost).trim();
+        if (effectiveIp) {
+          setIp(effectiveIp);
+        }
+
         const detectedHostname = hw?.hostname || res.hostname || '';
         if (detectedHostname) {
           setName(detectedHostname);
@@ -347,11 +371,30 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         }
         
         const resolvedTotalPorts = res.total_ports || hw?.total_ports || (res.ports && res.ports.length > 0 ? res.ports.length : 24);
-        setTotalPorts(resolvedTotalPorts);
 
         if (res.ports && res.ports.length > 0) {
-          setDiscoveredPorts(res.ports);
+          const seen = new Set<string>();
+          const deduped: SwitchPort[] = [];
+          for (let pIdx = 0; pIdx < res.ports.length; pIdx++) {
+            const p = res.ports[pIdx];
+            const pid = (p.port_id || p.port || p.name || `port-${pIdx + 1}`).trim();
+            const canon = pid.toLowerCase().replace(/gigabitethernet/g, 'gi').replace(/fastethernet/g, 'fa').replace(/tengigabitethernet/g, 'te');
+            if (seen.has(canon)) continue;
+            seen.add(canon);
+            deduped.push({
+              ...p,
+              id: p.id || pid,
+              port_id: pid,
+              port: pid,
+              name: pid,
+              description: p.description || (p.name && p.name !== pid ? p.name : ''),
+            });
+          }
+          setDiscoveredPorts(deduped);
+          setTotalPorts(deduped.length);
           setIsPortsExpanded(true);
+        } else {
+          setTotalPorts(resolvedTotalPorts);
         }
         setIsLockedByDiscovery(true);
         const srcText = res.simulated
@@ -1082,29 +1125,33 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-[10px]">
-                            {discoveredPorts.map((p) => (
-                              <tr key={p.id || p.name} className={isLightMode ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
-                                <td className="p-1.5 font-bold">{p.name}</td>
-                                <td className="p-1.5 text-amber-600 dark:text-amber-400">{p.description || '-'}</td>
-                                <td className="p-1.5">
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                    p.status === 'up' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                  }`}>
-                                    {p.status?.toUpperCase()}
-                                  </span>
-                                </td>
-                                <td className="p-1.5">
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                    p.mode === 'trunk' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
-                                  }`}>
-                                    {p.mode?.toUpperCase()}
-                                  </span>
-                                </td>
-                                <td className="p-1.5">{p.vlan || '-'}</td>
-                                <td className="p-1.5">{p.speed || 'auto'}</td>
-                                <td className="p-1.5">{p.duplex || 'auto'}</td>
-                              </tr>
-                            ))}
+                            {discoveredPorts.map((p, pIdx) => {
+                              const portDisplay = p.port_id || p.port || p.name || `Port ${pIdx + 1}`;
+                              const descDisplay = p.description || (p.name && p.name !== portDisplay ? p.name : '') || '-';
+                              return (
+                                <tr key={p.id || p.port_id || p.port || p.name || pIdx} className={isLightMode ? 'hover:bg-slate-50' : 'hover:bg-slate-800/50'}>
+                                  <td className="p-1.5 font-bold text-indigo-600 dark:text-indigo-400 font-mono">{portDisplay}</td>
+                                  <td className="p-1.5 text-amber-600 dark:text-amber-400">{descDisplay}</td>
+                                  <td className="p-1.5">
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                      p.status === 'up' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                    }`}>
+                                      {p.status?.toUpperCase()}
+                                    </span>
+                                  </td>
+                                  <td className="p-1.5">
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                      p.mode === 'trunk' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
+                                    }`}>
+                                      {p.mode?.toUpperCase()}
+                                    </span>
+                                  </td>
+                                  <td className="p-1.5">{p.vlan || '-'}</td>
+                                  <td className="p-1.5">{p.speed || 'auto'}</td>
+                                  <td className="p-1.5">{p.duplex || 'auto'}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1474,6 +1521,25 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                     }`}
                     dir="ltr"
                   />
+                  {duplicateDevice && (
+                    <div className={`mt-2 p-2.5 rounded-xl flex items-start gap-2 text-xs border ${
+                      isLightMode
+                        ? 'bg-amber-50 border-amber-300 text-amber-900'
+                        : 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+                    }`}>
+                      <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isLightMode ? 'text-amber-600' : 'text-amber-400'}`} />
+                      <div>
+                        <span className="font-bold">
+                          {isEn ? 'Warning: Duplicate IP / Connection Target' : 'هشدار: آدرس IP یا هدف اتصال تکراری'}
+                        </span>
+                        <p className="mt-0.5 text-[11px] opacity-90">
+                          {isEn
+                            ? `A device with this IP/Host already exists ("${duplicateDevice.name}" - ${duplicateDevice.ip || 'No IP'}). You may still proceed with registration if intended.`
+                            : `تجهیزی با این آدرس IP/هاست از قبل ثبت شده است («${duplicateDevice.name}» - ${duplicateDevice.ip || 'بدون IP'}). در صورت تمایل می‌توانید ثبت تجهیز را ادامه دهید.`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1991,6 +2057,18 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
           </div>
 
           {/* Form Actions Footer */}
+          {duplicateDevice && (
+            <div className={`px-5 py-2 border-t flex items-center gap-2 text-xs ${
+              isLightMode ? 'bg-amber-50/90 border-amber-200 text-amber-900' : 'bg-amber-950/30 border-amber-900/50 text-amber-300'
+            }`}>
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
+              <span>
+                {isEn
+                  ? `Notice: Device IP/Host matches existing device "${duplicateDevice.name}". Registration is allowed.`
+                  : `توجه: مشخصات آی‌پی/هاست با تجهیز موجود «${duplicateDevice.name}» مشابه است. ثبت مجاز می‌باشد.`}
+              </span>
+            </div>
+          )}
           <div className={`flex items-center justify-between px-5 py-3 border-t shrink-0 transition ${
             isLightMode ? 'border-slate-200 bg-slate-50/90' : 'border-slate-800 bg-slate-950/80'
           }`}>

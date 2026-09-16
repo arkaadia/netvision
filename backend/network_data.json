@@ -401,7 +401,8 @@
         "connected_type": "Router",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Uplink to Edge Gateway RT-EDGE-01"
+        "description": "Uplink to Edge Gateway RT-EDGE-01",
+        "port": "TenGig0/1"
       },
       {
         "port_id": "TenGig0/2",
@@ -417,7 +418,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Trunk Link to SW-DIST-BLDG-A"
+        "description": "Trunk Link to SW-DIST-BLDG-A",
+        "port": "TenGig0/2"
       },
       {
         "port_id": "TenGig0/3",
@@ -433,7 +435,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Trunk Link to SW-DIST-BLDG-B"
+        "description": "Trunk Link to SW-DIST-BLDG-B",
+        "port": "TenGig0/3"
       },
       {
         "port_id": "Gig0/1",
@@ -449,7 +452,8 @@
         "connected_type": "Server",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Network Management Server"
+        "description": "Network Management Server",
+        "port": "Gig0/1"
       },
       {
         "port_id": "Gig0/2",
@@ -465,7 +469,8 @@
         "connected_type": "Access Point",
         "poe_status": "delivering",
         "poe_power": 18.5,
-        "description": "PoE to AP Lobby"
+        "description": "PoE to AP Lobby",
+        "port": "Gig0/2"
       },
       {
         "port_id": "Gig0/3",
@@ -481,7 +486,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Spare Server Link"
+        "description": "Spare Server Link",
+        "port": "Gig0/3"
       },
       {
         "port_id": "Gig0/4",
@@ -497,7 +503,8 @@
         "connected_type": "None",
         "poe_status": "disabled",
         "poe_power": 0,
-        "description": "Shutdown for Security"
+        "description": "Shutdown for Security",
+        "port": "Gig0/4"
       }
     ],
     "dev-dist-bldg-a": [
@@ -515,7 +522,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Core Trunk"
+        "description": "Core Trunk",
+        "port": "Te1/1/1"
       },
       {
         "port_id": "Te1/1/2",
@@ -531,7 +539,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Downlink to Floor 3 Access Switch"
+        "description": "Downlink to Floor 3 Access Switch",
+        "port": "Te1/1/2"
       },
       {
         "port_id": "Gi1/0/1",
@@ -547,7 +556,8 @@
         "connected_type": "Printer",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Floor 2 Shared Printer"
+        "description": "Floor 2 Shared Printer",
+        "port": "Gi1/0/1"
       },
       {
         "port_id": "Gi1/0/2",
@@ -563,7 +573,8 @@
         "connected_type": "VoIP Phone",
         "poe_status": "delivering",
         "poe_power": 7.4,
-        "description": "Finance Desk Phone"
+        "description": "Finance Desk Phone",
+        "port": "Gi1/0/2"
       }
     ],
     "dev-acc-bldg-a-f3": [
@@ -581,7 +592,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Uplink to Distribution"
+        "description": "Uplink to Distribution",
+        "port": "Te1/0/1"
       },
       {
         "port_id": "Gi1/0/1",
@@ -597,7 +609,8 @@
         "connected_type": "Access Point",
         "poe_status": "delivering",
         "poe_power": 13.2,
-        "description": "PoE+ to UniFi AP U6 Pro"
+        "description": "PoE+ to UniFi AP U6 Pro",
+        "port": "Gi1/0/1"
       },
       {
         "port_id": "Gi1/0/2",
@@ -613,7 +626,8 @@
         "connected_type": "Workstation",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Lead Developer Workstation"
+        "description": "Lead Developer Workstation",
+        "port": "Gi1/0/2"
       },
       {
         "port_id": "Gi1/0/3",
@@ -629,7 +643,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Dev Desk 304"
+        "description": "Dev Desk 304",
+        "port": "Gi1/0/3"
       }
     ],
     "dev-dist-bldg-b": [
@@ -647,7 +662,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Inter-Building Fiber Trunk"
+        "description": "Inter-Building Fiber Trunk",
+        "port": "Te1/1/1"
       },
       {
         "port_id": "Gi1/0/1",
@@ -663,7 +679,8 @@
         "connected_type": "Access Point",
         "poe_status": "delivering",
         "poe_power": 15.1,
-        "description": "Aruba AP in MDF"
+        "description": "Aruba AP in MDF",
+        "port": "Gi1/0/1"
       },
       {
         "port_id": "Gi1/0/2",
@@ -679,7 +696,8 @@
         "connected_type": "Switch",
         "poe_status": "n/a",
         "poe_power": 0,
-        "description": "Link to MikroTik Switch (Currently Offline)"
+        "description": "Link to MikroTik Switch (Currently Offline)",
+        "port": "Gi1/0/2"
       }
     ],
     "dev-ap-bldg-a-f3": [
@@ -697,7 +715,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 1 Access"
+        "description": "Port 1 Access",
+        "port": "Gi1/0/1"
       }
     ],
     "dev-acc-bldg-b-f2": [
@@ -715,7 +734,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 1 Access"
+        "description": "Port 1 Access",
+        "port": "Gi1/0/1"
       },
       {
         "port_id": "Gi1/0/2",
@@ -731,7 +751,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 2 Access"
+        "description": "Port 2 Access",
+        "port": "Gi1/0/2"
       },
       {
         "port_id": "Gi1/0/3",
@@ -747,7 +768,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 3 Access"
+        "description": "Port 3 Access",
+        "port": "Gi1/0/3"
       },
       {
         "port_id": "Gi1/0/4",
@@ -763,7 +785,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 4 Access"
+        "description": "Port 4 Access",
+        "port": "Gi1/0/4"
       },
       {
         "port_id": "Gi1/0/5",
@@ -779,7 +802,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 5 Access"
+        "description": "Port 5 Access",
+        "port": "Gi1/0/5"
       },
       {
         "port_id": "Gi1/0/6",
@@ -795,7 +819,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 6 Access"
+        "description": "Port 6 Access",
+        "port": "Gi1/0/6"
       },
       {
         "port_id": "Gi1/0/7",
@@ -811,7 +836,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 7 Access"
+        "description": "Port 7 Access",
+        "port": "Gi1/0/7"
       },
       {
         "port_id": "Gi1/0/8",
@@ -827,7 +853,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 8 Access"
+        "description": "Port 8 Access",
+        "port": "Gi1/0/8"
       },
       {
         "port_id": "Gi1/0/9",
@@ -843,7 +870,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 9 Access"
+        "description": "Port 9 Access",
+        "port": "Gi1/0/9"
       },
       {
         "port_id": "Gi1/0/10",
@@ -859,7 +887,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 10 Access"
+        "description": "Port 10 Access",
+        "port": "Gi1/0/10"
       },
       {
         "port_id": "Gi1/0/11",
@@ -875,7 +904,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 11 Access"
+        "description": "Port 11 Access",
+        "port": "Gi1/0/11"
       },
       {
         "port_id": "Gi1/0/12",
@@ -891,7 +921,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 12 Access"
+        "description": "Port 12 Access",
+        "port": "Gi1/0/12"
       },
       {
         "port_id": "Gi1/0/13",
@@ -907,7 +938,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 13 Access"
+        "description": "Port 13 Access",
+        "port": "Gi1/0/13"
       },
       {
         "port_id": "Gi1/0/14",
@@ -923,7 +955,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 14 Access"
+        "description": "Port 14 Access",
+        "port": "Gi1/0/14"
       },
       {
         "port_id": "Gi1/0/15",
@@ -939,7 +972,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 15 Access"
+        "description": "Port 15 Access",
+        "port": "Gi1/0/15"
       },
       {
         "port_id": "Gi1/0/16",
@@ -955,7 +989,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 16 Access"
+        "description": "Port 16 Access",
+        "port": "Gi1/0/16"
       },
       {
         "port_id": "Gi1/0/17",
@@ -971,7 +1006,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 17 Access"
+        "description": "Port 17 Access",
+        "port": "Gi1/0/17"
       },
       {
         "port_id": "Gi1/0/18",
@@ -987,7 +1023,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 18 Access"
+        "description": "Port 18 Access",
+        "port": "Gi1/0/18"
       },
       {
         "port_id": "Gi1/0/19",
@@ -1003,7 +1040,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 19 Access"
+        "description": "Port 19 Access",
+        "port": "Gi1/0/19"
       },
       {
         "port_id": "Gi1/0/20",
@@ -1019,7 +1057,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 20 Access"
+        "description": "Port 20 Access",
+        "port": "Gi1/0/20"
       },
       {
         "port_id": "Gi1/0/21",
@@ -1035,7 +1074,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 21 Access"
+        "description": "Port 21 Access",
+        "port": "Gi1/0/21"
       },
       {
         "port_id": "Gi1/0/22",
@@ -1051,7 +1091,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 22 Access"
+        "description": "Port 22 Access",
+        "port": "Gi1/0/22"
       },
       {
         "port_id": "Gi1/0/23",
@@ -1067,7 +1108,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 23 Access"
+        "description": "Port 23 Access",
+        "port": "Gi1/0/23"
       },
       {
         "port_id": "Gi1/0/24",
@@ -1083,7 +1125,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 24 Access"
+        "description": "Port 24 Access",
+        "port": "Gi1/0/24"
       },
       {
         "port_id": "Gi1/0/25",
@@ -1099,7 +1142,8 @@
         "connected_type": "Host",
         "poe_status": "delivering",
         "poe_power": 12.5,
-        "description": "Port 25 Access"
+        "description": "Port 25 Access",
+        "port": "Gi1/0/25"
       },
       {
         "port_id": "Gi1/0/26",
@@ -1115,7 +1159,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 26 Access"
+        "description": "Port 26 Access",
+        "port": "Gi1/0/26"
       },
       {
         "port_id": "Gi1/0/27",
@@ -1131,7 +1176,8 @@
         "connected_type": "None",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 27 Access"
+        "description": "Port 27 Access",
+        "port": "Gi1/0/27"
       },
       {
         "port_id": "Gi1/0/28",
@@ -1147,7 +1193,8 @@
         "connected_type": "Host",
         "poe_status": "off",
         "poe_power": 0,
-        "description": "Port 28 Access"
+        "description": "Port 28 Access",
+        "port": "Gi1/0/28"
       }
     ],
     "dev-router-gw": [
@@ -1163,7 +1210,8 @@
         "duplex": "full",
         "description": "Uplink-To-Core-SW01",
         "connected_device": "Uplink-To-Core-SW01",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/1"
       },
       {
         "port_id": "Gi1/0/2",
@@ -1177,7 +1225,8 @@
         "duplex": "full",
         "description": "SW-DISTRIBUTION-02",
         "connected_device": "SW-DISTRIBUTION-02",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/2"
       },
       {
         "port_id": "Gi1/0/3",
@@ -1191,7 +1240,8 @@
         "duplex": "full",
         "description": "Server-ESXi01-MGMT",
         "connected_device": "Server-ESXi01-MGMT",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/3"
       },
       {
         "port_id": "Gi1/0/4",
@@ -1205,7 +1255,8 @@
         "duplex": "full",
         "description": "Server-ESXi02-VMs",
         "connected_device": "Server-ESXi02-VMs",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/4"
       },
       {
         "port_id": "Gi1/0/5",
@@ -1219,7 +1270,8 @@
         "duplex": "full",
         "description": "AP-Cisco-Floor1-North",
         "connected_device": "AP-Cisco-Floor1-North",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/5"
       },
       {
         "port_id": "Gi1/0/6",
@@ -1233,7 +1285,8 @@
         "duplex": "full",
         "description": "AP-Cisco-Floor1-South",
         "connected_device": "AP-Cisco-Floor1-South",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/6"
       },
       {
         "port_id": "Gi1/0/7",
@@ -1247,7 +1300,8 @@
         "duplex": "full",
         "description": "Printer-Admin-Dept",
         "connected_device": "Printer-Admin-Dept",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/7"
       },
       {
         "port_id": "Gi1/0/8",
@@ -1261,7 +1315,8 @@
         "duplex": "full",
         "description": "Workstation-Finance-01",
         "connected_device": "Workstation-Finance-01",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/8"
       },
       {
         "port_id": "Gi1/0/9",
@@ -1275,7 +1330,8 @@
         "duplex": "full",
         "description": "Workstation-Finance-02",
         "connected_device": "Workstation-Finance-02",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/9"
       },
       {
         "port_id": "Gi1/0/10",
@@ -1289,7 +1345,8 @@
         "duplex": "auto",
         "description": "",
         "connected_device": "-",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/10"
       },
       {
         "port_id": "Gi1/0/11",
@@ -1303,7 +1360,8 @@
         "duplex": "full",
         "description": "VoIP-Conference-Room",
         "connected_device": "VoIP-Conference-Room",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/11"
       },
       {
         "port_id": "Gi1/0/12",
@@ -1317,7 +1375,8 @@
         "duplex": "full",
         "description": "CCTV-Gate-Camera-01",
         "connected_device": "CCTV-Gate-Camera-01",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/12"
       },
       {
         "port_id": "Gi1/0/13",
@@ -1331,7 +1390,8 @@
         "duplex": "full",
         "description": "CCTV-Gate-Camera-02",
         "connected_device": "CCTV-Gate-Camera-02",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/13"
       },
       {
         "port_id": "Gi1/0/14",
@@ -1345,7 +1405,8 @@
         "duplex": "auto",
         "description": "Security-Port-Disabled",
         "connected_device": "Security-Port-Disabled",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/14"
       },
       {
         "port_id": "Gi1/0/15",
@@ -1359,7 +1420,8 @@
         "duplex": "full",
         "description": "Workstation-IT-01",
         "connected_device": "Workstation-IT-01",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/15"
       },
       {
         "port_id": "Gi1/0/16",
@@ -1373,7 +1435,8 @@
         "duplex": "full",
         "description": "Workstation-IT-02",
         "connected_device": "Workstation-IT-02",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/16"
       },
       {
         "port_id": "Gi1/0/17",
@@ -1387,7 +1450,8 @@
         "duplex": "auto",
         "description": "",
         "connected_device": "-",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/17"
       },
       {
         "port_id": "Gi1/0/18",
@@ -1401,7 +1465,8 @@
         "duplex": "auto",
         "description": "",
         "connected_device": "-",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/18"
       },
       {
         "port_id": "Gi1/0/19",
@@ -1415,7 +1480,8 @@
         "duplex": "full",
         "description": "NAS-Backup-Vault",
         "connected_device": "NAS-Backup-Vault",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/19"
       },
       {
         "port_id": "Gi1/0/20",
@@ -1429,7 +1495,8 @@
         "duplex": "full",
         "description": "Workstation-Marketing-01",
         "connected_device": "Workstation-Marketing-01",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/20"
       },
       {
         "port_id": "Gi1/0/21",
@@ -1443,7 +1510,8 @@
         "duplex": "auto",
         "description": "",
         "connected_device": "-",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/21"
       },
       {
         "port_id": "Gi1/0/22",
@@ -1457,7 +1525,8 @@
         "duplex": "full",
         "description": "Monitoring-Probe-01",
         "connected_device": "Monitoring-Probe-01",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/22"
       },
       {
         "port_id": "Gi1/0/23",
@@ -1471,7 +1540,8 @@
         "duplex": "full",
         "description": "Trunk-To-Backup-SW",
         "connected_device": "Trunk-To-Backup-SW",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/23"
       },
       {
         "port_id": "Gi1/0/24",
@@ -1485,7 +1555,8 @@
         "duplex": "full",
         "description": "Trunk-DMZ-Segment",
         "connected_device": "Trunk-DMZ-Segment",
-        "type": "10/100/1000BaseTX"
+        "type": "10/100/1000BaseTX",
+        "port": "Gi1/0/24"
       },
       {
         "port_id": "Te1/0/1",
@@ -1499,7 +1570,8 @@
         "duplex": "full",
         "description": "10G-Fiber-Core-Link-A",
         "connected_device": "10G-Fiber-Core-Link-A",
-        "type": "SFP-10GBase-SR"
+        "type": "SFP-10GBase-SR",
+        "port": "Te1/0/1"
       },
       {
         "port_id": "Te1/0/2",
@@ -1513,7 +1585,8 @@
         "duplex": "auto",
         "description": "10G-Fiber-Core-Link-B",
         "connected_device": "10G-Fiber-Core-Link-B",
-        "type": "Not Present"
+        "type": "Not Present",
+        "port": "Te1/0/2"
       }
     ],
     "dev-ap-bldg-a-f1": [
@@ -1538,7 +1611,8 @@
         "port_security_configured_mac": "",
         "port_security_violation": "shutdown",
         "port_security_status": "disabled",
-        "port_security_learned_macs": []
+        "port_security_learned_macs": [],
+        "port": "Gi1/0/1"
       },
       {
         "port_id": "Gi1/0/2",
@@ -1561,7 +1635,8 @@
         "port_security_configured_mac": "",
         "port_security_violation": "shutdown",
         "port_security_status": "disabled",
-        "port_security_learned_macs": []
+        "port_security_learned_macs": [],
+        "port": "Gi1/0/2"
       }
     ],
     "dev-mikrotik-ccr2004": [
@@ -1580,7 +1655,8 @@
         "poe_status": "delivering",
         "poe_power": 15.4,
         "description": "MikroTik LAN Port 1",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether1"
       },
       {
         "port_id": "ether2",
@@ -1597,7 +1673,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 2",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether2"
       },
       {
         "port_id": "ether3",
@@ -1614,7 +1691,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 3",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether3"
       },
       {
         "port_id": "ether4",
@@ -1631,7 +1709,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 4",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether4"
       },
       {
         "port_id": "ether5",
@@ -1648,7 +1727,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 5",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether5"
       },
       {
         "port_id": "ether6",
@@ -1665,7 +1745,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 6",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether6"
       },
       {
         "port_id": "ether7",
@@ -1682,7 +1763,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 7",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether7"
       },
       {
         "port_id": "ether8",
@@ -1699,7 +1781,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 8",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether8"
       },
       {
         "port_id": "ether9",
@@ -1716,7 +1799,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 9",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether9"
       },
       {
         "port_id": "ether10",
@@ -1733,7 +1817,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 10",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether10"
       },
       {
         "port_id": "ether11",
@@ -1750,7 +1835,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 11",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether11"
       },
       {
         "port_id": "ether12",
@@ -1767,7 +1853,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 12",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether12"
       },
       {
         "port_id": "ether13",
@@ -1784,7 +1871,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 13",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether13"
       },
       {
         "port_id": "ether14",
@@ -1801,7 +1889,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 14",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether14"
       },
       {
         "port_id": "ether15",
@@ -1818,7 +1907,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 15",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether15"
       },
       {
         "port_id": "ether16",
@@ -1835,7 +1925,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "MikroTik LAN Port 16",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "ether16"
       },
       {
         "port_id": "sfp-sfpplus1",
@@ -1852,7 +1943,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "SFP+ 10G Optical Uplink 1",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "sfp-sfpplus1"
       },
       {
         "port_id": "sfp-sfpplus2",
@@ -1869,7 +1961,8 @@
         "poe_status": "off",
         "poe_power": 0,
         "description": "SFP+ 10G Optical Uplink 2",
-        "port_security_enabled": false
+        "port_security_enabled": false,
+        "port": "sfp-sfpplus2"
       }
     ]
   },

@@ -696,17 +696,34 @@ apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response)
             pythonData.mac = pythonData.mac || pythonData.hardware.mac_address;
             pythonData.firmware = pythonData.firmware || pythonData.hardware.os_version;
             pythonData.uptime = pythonData.uptime || pythonData.hardware.uptime;
+            pythonData.ip = pythonData.ip || pythonData.hardware.ip;
           }
+          pythonData.ip = pythonData.ip || req.body?.ssh_host || req.body?.host || req.body?.ip;
+
           if (pythonData.ports_telemetry && (!pythonData.ports || pythonData.ports.length === 0)) {
             pythonData.ports = pythonData.ports_telemetry.ports;
             pythonData.total_ports = pythonData.total_ports || pythonData.ports_telemetry.total_ports;
           }
           if (Array.isArray(pythonData.ports)) {
-            pythonData.ports = pythonData.ports.map((p: any, idx: number) => ({
-              ...p,
-              port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
-              name: p.name || p.port_id || p.port || `port-${idx + 1}`,
-            }));
+            const seen = new Set<string>();
+            const deduped: any[] = [];
+            for (let idx = 0; idx < pythonData.ports.length; idx++) {
+              const p = pythonData.ports[idx];
+              if (!p || typeof p !== 'object') continue;
+              const portId = p.port_id || p.port || p.name || `port-${idx + 1}`;
+              const canon = String(portId).toLowerCase().replace(/gigabitethernet/g, 'gi').replace(/fastethernet/g, 'fa').replace(/tengigabitethernet/g, 'te');
+              if (seen.has(canon)) continue;
+              seen.add(canon);
+              deduped.push({
+                ...p,
+                port_id: portId,
+                port: p.port || portId,
+                name: portId,
+                description: p.description || '',
+              });
+            }
+            pythonData.ports = deduped;
+            pythonData.total_ports = deduped.length;
           }
           if (isEn && pythonData.message_en) {
             pythonData.message = pythonData.message_en;

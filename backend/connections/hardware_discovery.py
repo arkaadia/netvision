@@ -268,6 +268,7 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
     Gi1/0/3                      disabled     20           auto   auto 10/100/1000BaseTX
     """
     ports = []
+    seen_ports = set()
     lines = raw_text.splitlines()
     for line in lines:
         line_s = line.strip()
@@ -288,10 +289,16 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
             
             clean_status = "connected" if status_raw == "connected" else ("disabled" if status_raw in ["disabled", "err-disabled"] else "notconnect")
             
+            canon = port_name.lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
+            if canon in seen_ports:
+                continue
+            seen_ports.add(canon)
+
             ports.append({
                 "port_id": port_name,
                 "port": port_name,
-                "name": desc or port_name,
+                "name": port_name,
+                "description": desc,
                 "status": clean_status,
                 "admin_status": "disabled" if clean_status == "disabled" else "enabled",
                 "mode": "trunk" if (vlan and "trunk" in str(vlan).lower()) else "access",
@@ -309,6 +316,12 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
             short_name = re.sub(r'GigabitEthernet', 'Gi', long_name)
             short_name = re.sub(r'FastEthernet', 'Fa', short_name)
             short_name = re.sub(r'TenGigabitEthernet', 'Te', short_name)
+            canon = short_name.lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
+            if canon in seen_ports:
+                # Already captured with full switchport details from 'show interfaces status'
+                continue
+            seen_ports.add(canon)
+
             stat1 = m_ip.group(3).lower()
             stat2 = m_ip.group(4).lower()
             clean_status = "connected" if (stat1 == "up" and stat2 == "up") else ("disabled" if "admin" in stat1 else "notconnect")
@@ -316,6 +329,7 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
                 "port_id": short_name,
                 "port": short_name,
                 "name": short_name,
+                "description": "",
                 "status": clean_status,
                 "admin_status": "disabled" if "admin" in stat1 else "enabled",
                 "mode": "access",

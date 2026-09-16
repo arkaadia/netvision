@@ -10,9 +10,32 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.60.3';
+export const APP_VERSION = '1.60.4';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.60.4',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'تفکیک دقیق نمای کارت و فیزیکی در توپولوژی، تصحیح خودکار آی‌پی مدیریتی در ثبت تجهیز و ارتقای ایمنی تایپ‌ها',
+    title_en: 'Card vs Physical View Separation in Topology Canvas, SSH Target IP Auto-fill, Port Deduplication & Strict Type Safety',
+    changes: [
+      'تفکیک صریح کنترل‌ها و دکمه‌های نوار ابزار توپولوژی؛ دکمه‌های «افزودن رک»، «افزودن دکل» و «نصب تجهیز فیزیکی» تنها در نمای فیزیکی (Physical Mode) نمایش داده می‌شوند.',
+      'اصلاح مودال ثبت تجهیز در نقشه سفارشی جهت پنهان‌سازی سوییچر حالت فیزیکی در زمان انتخاب نمای کارتی.',
+      'تکمیل خودکار فیلد Management IP بر اساس نتیجه تست SSH و هاست ورودی در مودال ثبت تجهیز جدید.',
+      'رفع ریشه‌ای تکثیر و ۲ برابر شدن پورت‌ها در دیسکاوری تجهیزات و تلمتری اینترفیس‌ها.',
+      'رفع تمامی خطاهای تایپ‌اسکریپت در کامپوننت‌های گوناگون و تضمین اجرای کاملاً سبز lint و build پروژه.',
+      'پایبندی ۱۰۰٪ به قوانین محلی‌سازی و ممنوعیت متون فارسی در حالت انگلیسی پنل.'
+    ],
+    changes_en: [
+      'Explicitly separated toolbar controls for topology canvas: "Add Rack", "Add Tower", and "Install Hardware" buttons are only visible when in Physical Mode.',
+      'Updated Custom Map Add Device Modal to conditionally hide representation switcher when initialized in Card mode.',
+      'Implemented auto-filling of the Management IP Address field based on SSH test probe results and target host.',
+      'Resolved interface duplication bug where ports were counted twice during device discovery and telemetry fetching.',
+      'Fixed all TypeScript type issues across components, ensuring 100% green compilation and lint verification.',
+      'Strictly adhered to i18n localization guidelines with no Persian text appearing in English mode.'
+    ]
+  },
   {
     version: '1.60.3',
     releaseDate: '2026-09-16',

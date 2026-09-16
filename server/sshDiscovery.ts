@@ -177,6 +177,7 @@ export function calculatePowerSpecs(model: string, totalPorts: number, platform:
 export function parseShowInterfacesStatus(output: string): DiscoveredSwitchPort[] {
   const lines = output.split(/\r?\n/);
   const ports: DiscoveredSwitchPort[] = [];
+  const seenPorts = new Set<string>();
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -200,6 +201,12 @@ export function parseShowInterfacesStatus(output: string): DiscoveredSwitchPort[
       const duplexRaw = m[4];
       const speedRaw = m[5];
       const typeRaw = (m[6] || '').trim();
+
+      const canonId = portName.toLowerCase().replace(/gigabitethernet/g, 'gi').replace(/fastethernet/g, 'fa').replace(/tengigabitethernet/g, 'te');
+      if (seenPorts.has(canonId)) {
+        continue;
+      }
+      seenPorts.add(canonId);
 
       const isConnected = statusRaw === 'connected' || statusRaw === 'up';
       const isDisabled = statusRaw === 'disabled' || statusRaw === 'err-disabled';

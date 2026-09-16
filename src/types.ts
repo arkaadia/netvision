@@ -1,4 +1,4 @@
-export type DeviceType = 'switch' | 'router' | 'access_point';
+export type DeviceType = 'switch' | 'router' | 'access_point' | 'firewall';
 
 export type DevicePlatform =
   | 'cisco_ios_xe'
@@ -109,13 +109,17 @@ export interface Device {
   power_supplies?: number;
   power_watts?: number;
   serial_number?: string;
+  vendor?: string;
   master_session_id?: string;
   detected_ports?: SwitchPort[];
 }
 
 export interface SwitchPort {
+  id?: string;
+  port?: string;
   port_id: string;
   name: string;
+  mac_address?: string;
   status: 'up' | 'down';
   admin_status: 'enabled' | 'disabled';
   mode: 'trunk' | 'access';
@@ -247,6 +251,8 @@ export interface MountedTowerDevice {
   azimuthLabel?: string; // e.g. "North 0°", "East 90°", "South 180°", "West 270°"
   frequency?: string; // e.g. "5 GHz", "60 GHz", "24 GHz", "11 GHz"
   ip?: string;
+  deviceId?: string;
+  isOnline?: boolean;
   targetLink?: string; // e.g. "PTP to Central Branch", "Factory CCTV Link"
   powerWatts?: number;
   notes?: string;
@@ -255,6 +261,7 @@ export interface MountedTowerDevice {
 export interface CustomTopologyTower {
   id: string;
   name: string;
+  location?: string;
   type: TowerType;
   heightMeters: number; // e.g. 18, 24, 30, 36, 42, 48, 60
   x: number;
@@ -266,6 +273,7 @@ export interface CustomTopologyTower {
 export interface MountedHardwareDevice {
   id: string;
   name: string;
+  label?: string;
   category: HardwareCategory;
   brand: string;
   model: string;
@@ -322,6 +330,7 @@ export interface CustomTopologyMap {
   description?: string;
   createdAt: string;
   updatedAt: string;
+  nodes?: any[];
   devicePositions: Record<string, { x: number; y: number }>;
   physicalPositions?: Record<string, { x: number; y: number }>;
   deviceIds: string[];
@@ -340,6 +349,7 @@ export interface TopologyNode extends Device {}
 
 export interface TopologyData {
   nodes: TopologyNode[];
+  devices?: Device[];
   links: TopologyLink[];
   buildings: string[];
   floors: string[];
@@ -356,9 +366,13 @@ export interface TopologyData {
 export interface VlanInfo {
   id: number;
   name: string;
-  subnet: string;
-  color: string;
+  subnet?: string;
+  color?: string;
+  status?: string;
+  ports_count?: number;
 }
+
+export type ThemeType = 'obsidian' | 'emerald' | 'cobalt' | 'rose' | 'amber' | 'light';
 
 export type TemplateVendor = 'cisco' | 'mikrotik' | 'generic';
 export type TemplateTargetType = 'switch' | 'router' | 'access_point' | 'all';
@@ -377,6 +391,8 @@ export interface ConfigTemplate {
   name: string;
   vendor: TemplateVendor;
   target_type: TemplateTargetType;
+  target_platform?: string;
+  category?: string;
   role: string;
   description: string;
   default_cli_mode?: string;
@@ -587,6 +603,7 @@ export interface AccessPolicy {
   // 5. Backup & Disaster Recovery Operations
   canExportBackup?: boolean;          // Export full or partial network backup package
   canImportBackup?: boolean;          // Import and restore network backup package
+  permissions?: any;
 }
 
 export type BackupScope = 'full' | 'devices_topology' | 'security_rbac' | 'templates_only';

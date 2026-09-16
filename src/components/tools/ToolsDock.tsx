@@ -203,14 +203,16 @@ export const ToolsDock: React.FC<ToolsDockProps> = ({
       config: allMinimizedItems.filter((i) => i.category === 'config').length,
     };
 
-    return [
+    const categoryList: { id: DockCategoryId; labelEn: string; labelFa: string; count: number }[] = [
       { id: 'all', labelEn: 'All', labelFa: 'همه', count: counts.all },
       { id: 'tools', labelEn: 'Network Tools', labelFa: 'ابزارهای شبکه', count: counts.tools },
       { id: 'device', labelEn: 'Devices & Ports', labelFa: 'تجهیزات و پورت‌ها', count: counts.device },
       { id: 'terminal', labelEn: 'Terminals', labelFa: 'ترمینال‌ها', count: counts.terminal },
       { id: 'config', labelEn: 'Templates', labelFa: 'تمپلت‌ها', count: counts.config },
       { id: 'system', labelEn: 'System', labelFa: 'سیستم', count: counts.system },
-    ].filter((cat) => cat.id === 'all' || cat.count > 0);
+    ];
+
+    return categoryList.filter((cat) => cat.id === 'all' || cat.count > 0);
   }, [allMinimizedItems]);
 
   // Filter items based on active category

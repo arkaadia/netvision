@@ -1042,6 +1042,7 @@ def normalize_port_list(port_list):
     if not isinstance(port_list, list):
         return []
     normalized = []
+    seen = set()
     for idx, p in enumerate(port_list):
         if not isinstance(p, dict):
             continue
@@ -1056,6 +1057,11 @@ def normalize_port_list(port_list):
             p_copy["mode"] = "access"
         if not p_copy.get("admin_status"):
             p_copy["admin_status"] = "disabled" if p_copy.get("status") == "disabled" else "enabled"
+
+        canon_id = str(p_copy["port_id"]).strip().lower().replace("gigabitethernet", "gi").replace("fastethernet", "fa").replace("tengigabitethernet", "te")
+        if canon_id in seen:
+            continue
+        seen.add(canon_id)
         normalized.append(p_copy)
     return normalized
 
