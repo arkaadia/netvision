@@ -36,7 +36,8 @@ export type StandardModalId =
   | 'port_inspector'
   | 'terminal'
   | 'apply_template'
-  | 'release_notes';
+  | 'release_notes'
+  | 'topology_discovery';
 
 export interface MinimizedStandardModal {
   id: StandardModalId;
@@ -86,6 +87,7 @@ const STANDARD_MODAL_ICONS: Record<StandardModalId, React.ComponentType<{ classN
   terminal: Terminal,
   apply_template: FileSpreadsheet,
   release_notes: History,
+  topology_discovery: Radar,
 };
 
 export interface UnifiedDockItem {

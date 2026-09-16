@@ -16,6 +16,7 @@ import { MikroTikDeviceManageModal } from './components/MikroTikDeviceManageModa
 import { MultiTerminalWorkspace } from './components/terminal/MultiTerminalWorkspace';
 import { ApplyTemplateModal } from './components/ApplyTemplateModal';
 import { ReleaseNotesModal } from './components/ReleaseNotesModal';
+import { TopologyDiscoveryModal } from './components/TopologyDiscoveryModal';
 import { SettingsView } from './components/settings/SettingsView';
 import { AuditLogsView } from './components/logs/AuditLogsView';
 import { NetworkToolsMenu } from './components/tools/NetworkToolsMenu';
@@ -131,6 +132,7 @@ export default function App() {
   const [applyTemplateDevice, setApplyTemplateDevice] = useState<Device | null>(null);
   const [applyPreselectedTemplateId, setApplyPreselectedTemplateId] = useState<string | undefined>(undefined);
   const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
+  const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
 
   // Network Tools Suite State
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -216,6 +218,7 @@ export default function App() {
     setMinimizedModals((prev) => prev.filter((m) => m.id !== id));
     if (id === 'add_device') setIsAddModalOpen(true);
     if (id === 'release_notes') setIsReleaseNotesOpen(true);
+    if (id === 'topology_discovery') setIsDiscoveryModalOpen(true);
     handleClearAttention();
   };
 
@@ -230,6 +233,7 @@ export default function App() {
       setApplyPreselectedTemplateId(undefined);
     }
     if (id === 'release_notes') setIsReleaseNotesOpen(false);
+    if (id === 'topology_discovery') setIsDiscoveryModalOpen(false);
     handleClearAttention();
   };
 
@@ -243,6 +247,7 @@ export default function App() {
     setApplyTemplateDevice(null);
     setApplyPreselectedTemplateId(undefined);
     setIsReleaseNotesOpen(false);
+    setIsDiscoveryModalOpen(false);
     handleClearAttention();
   }, [handleClearAttention]);
 
@@ -251,6 +256,7 @@ export default function App() {
     setMinimizedModals([]);
     if (modalIds.includes('add_device')) setIsAddModalOpen(true);
     if (modalIds.includes('release_notes')) setIsReleaseNotesOpen(true);
+    if (modalIds.includes('topology_discovery')) setIsDiscoveryModalOpen(true);
     setActiveTools((prev) => prev.map((t) => ({ ...t, isMinimized: false })));
     handleClearAttention();
   }, [minimizedModals, handleClearAttention]);
@@ -338,6 +344,18 @@ export default function App() {
       return;
     }
     setIsReleaseNotesOpen(true);
+  }, [isModalMinimized, triggerDockAttention]);
+
+  const handleOpenDiscoveryModal = useCallback(() => {
+    if (isModalMinimized('topology_discovery')) {
+      triggerDockAttention(
+        'topology_discovery',
+        'CDP & LLDP Discovery window is already open in the dock.',
+        'پنجره کشف توپولوژی در نوار پایین باز است.'
+      );
+      return;
+    }
+    setIsDiscoveryModalOpen(true);
   }, [isModalMinimized, triggerDockAttention]);
 
   // Fullscreen Topology Mode (Hides Navbar header, sidebar, and footer for 100% canvas view)
@@ -662,6 +680,7 @@ export default function App() {
               loading={loading}
               onRefresh={loadData}
               onScanCdpLldp={handleRunScan}
+              onOpenDiscoveryModal={handleOpenDiscoveryModal}
               isScanning={isScanning}
               onInspectDevice={handleInspectPorts}
               onInspectPorts={handleInspectPorts}
@@ -929,6 +948,26 @@ export default function App() {
             category: 'system',
           })
         }
+      />
+
+      {/* CDP & LLDP Topology Discovery Modal */}
+      <TopologyDiscoveryModal
+        isOpen={isDiscoveryModalOpen && !isModalMinimized('topology_discovery')}
+        onClose={() => handleCloseStandardModal('topology_discovery')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'topology_discovery',
+            labelEn: 'CDP/LLDP Discovery',
+            labelFa: 'کشف هوشمند توپولوژی',
+            badge: 'CDP/LLDP',
+            category: 'config',
+          })
+        }
+        devices={topology?.devices || devices}
+        onApplyToMap={() => {
+          loadData();
+        }}
+        isLightMode={panelTheme === 'light'}
       />
 
       {/* Minimized Tools & Modals Dock (Shows all minimized tool & modal pills at bottom) */}

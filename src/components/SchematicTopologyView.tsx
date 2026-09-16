@@ -47,7 +47,8 @@ import {
   Radio,
   Globe,
   Lock,
-  Users
+  Users,
+  Radar,
 } from 'lucide-react';
 import {
   TopologyData,
@@ -92,6 +93,7 @@ import { AddTowerModal } from './rack/AddTowerModal';
 import { MountRadioOnTowerModal } from './rack/MountRadioOnTowerModal';
 import { TowerStructureSvg } from './rack/TowerStructureSvg';
 import { NetworkSocketLoader } from './common/NetworkSocketLoader';
+import { TopologyDiscoveryModal } from './TopologyDiscoveryModal';
 
 interface SchematicTopologyViewProps {
   topology: TopologyData | null;
@@ -99,6 +101,7 @@ interface SchematicTopologyViewProps {
   loading: boolean;
   onRefresh: () => void | Promise<void>;
   onScanCdpLldp: () => void;
+  onOpenDiscoveryModal?: () => void;
   isScanning: boolean;
   onInspectDevice: (device: Device) => void;
   onInspectPorts: (device: Device) => void;
@@ -343,6 +346,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   loading,
   onRefresh,
   onScanCdpLldp,
+  onOpenDiscoveryModal,
   isScanning,
   onInspectDevice,
   onInspectPorts,
@@ -497,6 +501,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   const [manageMapMode, setManageMapMode] = useState<'create' | 'edit' | 'delete'>('create');
   const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null);
   const [linkToDelete, setLinkToDelete] = useState<CustomTopologyLink | null>(null);
+  const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
 
   // Rack & Hardware Studio States
   const [isAddRackOpen, setIsAddRackOpen] = useState(false);
@@ -719,6 +724,78 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
     };
     saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
   }, [currentCustomMap, customMaps, saveCustomMaps]);
+
+  // Topology Discovery (CDP / LLDP) Apply Handler
+  const handleApplyDiscoveredLinksAndDevices = useCallback(
+    (
+      newLinks: CustomTopologyLink[],
+      newDevs: { id: string; name: string; ip: string; model: string; type: string }[],
+      targetMapId: string
+    ) => {
+      const targetMap =
+        customMaps.find((m) => m.id === targetMapId) ||
+        currentCustomMap ||
+        customMaps[0];
+
+      if (!targetMap) {
+        onRefresh();
+        return;
+      }
+
+      // Deduplicate and merge links
+      const existingLinks = targetMap.links || [];
+      const mergedLinks = [...existingLinks];
+      for (const nl of newLinks) {
+        const alreadyExists = mergedLinks.some(
+          (el) =>
+            (el.sourceDeviceId === nl.sourceDeviceId &&
+              el.targetDeviceId === nl.targetDeviceId &&
+              el.sourcePort === nl.sourcePort &&
+              el.targetPort === nl.targetPort) ||
+            (el.sourceDeviceId === nl.targetDeviceId &&
+              el.targetDeviceId === nl.sourceDeviceId &&
+              el.sourcePort === nl.targetPort &&
+              el.targetPort === nl.sourcePort)
+        );
+        if (!alreadyExists) {
+          mergedLinks.push(nl);
+        }
+      }
+
+      // Merge new device IDs and position them cleanly on canvas
+      const existingDeviceIds = targetMap.deviceIds || [];
+      const mergedDeviceIds = [...existingDeviceIds];
+      const updatedPositions = { ...(targetMap.devicePositions || {}) };
+
+      let startX = 200;
+      let startY = 300;
+      for (const dev of newDevs) {
+        if (!mergedDeviceIds.includes(dev.id)) {
+          mergedDeviceIds.push(dev.id);
+          if (!updatedPositions[dev.id]) {
+            updatedPositions[dev.id] = { x: startX, y: startY };
+            startX += 140;
+            if (startX > 800) {
+              startX = 200;
+              startY += 130;
+            }
+          }
+        }
+      }
+
+      const updatedMap: CustomTopologyMap = {
+        ...targetMap,
+        links: mergedLinks,
+        deviceIds: mergedDeviceIds,
+        devicePositions: updatedPositions,
+        updatedAt: new Date().toISOString(),
+      };
+
+      saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+      onRefresh();
+    },
+    [currentCustomMap, customMaps, saveCustomMaps, onRefresh]
+  );
 
   // Sticky Notes Handlers
   const handleAddStickyNote = useCallback(() => {
@@ -4452,6 +4529,22 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
               <span>{isScanning ? t('topology_scanning') : t('topology_scan_cdp_lldp')}</span>
             </button>
 
+            {/* Comprehensive CDP/LLDP Discovery Modal */}
+            <button
+              onClick={() => {
+                if (onOpenDiscoveryModal) {
+                  onOpenDiscoveryModal();
+                } else {
+                  setIsDiscoveryModalOpen(true);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 transition active:scale-95 cursor-pointer"
+              title={isEn ? 'Open CDP & LLDP Topology Discovery Modal' : 'کشف هوشمند اتصالات و توپولوژی با CDP و LLDP'}
+            >
+              <Radar className="w-3.5 h-3.5 text-cyan-200" />
+              <span>{isEn ? 'Discover Topology' : 'کشف هوشمند توپولوژی'}</span>
+            </button>
+
             {/* Canvas Controls */}
             {viewMode === 'schematic' && (
               <div className="flex items-center gap-1 bg-slate-900/60 border border-white/10 rounded-xl p-1">
@@ -7967,6 +8060,19 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         onConfirmDeleteDevice={handleConfirmDeleteDevice}
         onConfirmDeleteRack={handleConfirmDeleteRack}
       />
+
+      {/* CDP & LLDP Topology Discovery Modal */}
+      {isDiscoveryModalOpen && (
+        <TopologyDiscoveryModal
+          isOpen={isDiscoveryModalOpen}
+          onClose={() => setIsDiscoveryModalOpen(false)}
+          devices={allAvailableDevices}
+          customMaps={customMaps}
+          activeMapId={currentCustomMap?.id || 'default'}
+          onApplyToMap={handleApplyDiscoveredLinksAndDevices}
+          isLightMode={isLightMode}
+        />
+      )}
       </div>
     </div>
   );

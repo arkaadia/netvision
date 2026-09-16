@@ -10,9 +10,36 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.60.4';
+export const APP_VERSION = '1.61.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.0',
+    releaseDate: '2026-09-16',
+    type: 'minor',
+    title: 'افزودن سیستم هوشمند کشف توپولوژی شبکه با پروتکل‌های CDP و LLDP و تطبیق خودکار اتصالات فیزیکی',
+    title_en: 'Intelligent Network Topology Discovery Suite via CDP & LLDP Protocols with Automatic Physical Link Correlation',
+    changes: [
+      'پیاده‌سازی موتور جامع کشف همسایگی لایه ۲ و لایه ۳ با پروتکل‌های استانداردی سیسکو (CDP)، پروتکل بین‌المللی LLDP و پروتکل همسایگی میکروتیک (MNDP).',
+      'پشتیبانی از ۴ روش متنوع کشف: از کلیه سوییچ‌های ثبت‌شده در انبار (Inventory-wide)، از طریق یک سوییچ مشخص، اسکن محدوده آی‌پی دلخواه با اتصال SSH، و کشف از شبکه محلی سرور.',
+      'افزودن مودال اختصاصی TopologyDiscoveryModal مطابق با دستورالعمل جامع مودال‌ها (MODAL_GUIDELINES) با پشتیبانی کامل از قابلیت مینیمایز به نوار داک پایین (ToolsDock).',
+      'موتور تطبیق و همبستگی دوطرفه لینک‌ها (Link Correlation Engine) جهت تفکیک لینک‌های تاییدشده دوطرفه از یک‌طرفه و حذف ریشه‌ای اتصالات تکراری.',
+      'شناسایی و کشف خودکار تجهیزات جدید و متصل‌نشده (Unmanaged Neighbors) و امکان افزودن آنها با یک کلیک به بوم نقشه.',
+      'ترمینال زنده جریان لاگ‌های SSH با گزارش وضعیت هر سوییچ، تعداد همسایگان، پورت‌ها و مدیریت خطاهای عدم دسترسی بدون متوقف شدن کل اسکن.',
+      'امکان تایید انتخابی لینک‌ها و اعمال مستقیم آنها روی نقشه با حفظ کامل ساختار کارت‌ها، پورت‌ها و کابل‌های بوم توپولوژی.',
+      'رعایت صددرصدی قوانین چندزبانگی (Strict i18n) و عدم نمایش هرگونه متن فارسی در حالت انگلیسی.'
+    ],
+    changes_en: [
+      'Implemented an enterprise-grade L2/L3 topology discovery engine supporting Cisco CDP, IEEE 802.1AB LLDP, and MikroTik MNDP neighbor discovery protocols.',
+      'Supported 4 distinct discovery methods: Inventory-wide sweep across registered switches, single switch query, custom IP range SSH sweep (CIDR), and server local network neighbor detection.',
+      'Created TopologyDiscoveryModal adhering strictly to MODAL_GUIDELINES with universal minimization support into the bottom ToolsDock.',
+      'Developed a topology correlation engine to deduplicate inter-switch links, cross-verify bidirectional vs unidirectional connections, and map local-to-remote ports accurately.',
+      'Automated detection of unmanaged neighbor devices with one-click canvas onboarding and coordinate distribution.',
+      'Real-time streaming CLI log terminal displaying per-device query progress, neighbor counts, latency, and graceful error isolation.',
+      'Interactive preview table allowing selective link confirmation and immediate application to the active schematic topology map.',
+      'Enforced 100% strict localization compliance with complete Persian and English symmetry.'
+    ]
+  },
   {
     version: '1.60.4',
     releaseDate: '2026-09-16',

@@ -36,6 +36,12 @@ import {
   addAuditLog,
 } from './db';
 import { testAndDiscoverDeviceViaSsh } from './sshDiscovery';
+import {
+  startDiscoveryJob,
+  getDiscoveryJobStatus,
+  cancelDiscoveryJob,
+  applyDiscoveryResultsToMap,
+} from './cdpLldpDiscovery';
 
 export const apiRouter = Router();
 
@@ -756,4 +762,41 @@ apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response)
     });
   }
 });
+
+// -------------------------------------------------------------
+// CDP & LLDP Topology Discovery Endpoints
+// -------------------------------------------------------------
+apiRouter.post('/topology/discovery/start', async (req: Request, res: Response) => {
+  try {
+    const jobId = await startDiscoveryJob(req.body);
+    res.json({ success: true, jobId });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.get('/topology/discovery/status/:jobId', (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const status = getDiscoveryJobStatus(jobId);
+  if (!status) {
+    return res.status(404).json({ success: false, error: 'Discovery job not found' });
+  }
+  res.json({ success: true, job: status });
+});
+
+apiRouter.post('/topology/discovery/cancel/:jobId', (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const cancelled = cancelDiscoveryJob(jobId);
+  res.json({ success: cancelled });
+});
+
+apiRouter.post('/topology/discovery/apply', async (req: Request, res: Response) => {
+  try {
+    const result = await applyDiscoveryResultsToMap(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
