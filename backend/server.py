@@ -1038,6 +1038,27 @@ def get_initial_seed_data():
         "access_policies": get_default_access_policies()
     }
 
+def normalize_port_list(port_list):
+    if not isinstance(port_list, list):
+        return []
+    normalized = []
+    for idx, p in enumerate(port_list):
+        if not isinstance(p, dict):
+            continue
+        p_copy = dict(p)
+        if not p_copy.get("port_id"):
+            p_copy["port_id"] = p_copy.get("port") or p_copy.get("name") or f"port-{idx+1}"
+        if not p_copy.get("port"):
+            p_copy["port"] = p_copy["port_id"]
+        if not p_copy.get("name"):
+            p_copy["name"] = p_copy["port_id"]
+        if not p_copy.get("mode"):
+            p_copy["mode"] = "access"
+        if not p_copy.get("admin_status"):
+            p_copy["admin_status"] = "disabled" if p_copy.get("status") == "disabled" else "enabled"
+        normalized.append(p_copy)
+    return normalized
+
 # Persistence operations
 db_lock = threading.Lock()
 
@@ -1083,6 +1104,18 @@ def load_data():
                         dev["ssh_status"] = "authenticated"
                         dev_updated = True
                 if dev_updated:
+                    save_data_unsafe(data)
+
+                # Auto-normalize ports structure to guarantee port_id
+                ports_updated = False
+                if "ports" in data and isinstance(data["ports"], dict):
+                    for dev_id, p_list in data["ports"].items():
+                        if isinstance(p_list, list):
+                            normalized = normalize_port_list(p_list)
+                            if normalized != p_list:
+                                data["ports"][dev_id] = normalized
+                                ports_updated = True
+                if ports_updated:
                     save_data_unsafe(data)
 
                 return data
@@ -1360,10 +1393,10 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             existing_ports = data.get("ports", {}).get(dev_id, [])
 
             if conn_mode == "simulator":
-                ports = existing_ports
+                ports = normalize_port_list(existing_ports)
                 if not ports:
                     total = device.get("total_ports", 24)
-                    ports = driver.get_default_ports(total)
+                    ports = normalize_port_list(driver.get_default_ports(total))
                     data["ports"][dev_id] = ports
                     save_data(data)
                 self._send_json(200, {
@@ -1387,7 +1420,7 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                     r = connection_manager.execute_command(device, cmd, require_real=True)
                     if r.get("success") and r.get("output"):
                         full_output += "\n" + r["output"]
-                parsed = driver.parse_interfaces(full_output)
+                parsed = normalize_port_list(driver.parse_interfaces(full_output))
                 if parsed:
                     data.setdefault("ports", {})[dev_id] = parsed
                     save_data(data)
@@ -1406,10 +1439,11 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             # If device is unreachable:
             err_msg = sess.error_message or f"Device unreachable at {sess.host}:{sess.port}"
             if existing_ports:
+                normalized_existing = normalize_port_list(existing_ports)
                 # Return cached data with clear offline notice
                 self._send_json(200, {
                     "device": sanitize_device(device),
-                    "ports": existing_ports,
+                    "ports": normalized_existing,
                     "is_live": False,
                     "cached": True,
                     "mode": "cached_offline",
@@ -2099,26 +2133,27 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                         print(f"[PortSync] SSH interface query error: {e}")
 
             if is_live_sync and parsed:
-                data.setdefault("ports", {})[dev_id] = parsed
-                device["total_ports"] = len(parsed)
+                normalized_parsed = normalize_port_list(parsed)
+                data.setdefault("ports", {})[dev_id] = normalized_parsed
+                device["total_ports"] = len(normalized_parsed)
                 save_data(data)
                 self._send_json(200, {
                     "device": sanitize_device(device),
-                    "ports": parsed,
+                    "ports": normalized_parsed,
                     "is_live": True,
                     "sync_source": "ssh_tunnel",
-                    "active_count": sum(1 for p in parsed if p.get("status") == "up"),
-                    "inactive_count": sum(1 for p in parsed if p.get("status") == "down"),
-                    "admin_disabled_count": sum(1 for p in parsed if p.get("admin_status") == "disabled"),
+                    "active_count": sum(1 for p in normalized_parsed if p.get("status") == "up"),
+                    "inactive_count": sum(1 for p in normalized_parsed if p.get("status") == "down"),
+                    "admin_disabled_count": sum(1 for p in normalized_parsed if p.get("admin_status") == "disabled"),
                     "message": "Interface data synchronized live via SSH tunnel."
                 })
                 return
 
             # Fallback to existing or simulator driver ports
-            ports = existing_ports
+            ports = normalize_port_list(existing_ports)
             if not ports:
                 total = device.get("total_ports", 24)
-                ports = driver.get_default_ports(total)
+                ports = normalize_port_list(driver.get_default_ports(total))
                 data.setdefault("ports", {})[dev_id] = ports
                 save_data(data)
 
@@ -2364,9 +2399,9 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             total_ports = new_device["total_ports"]
             detected_ports = body.get("detected_ports")
             if detected_ports and isinstance(detected_ports, list) and len(detected_ports) > 0:
-                new_ports = detected_ports
+                new_ports = normalize_port_list(detected_ports)
             else:
-                new_ports = driver.get_default_ports(total_ports)
+                new_ports = normalize_port_list(driver.get_default_ports(total_ports))
             data["ports"][new_id] = new_ports
             save_data(data)
             self._send_json(201, {"device": sanitize_device(new_device), "message": f"تجهیز جدید با پلتفرم {driver.platform_name} با موفقیت ثبت شد."})

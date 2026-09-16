@@ -98,8 +98,13 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
     fetchDevicePorts(device.id)
       .then((data) => {
         if (data && data.ports && data.ports.length > 0) {
-          setPorts(data.ports);
-          setSelectedPort(data.ports[0]);
+          const rawPorts = data.ports || [];
+          const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
+            ...p,
+            port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+          }));
+          setPorts(normalizedPorts);
+          setSelectedPort(normalizedPorts[0]);
         } else {
           // Generate realistic default MikroTik RouterBOARD ports
           const defaultPorts: SwitchPort[] = [
@@ -543,22 +548,30 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
                       : 'bg-black/50 border-slate-800/80'
                   }`}
                 >
-                  {ports.map((port) => (
-                    <MikroTikPortSvg
-                      key={port.port_id}
-                      port={port}
-                      isSelected={selectedPort?.port_id === port.port_id}
-                      onClick={() => setSelectedPort(port)}
-                      onContextMenu={(e) => {
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          port,
-                        });
-                      }}
-                      isLightMode={isLightMode}
-                    />
-                  ))}
+                  {ports.map((port, pIdx) => {
+                    const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
+                    const isSelected = Boolean(
+                      pId &&
+                      selectedPort &&
+                      (selectedPort.port_id || (selectedPort as any).port || selectedPort.name) === pId
+                    );
+                    return (
+                      <MikroTikPortSvg
+                        key={pId}
+                        port={port}
+                        isSelected={isSelected}
+                        onClick={() => setSelectedPort(port)}
+                        onContextMenu={(e) => {
+                          setContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            port,
+                          });
+                        }}
+                        isLightMode={isLightMode}
+                      />
+                    );
+                  })}
                 </div>
 
                 <div className={`mt-2 text-[11px] flex items-center justify-between ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>

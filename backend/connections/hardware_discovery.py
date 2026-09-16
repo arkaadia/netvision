@@ -289,10 +289,13 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
             clean_status = "connected" if status_raw == "connected" else ("disabled" if status_raw in ["disabled", "err-disabled"] else "notconnect")
             
             ports.append({
+                "port_id": port_name,
                 "port": port_name,
                 "name": desc or port_name,
                 "status": clean_status,
-                "vlan": vlan,
+                "admin_status": "disabled" if clean_status == "disabled" else "enabled",
+                "mode": "trunk" if (vlan and "trunk" in str(vlan).lower()) else "access",
+                "vlan": int(vlan) if (vlan and str(vlan).isdigit()) else 1,
                 "duplex": duplex,
                 "speed": speed,
                 "type": port_type
@@ -310,10 +313,13 @@ def parse_cisco_show_interface_status(raw_text: str) -> List[Dict[str, Any]]:
             stat2 = m_ip.group(4).lower()
             clean_status = "connected" if (stat1 == "up" and stat2 == "up") else ("disabled" if "admin" in stat1 else "notconnect")
             ports.append({
+                "port_id": short_name,
                 "port": short_name,
                 "name": short_name,
                 "status": clean_status,
-                "vlan": "1",
+                "admin_status": "disabled" if "admin" in stat1 else "enabled",
+                "mode": "access",
+                "vlan": 1,
                 "duplex": "auto",
                 "speed": "1Gbps" if "Gi" in short_name else "100Mbps",
                 "type": "10/100/1000BaseTX"
@@ -373,10 +379,13 @@ def parse_mikrotik_output(raw_text: str) -> Tuple[Dict[str, Any], List[Dict[str,
         is_disabled = "X" in flags
         clean_status = "connected" if is_running else ("disabled" if is_disabled else "notconnect")
         ports.append({
+            "port_id": pname,
             "port": pname,
             "name": pname,
             "status": clean_status,
-            "vlan": "1",
+            "admin_status": "disabled" if is_disabled else "enabled",
+            "mode": "access",
+            "vlan": 1,
             "duplex": "full" if is_running else "auto",
             "speed": speed,
             "type": "Ethernet SFP/RJ45" if "sfp" in pname.lower() else "10/100/1000BaseTX"
@@ -387,13 +396,16 @@ def parse_mikrotik_output(raw_text: str) -> Tuple[Dict[str, Any], List[Dict[str,
         simple_eth = re.findall(r'name="?(ether\d+|sfp\S*)"?', raw_text, re.IGNORECASE)
         for p in list(dict.fromkeys(simple_eth)):
             ports.append({
+                "port_id": p,
                 "port": p,
                 "name": p,
                 "status": "connected",
-                "vlan": "1",
+                "admin_status": "enabled",
+                "mode": "access",
+                "vlan": 1,
                 "duplex": "full",
                 "speed": "1Gbps",
-                "type": "10/100/1000BaseTX"
+                "type": "Ethernet RJ45"
             })
 
     return hw, ports
@@ -594,10 +606,13 @@ def execute_real_hardware_probe(
                 pname = m.group(1)
                 st = "connected" if m.group(2).upper() == "UP" else "notconnect"
                 ports.append({
+                    "port_id": pname,
                     "port": pname,
                     "name": pname,
                     "status": st,
-                    "vlan": "1",
+                    "admin_status": "enabled",
+                    "mode": "access",
+                    "vlan": 1,
                     "duplex": "full",
                     "speed": "1Gbps",
                     "type": "Ethernet Virtual/Physical"

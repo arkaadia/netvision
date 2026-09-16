@@ -71,9 +71,11 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
   const disabledCount = ports.filter((p) => p.admin_status === 'disabled').length;
   const trunkCount = ports.filter((p) => p.mode === 'trunk').length;
 
-  const currentSelectedPort = ports.find((p) => p.port_id === selectedPortId);
+  const currentSelectedPort = selectedPortId
+    ? ports.find((p) => (p.port_id || (p as any).port || p.name) === selectedPortId)
+    : undefined;
   const displayPort = activeHoverPort || currentSelectedPort;
-  const multiSelectedCount = selectedPortIds ? selectedPortIds.length : 0;
+  const multiSelectedCount = Array.isArray(selectedPortIds) ? selectedPortIds.length : 0;
 
   return (
     <div
@@ -259,15 +261,22 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
             }`}
           >
             <div className="flex items-center gap-1.5 min-w-max py-0.5">
-              {ports.map((port) => {
-                const isSelected =
-                  selectedPortId === port.port_id ||
-                  (selectedPortIds && selectedPortIds.includes(port.port_id));
-                const isHovered = activeHoverPort?.port_id === port.port_id;
+              {ports.map((port, pIdx) => {
+                const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
+                const isSelected = Boolean(
+                  pId && (
+                    (selectedPortId && selectedPortId === pId) ||
+                    (Array.isArray(selectedPortIds) && selectedPortIds.length > 0 && selectedPortIds.includes(pId))
+                  )
+                );
+                const isHovered = Boolean(
+                  activeHoverPort &&
+                  (activeHoverPort.port_id || (activeHoverPort as any).port || activeHoverPort.name) === pId
+                );
 
                 return (
                   <div
-                    key={port.port_id}
+                    key={pId}
                     onClick={(e) => onPortClick?.(port, e)}
                     onMouseEnter={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -275,7 +284,11 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
                       setActiveHoverPort(port);
                     }}
                     onMouseLeave={() => {
-                      setActiveHoverPort((cur) => (cur?.port_id === port.port_id ? null : cur));
+                      setActiveHoverPort((cur) => {
+                        if (!cur) return null;
+                        const curId = cur.port_id || (cur as any).port || cur.name;
+                        return curId === pId ? null : cur;
+                      });
                       setHoverCoords(null);
                     }}
                     className={`cursor-pointer shrink-0 rounded transition-shadow ${

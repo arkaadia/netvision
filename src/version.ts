@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.60.2';
+export const APP_VERSION = '1.60.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.60.3',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'رفع باگ انتخاب خودکار تمامی پورت‌ها در ترمینال سیسکو، میکروتیک و بازرس پورت‌ها',
+    title_en: 'Fix All Ports Pre-Selected Bug in Cisco/MikroTik Terminal and Port Inspector Modals',
+    changes: [
+      'برطرف‌سازی ریشه‌ای مشکل انتخاب و هایلایت شدن ناخواسته همه پورت‌های تجهیز هنگام باز کردن مودال ترمینال سیسکو، ترمینال میکروتیک و بازرس پورت‌ها.',
+      'اصلاح منطق بررسی وضعیت انتخاب پورت (isSelected) در فیس‌پلیت پورت‌ها و جدول بازرس پورت‌ها به صورت ایمن و عدم تطابق مقادیر تعریف‌نشده (undefined).',
+      'نرمال‌سازی کامل ساختار اطلاعات پورت‌ها و تضمین اختصاص شناسه یکتای port_id در بک‌اند سرور و تمامی لایه‌های فرانت‌اند (PortInspectorModal، CiscoTerminalModal، MikroTikTerminalModal، PortManagementView).',
+      'ریست و خالی کردن صریح آرایه selectedPortIds و selectedPort به محض باز شدن مودال ترمینال یا تغییر دیوایس برای جلوگیری از نشت استیت قبلی.',
+      'رعایت کامل استانداردهای بین‌المللی‌سازی و عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization Rule).'
+    ],
+    changes_en: [
+      'Fundamentally fixed the bug where all device ports were unexpectedly shown as selected/highlighted when opening Cisco terminal, MikroTik terminal, or Port Inspector modals.',
+      'Hardened the selection check logic (isSelected) in CompactTerminalFaceplate, PortInspectorModal, PortManagementView, and MikroTik modals to prevent undefined-to-undefined accidental matches.',
+      'Normalized port data structures at both the backend route layer and frontend consumers to ensure consistent presence of port_id and fallback naming.',
+      'Explicitly cleared and initialized selectedPortIds and selectedPort state upon modal opening and device switching, preventing stale selection leakage.',
+      'Enforced 100% strict localization compliance with complete Persian/English symmetry.'
+    ]
+  },
   {
     version: '1.60.2',
     releaseDate: '2026-09-16',

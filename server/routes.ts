@@ -701,6 +701,13 @@ apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response)
             pythonData.ports = pythonData.ports_telemetry.ports;
             pythonData.total_ports = pythonData.total_ports || pythonData.ports_telemetry.total_ports;
           }
+          if (Array.isArray(pythonData.ports)) {
+            pythonData.ports = pythonData.ports.map((p: any, idx: number) => ({
+              ...p,
+              port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+              name: p.name || p.port_id || p.port || `port-${idx + 1}`,
+            }));
+          }
           if (isEn && pythonData.message_en) {
             pythonData.message = pythonData.message_en;
           } else if (!isEn && pythonData.message_fa) {

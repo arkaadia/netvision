@@ -143,9 +143,19 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
 
   useEffect(() => {
     if (!device || !isOpen) return;
+    setSelectedPort(null);
+    setSelectedPortIds([]);
+    lastClickedPortRef.current = null;
     fetchDevicePorts(device.id)
       .then((res) => {
-        if (res && res.ports) setPorts(res.ports);
+        if (res && res.ports) {
+          const rawPorts = res.ports || [];
+          const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
+            ...p,
+            port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+          }));
+          setPorts(normalizedPorts);
+        }
       })
       .catch((err) => console.warn('Failed to fetch ports for MikroTik terminal', err));
   }, [device?.id, isOpen]);
@@ -183,29 +193,33 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
     let isRange = false;
     let rangeStr = '';
 
+    const pId = port.port_id || (port as any).port || port.name;
+    if (!pId) return;
+
     if (isRangeAction && lastClickedPortRef.current) {
-      const idxA = ports.findIndex((p) => p.port_id === lastClickedPortRef.current?.port_id);
-      const idxB = ports.findIndex((p) => p.port_id === port.port_id);
+      const lastId = lastClickedPortRef.current?.port_id || (lastClickedPortRef.current as any)?.port || lastClickedPortRef.current?.name;
+      const idxA = ports.findIndex((p) => (p.port_id || (p as any).port || p.name) === lastId);
+      const idxB = ports.findIndex((p) => (p.port_id || (p as any).port || p.name) === pId);
       if (idxA !== -1 && idxB !== -1) {
         const minIdx = Math.min(idxA, idxB);
         const maxIdx = Math.max(idxA, idxB);
         const rangePorts = ports.slice(minIdx, maxIdx + 1);
-        newSelectedIds = rangePorts.map((p) => p.port_id);
+        newSelectedIds = rangePorts.map((p) => p.port_id || (p as any).port || p.name).filter(Boolean);
         isRange = true;
-        rangeStr = rangePorts.map((p) => p.port_id).join(',');
+        rangeStr = newSelectedIds.join(',');
       } else {
-        newSelectedIds = [port.port_id];
+        newSelectedIds = [pId];
         lastClickedPortRef.current = port;
       }
     } else {
-      newSelectedIds = [port.port_id];
+      newSelectedIds = [pId];
       lastClickedPortRef.current = port;
     }
 
     setSelectedPort(port);
     setSelectedPortIds(newSelectedIds);
 
-    const targetText = isRange ? rangeStr : port.port_id;
+    const targetText = isRange ? rangeStr : pId;
 
     setInput((prevInput) => {
       // 1. If empty or whitespace only
@@ -310,9 +324,14 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
     try {
       const res = await syncDevicePorts(curDev.id);
       if (res && res.ports && res.ports.length > 0) {
-        setPorts(res.ports);
-        const upCount = res.ports.filter((p) => p.status === 'up').length;
-        const downCount = res.ports.filter((p) => p.status !== 'up').length;
+        const rawPorts = res.ports || [];
+        const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
+          ...p,
+          port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+        }));
+        setPorts(normalizedPorts);
+        const upCount = normalizedPorts.filter((p) => p.status === 'up').length;
+        const downCount = normalizedPorts.filter((p) => p.status !== 'up').length;
         if (!silent) {
           setLines((prev) => [
             ...prev,
@@ -320,8 +339,8 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
               id: 'sync-ok-' + Date.now(),
               type: 'system',
               text: isEn
-                ? `[SYNC SUCCESS] Verified ${res.ports.length} interfaces via ${res.sync_source || 'SSH tunnel'}: ${upCount} UP, ${downCount} DOWN.`
-                : `[پایان بررسی] وضعیت ${res.ports.length} پورت از طریق ${res.sync_source || 'تانل SSH'} تایید شد (${upCount} متصل، ${downCount} قطع).`,
+                ? `[SYNC SUCCESS] Verified ${normalizedPorts.length} interfaces via ${res.sync_source || 'SSH tunnel'}: ${upCount} UP, ${downCount} DOWN.`
+                : `[پایان بررسی] وضعیت ${normalizedPorts.length} پورت از طریق ${res.sync_source || 'تانل SSH'} تایید شد (${upCount} متصل، ${downCount} قطع).`,
             },
           ]);
         }
@@ -908,7 +927,7 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
             isMikroTik={true}
             isLightMode={isLightMode}
             onPortClick={handlePortClick}
-            selectedPortId={selectedPort?.port_id}
+            selectedPortId={selectedPort ? (selectedPort.port_id || (selectedPort as any).port || selectedPort.name) : undefined}
             selectedPortIds={selectedPortIds}
             onSyncPorts={() => handleSyncPorts(false)}
             isSyncing={isSyncingPorts}

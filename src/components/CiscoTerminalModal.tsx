@@ -316,31 +316,35 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     let isRange = false;
     let rangeStr = '';
 
+    const pId = port.port_id || (port as any).port || port.name;
+    if (!pId) return;
+
     if (isRangeAction && lastClickedPortRef.current) {
-      const idxA = ports.findIndex((p) => p.port_id === lastClickedPortRef.current?.port_id);
-      const idxB = ports.findIndex((p) => p.port_id === port.port_id);
+      const lastId = lastClickedPortRef.current?.port_id || (lastClickedPortRef.current as any)?.port || lastClickedPortRef.current?.name;
+      const idxA = ports.findIndex((p) => (p.port_id || (p as any).port || p.name) === lastId);
+      const idxB = ports.findIndex((p) => (p.port_id || (p as any).port || p.name) === pId);
       if (idxA !== -1 && idxB !== -1) {
         const minIdx = Math.min(idxA, idxB);
         const maxIdx = Math.max(idxA, idxB);
         const rangePorts = ports.slice(minIdx, maxIdx + 1);
-        newSelectedIds = rangePorts.map((p) => p.port_id);
+        newSelectedIds = rangePorts.map((p) => p.port_id || (p as any).port || p.name).filter(Boolean);
         isRange = true;
 
-        const firstPort = rangePorts[0].port_id;
-        const lastPort = rangePorts[rangePorts.length - 1].port_id;
+        const firstPort = rangePorts[0].port_id || (rangePorts[0] as any).port || rangePorts[0].name;
+        const lastPort = rangePorts[rangePorts.length - 1].port_id || (rangePorts[rangePorts.length - 1] as any).port || rangePorts[rangePorts.length - 1].name;
         const matchFirst = firstPort.match(/^(.*?)(\d+)$/);
         const matchLast = lastPort.match(/^(.*?)(\d+)$/);
         if (matchFirst && matchLast && matchFirst[1] === matchLast[1]) {
           rangeStr = `${firstPort} - ${matchLast[2]}`;
         } else {
-          rangeStr = rangePorts.map((p) => p.port_id).join(', ');
+          rangeStr = rangePorts.map((p) => p.port_id || (p as any).port || p.name).join(', ');
         }
       } else {
-        newSelectedIds = [port.port_id];
+        newSelectedIds = [pId];
         lastClickedPortRef.current = port;
       }
     } else {
-      newSelectedIds = [port.port_id];
+      newSelectedIds = [pId];
       lastClickedPortRef.current = port;
     }
 
@@ -446,17 +450,22 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     try {
       const res = await syncDevicePorts(curDev.id);
       if (res && res.ports && res.ports.length > 0) {
-        setPorts(res.ports);
-        const upCount = res.ports.filter((p) => p.status === 'up').length;
-        const downCount = res.ports.filter((p) => p.status !== 'up').length;
+        const rawPorts = res.ports || [];
+        const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
+          ...p,
+          port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+        }));
+        setPorts(normalizedPorts);
+        const upCount = normalizedPorts.filter((p) => p.status === 'up').length;
+        const downCount = normalizedPorts.filter((p) => p.status !== 'up').length;
         if (!silent) {
           appendLines([
             {
               id: 'sync-ok-' + Date.now(),
               type: 'success',
               text: isEn
-                ? `[SYNC SUCCESS] Verified ${res.ports.length} interfaces via ${res.sync_source || 'SSH tunnel'}: ${upCount} UP, ${downCount} DOWN.`
-                : `[پایان بررسی] وضعیت ${res.ports.length} پورت با موفقیت از طریق ${res.sync_source || 'تانل SSH'} همگام شد (${upCount} متصل، ${downCount} قطع).`,
+                ? `[SYNC SUCCESS] Verified ${normalizedPorts.length} interfaces via ${res.sync_source || 'SSH tunnel'}: ${upCount} UP, ${downCount} DOWN.`
+                : `[پایان بررسی] وضعیت ${normalizedPorts.length} پورت با موفقیت از طریق ${res.sync_source || 'تانل SSH'} همگام شد (${upCount} متصل، ${downCount} قطع).`,
             },
           ]);
         }
@@ -518,6 +527,9 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       setHasUnsavedChanges(!!curDev.has_unsaved_changes);
       setSshSessionMode('connecting');
       setSshLatency(null);
+      setSelectedPort(null);
+      setSelectedPortIds([]);
+      lastClickedPortRef.current = null;
       loadPortsAndVlans(curDev.id);
 
       const hostDisplay = targetHost || (isEn ? 'No IP Configured' : 'بدون آی‌پی');
@@ -735,8 +747,13 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         fetchDevicePorts(devId),
         fetchVlans(),
       ]);
-      setPorts(portsRes.ports);
-      setVlans(vlanRes.vlans);
+      const rawPorts = portsRes.ports || [];
+      const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
+        ...p,
+        port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+      }));
+      setPorts(normalizedPorts);
+      setVlans(vlanRes.vlans || []);
     } catch (e) {
       console.error('Failed to load device ports/vlans for CLI:', e);
     }
@@ -2364,7 +2381,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             isMikroTik={false}
             isLightMode={isLightMode}
             onPortClick={handlePortClick}
-            selectedPortId={selectedPort?.port_id}
+            selectedPortId={selectedPort ? (selectedPort.port_id || (selectedPort as any).port || selectedPort.name) : undefined}
             selectedPortIds={selectedPortIds}
             onSyncPorts={() => handleSyncPorts(false)}
             isSyncing={isSyncingPorts}
@@ -2788,12 +2805,18 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
                     {isEn ? 'No interfaces found matching filter.' : 'هیچ اینترفیسی مطابق فیلتر یافت نشد.'}
                   </div>
                 ) : (
-                  filteredInterfaces.map((p) => {
+                  filteredInterfaces.map((p, pIdx) => {
                     const isUp = p.status === 'up';
-                    const isSelected = selectedPort?.port_id === p.port_id;
+                    const pId = p.port_id || (p as any).port || p.name || `port-${pIdx + 1}`;
+                    const isSelected = Boolean(
+                      pId && (
+                        (selectedPort && (selectedPort.port_id || (selectedPort as any).port || selectedPort.name) === pId) ||
+                        (Array.isArray(selectedPortIds) && selectedPortIds.length > 0 && selectedPortIds.includes(pId))
+                      )
+                    );
                     return (
                       <div
-                        key={p.port_id}
+                        key={pId}
                         className={`p-2.5 rounded-xl border transition-all flex flex-col gap-2 ${
                           isSelected
                             ? 'bg-indigo-500/10 border-indigo-500/60 shadow-xs'

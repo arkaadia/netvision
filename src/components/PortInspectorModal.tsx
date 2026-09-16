@@ -260,10 +260,20 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       setLoading(true);
       setError(null);
       const res = await fetchDevicePorts(device.id);
-      setPorts(res.ports);
-      if (res.ports.length > 0) {
-        setSelectedPort(res.ports[0]);
-        setSelectedPortIds([res.ports[0].port_id]);
+      const rawPorts = res.ports || [];
+      const normalizedPorts = rawPorts.map((p: any, idx: number) => ({
+        ...p,
+        port_id: p.port_id || p.port || p.name || `port-${idx + 1}`,
+      }));
+      setPorts(normalizedPorts);
+      if (normalizedPorts.length > 0) {
+        const firstPort = normalizedPorts[0];
+        const firstId = firstPort.port_id;
+        setSelectedPort(firstPort);
+        setSelectedPortIds(firstId ? [firstId] : []);
+      } else {
+        setSelectedPort(null);
+        setSelectedPortIds([]);
       }
     } catch (err: any) {
       setError(err.message || 'خطا در بارگذاری اطلاعات پورت‌ها');
@@ -274,16 +284,18 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
 
   const handlePortClick = (e: React.MouseEvent, port: SwitchPort) => {
     setBatchSuccessMessage(null);
+    const pId = port.port_id || (port as any).port || port.name;
+    if (!pId) return;
     if (e.ctrlKey || e.metaKey || e.shiftKey) {
       // Multi-selection with Ctrl / Cmd / Shift
       setSelectedPortIds((prev) => {
-        const exists = prev.includes(port.port_id);
+        const exists = prev.includes(pId);
         let updated: string[];
         if (exists) {
-          updated = prev.filter((id) => id !== port.port_id);
-          if (updated.length === 0) updated = [port.port_id];
+          updated = prev.filter((id) => id !== pId);
+          if (updated.length === 0) updated = [pId];
         } else {
-          updated = [...prev, port.port_id];
+          updated = [...prev, pId];
         }
         return updated;
       });
@@ -292,14 +304,15 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
     } else {
       // Single select
       setSelectedPort(port);
-      setSelectedPortIds([port.port_id]);
+      setSelectedPortIds([pId]);
       setIsEditing(false);
     }
   };
 
   const handleSelectPort = (port: SwitchPort) => {
+    const pId = port.port_id || (port as any).port || port.name;
     setSelectedPort(port);
-    setSelectedPortIds([port.port_id]);
+    setSelectedPortIds(pId ? [pId] : []);
     setIsEditing(false);
   };
 
@@ -453,9 +466,9 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       } else {
         const portId = targetPortIds[0];
         const res = await updateSwitchPort(device.id, portId, {
-          admin_status: updates.admin_status,
+          admin_status: updates.admin_status !== 'no_change' ? updates.admin_status : undefined,
           status: updates.status,
-          mode: updates.mode,
+          mode: updates.mode !== 'no_change' ? updates.mode : undefined,
           vlan: Number(updates.vlan) || 1,
           allowed_vlans: updates.allowed_vlans,
           connected_device: updates.connected_device,
@@ -656,15 +669,24 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
               <div className="switch-faceplate-chassis rounded-xl p-3 border border-slate-800 shadow-inner">
                 <div className="switch-faceplate-grid rounded-lg p-2.5 overflow-x-auto border border-slate-850">
                   <div className="flex flex-wrap gap-2 justify-start min-w-[500px]">
-                    {ports.map((port) => (
-                      <NetworkPortSvg
-                        key={port.port_id}
-                        port={port}
-                        isSelected={selectedPortIds.includes(port.port_id)}
-                        onClick={(e) => handlePortClick(e, port)}
-                        onContextMenu={(e) => handlePortContextMenu(e, port)}
-                      />
-                    ))}
+                    {ports.map((port, pIdx) => {
+                      const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
+                      const isPortSelected = Boolean(
+                        pId &&
+                        Array.isArray(selectedPortIds) &&
+                        selectedPortIds.length > 0 &&
+                        selectedPortIds.includes(pId)
+                      );
+                      return (
+                        <NetworkPortSvg
+                          key={pId}
+                          port={port}
+                          isSelected={isPortSelected}
+                          onClick={(e) => handlePortClick(e, port)}
+                          onContextMenu={(e) => handlePortContextMenu(e, port)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1430,12 +1452,24 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                     <th className="px-3 py-2.5 w-10 text-center">
                       <input
                         type="checkbox"
-                        checked={filteredPorts.length > 0 && filteredPorts.every((p) => selectedPortIds.includes(p.port_id))}
+                        checked={
+                          filteredPorts.length > 0 &&
+                          filteredPorts.every((p) => {
+                            const pId = p.port_id || (p as any).port || p.name;
+                            return Boolean(pId && Array.isArray(selectedPortIds) && selectedPortIds.includes(pId));
+                          })
+                        }
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedPortIds(filteredPorts.map((p) => p.port_id));
+                            const allIds = filteredPorts
+                              .map((p) => p.port_id || (p as any).port || p.name)
+                              .filter(Boolean) as string[];
+                            setSelectedPortIds(allIds);
                           } else {
-                            setSelectedPortIds(selectedPort ? [selectedPort.port_id] : []);
+                            const selId = selectedPort
+                              ? selectedPort.port_id || (selectedPort as any).port || selectedPort.name
+                              : null;
+                            setSelectedPortIds(selId ? [selId] : []);
                           }
                         }}
                         className="rounded text-indigo-600 bg-white/10 border-white/20 cursor-pointer"
@@ -1454,11 +1488,17 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-mono">
-                  {filteredPorts.map((port) => {
-                    const isSelected = selectedPortIds.includes(port.port_id);
+                  {filteredPorts.map((port, pIdx) => {
+                    const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
+                    const isSelected = Boolean(
+                      pId &&
+                      Array.isArray(selectedPortIds) &&
+                      selectedPortIds.length > 0 &&
+                      selectedPortIds.includes(pId)
+                    );
                     return (
                       <tr
-                        key={port.port_id}
+                        key={pId}
                         onClick={(e) => handlePortClick(e, port)}
                         className={`cursor-pointer transition ${
                           isSelected ? 'bg-indigo-500/20 text-white font-medium' : 'hover:bg-white/5 text-slate-300'
