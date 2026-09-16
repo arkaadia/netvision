@@ -26,8 +26,8 @@
       "last_modified_time": "09:54:55",
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir96AxVoppnrpPL3nmo6Oxl9Krpp3UAzNXrMHH6Oz2kdrzBkhkt--bk6WftxJ5Gx9VjrC3dTuBgrWMGLwDyOACXxQ==",
+      "enable_password": "enc:fernet:gAAAAABqqir9ebxlc3Oioaru7I-MzUh_g0NDI1RdoJmh3YzdowcH3O6q3oKKavWSpLYlsF5rwUd9xPnMrFddHL6QclR96Xpi4A==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.1",
       "platform": "cisco_ios_xe",
@@ -37,7 +37,7 @@
         "host": "192.168.1.1",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir9H9PAF80IwA7FZ9wNKQQ3TcfmKLYHjhxT6N-0Iyf_AhZWA97frrqqriJ4xnR9J358AWMIMqY3yhGgNM408r6mAw=="
       }
     },
     {
@@ -104,8 +104,8 @@
       "total_ports": 48,
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir9c6kksKvW3biXfwlOEhPLm6OSlUeBFd71pPsmZ24RUdFbCiAqgE5sz3WMtKHq-StDBiAQYzBR8P16YEpMJ9mbgA==",
+      "enable_password": "enc:fernet:gAAAAABqqir9_JAu4aOLXWkOEXsP93M3TGGs-5rFIxDyXGTt4X61FV4ncDM7fgNZCooFvAVXux6zvE4qqmRJLmaNtBqmq9fbbA==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.10",
       "platform": "cisco_ios_xe",
@@ -115,7 +115,7 @@
         "host": "192.168.1.10",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir9eYeuBVTErZh1rGW_xwNKa-iLFSk4eDDidwS2hiARVWX6unEyf5Z772FruMDMK2wMP4JZW47cyPJfilDgMT4p_w=="
       }
     },
     {
@@ -142,8 +142,8 @@
       "total_ports": 48,
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir9BpkJI18Y_V76dsksQ-2gSY0o66djGmuoT1iEHI6n5rMHy9IdhCEMz3yWAf37GsYlgWXsu7DEmkc4ABNQaufIww==",
+      "enable_password": "enc:fernet:gAAAAABqqir9q2EeZ7ud_cUJ708DZS0KnF7YlzbeVgciOywh7hjTq4ZC7YID3_kHQ_RPThbbePIwmBxRI1vibrtJnak-ZGqHMg==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.21",
       "platform": "cisco_ios",
@@ -153,7 +153,7 @@
         "host": "192.168.1.21",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir9pCH1sGlMTLLcdUCtMeyZixi9BmgSqUzZ5VX0hAXJkFObmyDJuuLqZpJmZvlEJzXtYmr9gTd9iSInLh725rdVMw=="
       }
     },
     {
@@ -180,8 +180,8 @@
       "total_ports": 24,
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir9PtqkX2zhWnQe5fEZHAGR1F8frcNwAXvF-BvWuTMfFm32cVgjUzpQO0AToNCw0EMbJCXh44A4bnYoz0oV-GEJkg==",
+      "enable_password": "enc:fernet:gAAAAABqqir9Tz4MHu2F5i6Vzn07Kpp5shmpcTDxvl6hHPeFryZ_7LpeD3l-Htjd8u0h1ibdGpZKHtmnmvgUyHnkVsit1NuXLA==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.11",
       "platform": "cisco_ios_xe",
@@ -191,7 +191,7 @@
         "host": "192.168.1.11",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir979lVTVvOBKoH_6oM6PgWhLlPQi2odQ_l6wuSBBNICKEo4pSWSt4WolUaTqJS3EFjipxdd3qvkZ23304RWH2xAQ=="
       }
     },
     {
@@ -218,8 +218,8 @@
       "total_ports": 28,
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir911Hifp7OIgfzk9cKKUMfY7EhlDLHso5E7VzscB1Ni1hE2jakfpTbh15XvjLgEcY8mOA4EbqQd2OVNWVtghOA3g==",
+      "enable_password": "enc:fernet:gAAAAABqqir9wUkA3OkqR7P4brc_JFF6dLHv8ySLZXFYCVGktQax3P5xtS_D-AuZXQnspqw751MUFRSwB37BaT0AHNN7dJ3REg==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.32",
       "platform": "cisco_ios",
@@ -229,7 +229,7 @@
         "host": "192.168.1.32",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir9ENZtchB6Ytu52wE9EEfwW5RMcld6HtDsKuc5PGVfIGWVftSGxCCmXaNV4fudSG4gZs-Ecre0ngFe6CaBp94dag=="
       }
     },
     {
@@ -258,8 +258,8 @@
       "last_modified_time": "10:38:37",
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir9F9yHZCaNTJatcbxiOB77soyCCSqGJ2-_blYTRA2twiNLylYE2ZO-Tq_fHOeQj0Xy787PjWnhERJmFqIdfTEG8g==",
+      "enable_password": "enc:fernet:gAAAAABqqir9fEp_FDFpbCFJgMBXfoCg9O544c8502meqNtB_F-PzBEJBENnNDLzBMWCQIre_CxzWjCAtNCymR7x65LL130Qtw==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.101",
       "platform": "cisco_ios",
@@ -269,7 +269,7 @@
         "host": "192.168.1.101",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir9wpvGJcf62RgDZOVg8PaEzgYYud9YArgrR2CMyTp2T2hvncASOQtaLUgvgtlVBG6IDiDQPbp2lqne3KZl9pxcVw=="
       }
     },
     {
@@ -296,8 +296,8 @@
       "total_ports": 2,
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir9LnRXteQxQ8V3PW2j42I0WcGt5vs8Fy_dNvgByMFf6I7L8idSH2ynrYuNSwWDC9SuZdUpR_h6lrDpkAteZUhTcQ==",
+      "enable_password": "enc:fernet:gAAAAABqqir9KXvj8RoQYgNSTfhfzZv06Z-yb0nqvTftDJk7YEpvf6WDnNsScXCx8RKN7EIr2PyBlkhYhkaUpcroyz2_SbbS9Q==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.103",
       "platform": "cisco_ios",
@@ -307,7 +307,7 @@
         "host": "192.168.1.103",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir95kkZNYeTryKwzvRjjPSBzwLQmWLAt01TEfl74VJOX-z9h806YQCgG1rXdbezS0roJ2bY4VWPBebZWyqGYeZ7yA=="
       }
     },
     {
@@ -334,8 +334,8 @@
       "total_ports": 2,
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "cisco123",
-      "enable_password": "cisco_enable",
+      "ssh_password": "enc:fernet:gAAAAABqqir9KrL2p6vtn9W_Nm5CmsuFDfAmKLHXfGGfc_Vz2zyDrNVa8ar8WviBLxgHS2wBt_gyN6nNI7ZZm_k43CQs6tUGsA==",
+      "enable_password": "enc:fernet:gAAAAABqqir9Tq1OtOnPCxsXTDPMPILnRq5Hl8RAiQPjRn0U0UHlrFqL5xl62uOwDn6hWLCKbCY3hy5U3-EogNmrP9UDxKbObg==",
       "ssh_status": "authenticated",
       "ssh_host": "192.168.1.105",
       "platform": "cisco_ios",
@@ -345,7 +345,7 @@
         "host": "192.168.1.105",
         "port": 22,
         "username": "admin",
-        "password": "cisco123"
+        "password": "enc:fernet:gAAAAABqqir9DEKx6oSUph3ZmLxM2uLDPF-CM8GCNBViX-KKNnx6y-xaXLKxe64AZ-h7lJNPa0ACwXgWpa0Cy6tCY42T-iks4Q=="
       }
     },
     {
@@ -374,13 +374,13 @@
       "ssh_host": "192.168.88.1",
       "ssh_port": 22,
       "ssh_username": "admin",
-      "ssh_password": "admin",
+      "ssh_password": "enc:fernet:gAAAAABqqir9MQWj1UJbCLcmTiq4566Pdo4aSbxENemTAZXf1zA4qDUY8GwYUJ3XTfpgrl4RZrG5UkgYwV6Yd0wWad-ZHDYQRQ==",
       "connection": {
         "protocol": "ssh",
         "host": "192.168.88.1",
         "port": 22,
         "username": "admin",
-        "password": "admin"
+        "password": "enc:fernet:gAAAAABqqir9afQmUqp0ZxJGlwa1asAeFcXkETWzPMU3reuutwJSc_DCFJsAUPpu15yi7oLCSbc7a5RSM6YeO5pu9qL1lnc2Pw=="
       },
       "last_seen": "هم اکنون (Just now)"
     }

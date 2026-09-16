@@ -180,6 +180,162 @@ function getLinkCurve(
   };
 }
 
+/**
+ * Resolves all identifier aliases for a device across rack mounts, tower mounts, clean IDs, and inventory records.
+ */
+function getDevicePositionAliases(
+  idOrCleanId: string,
+  map?: CustomTopologyMap | null,
+  availableDevices?: Device[]
+): string[] {
+  if (!idOrCleanId) return [];
+  const cleanId = idOrCleanId.replace(/^hw-/, '').replace(/^radio-/, '');
+  const baseCleanId = cleanId.replace(/-\d{10,}$/, '');
+  const aliases = new Set<string>([
+    idOrCleanId,
+    cleanId,
+    `hw-${cleanId}`,
+    `radio-${cleanId}`,
+  ]);
+  if (baseCleanId && baseCleanId !== cleanId) {
+    aliases.add(baseCleanId);
+    aliases.add(`hw-${baseCleanId}`);
+    aliases.add(`radio-${baseCleanId}`);
+  }
+
+  // Check available devices (by ID, IP, or exact name)
+  let targetDevName: string | undefined;
+  let targetDevIp: string | undefined;
+  if (availableDevices) {
+    const matched = availableDevices.find(
+      (d) =>
+        d.id === idOrCleanId ||
+        d.id === cleanId ||
+        d.id.replace(/^hw-/, '') === cleanId ||
+        d.id.replace(/^radio-/, '') === cleanId
+    );
+    if (matched) {
+      aliases.add(matched.id);
+      const mClean = matched.id.replace(/^hw-/, '').replace(/^radio-/, '');
+      aliases.add(mClean);
+      aliases.add(`hw-${mClean}`);
+      if (matched.name) targetDevName = matched.name.trim().toLowerCase();
+      if (matched.ip) targetDevIp = matched.ip.trim();
+    }
+  }
+
+  // Match in racks
+  if (map?.racks) {
+    map.racks.forEach((rack) => {
+      (rack.devices || []).forEach((dev) => {
+        const dClean = dev.id.replace(/^hw-/, '');
+        const dBase = dClean.replace(/-\d{10,}$/, '');
+        const devNameLower = dev.name?.trim().toLowerCase();
+
+        const matchesId =
+          dev.id === idOrCleanId ||
+          dClean === cleanId ||
+          dBase === baseCleanId ||
+          dev.id.startsWith(`hw-${cleanId}`);
+
+        const matchesName =
+          Boolean(targetDevName) && devNameLower === targetDevName;
+
+        const matchesIp =
+          Boolean(targetDevIp) && Boolean(dev.ip) && dev.ip === targetDevIp;
+
+        if (matchesId || matchesName || matchesIp) {
+          aliases.add(dev.id);
+          aliases.add(dClean);
+          aliases.add(`hw-${dClean}`);
+          if (dBase) {
+            aliases.add(dBase);
+            aliases.add(`hw-${dBase}`);
+          }
+        }
+      });
+    });
+  }
+
+  // Match in towers
+  if (map?.towers) {
+    map.towers.forEach((tower) => {
+      (tower.devices || []).forEach((dev) => {
+        const dClean = dev.id.replace(/^radio-/, '');
+        const devNameLower = dev.name?.trim().toLowerCase();
+        const towerDeviceId = (dev as unknown as { deviceId?: string }).deviceId;
+
+        const matchesId =
+          dev.id === idOrCleanId ||
+          dClean === cleanId ||
+          towerDeviceId === idOrCleanId ||
+          towerDeviceId === cleanId;
+
+        const matchesName =
+          Boolean(targetDevName) && devNameLower === targetDevName;
+
+        const matchesIp =
+          Boolean(targetDevIp) && Boolean(dev.ip) && dev.ip === targetDevIp;
+
+        if (matchesId || matchesName || matchesIp) {
+          aliases.add(dev.id);
+          aliases.add(dClean);
+          if (towerDeviceId) aliases.add(towerDeviceId);
+        }
+      });
+    });
+  }
+
+  // Match in map.deviceIds
+  if (map?.deviceIds) {
+    map.deviceIds.forEach((dId) => {
+      const dClean = dId.replace(/^hw-/, '').replace(/^radio-/, '');
+      if (dId === idOrCleanId || dClean === cleanId || dClean === baseCleanId) {
+        aliases.add(dId);
+        aliases.add(dClean);
+      }
+    });
+  }
+
+  return Array.from(aliases).filter(Boolean);
+}
+
+/**
+ * Resolves the coordinate for a device by checking all known aliases across physical and device position stores.
+ */
+function resolveDevicePosition(
+  id: string,
+  map: CustomTopologyMap,
+  mode: DeviceCanvasDisplayMode,
+  availableDevices?: Device[]
+): { x: number; y: number } | undefined {
+  const aliases = getDevicePositionAliases(id, map, availableDevices);
+
+  // In Card mode: check devicePositions first. In Physical mode: check physicalPositions first.
+  const primaryStore = mode === 'physical' ? map.physicalPositions : map.devicePositions;
+  if (primaryStore) {
+    for (const a of aliases) {
+      const p = primaryStore[a];
+      if (p && typeof p.x === 'number' && typeof p.y === 'number') {
+        return p;
+      }
+    }
+  }
+
+  // Fallback to secondary store
+  const secondaryStore = mode === 'physical' ? map.devicePositions : map.physicalPositions;
+  if (secondaryStore) {
+    for (const a of aliases) {
+      const p = secondaryStore[a];
+      if (p && typeof p.x === 'number' && typeof p.y === 'number') {
+        return p;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   topology,
   inventoryDevices = [],
@@ -1046,27 +1202,47 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
     const deviceId = device.id;
     const cleanId = device.id.replace(/^hw-/, '');
     const currentDeviceIds = currentCustomMap.deviceIds || [];
-    const newDeviceIds = currentDeviceIds.includes(deviceId) || currentDeviceIds.includes(cleanId)
-      ? currentDeviceIds
-      : [...currentDeviceIds, deviceId];
+    const newDeviceIds = [...currentDeviceIds];
+    if (!newDeviceIds.includes(deviceId)) newDeviceIds.push(deviceId);
+    if (!newDeviceIds.includes(cleanId)) newDeviceIds.push(cleanId);
 
     const currentPositions = { ...(currentCustomMap.devicePositions || {}) };
+    const currentPhysicalPositions = { ...(currentCustomMap.physicalPositions || {}) };
     const targetRack = (currentCustomMap.racks || []).find((r) => r.id === rackId);
-    if (!currentPositions[deviceId] && !currentPositions[cleanId]) {
-      const rackX = targetRack ? targetRack.x : 200;
-      const rackY = targetRack ? targetRack.y : 200;
-      const devCount = targetRack?.devices.length || 0;
-      currentPositions[deviceId] = {
-        x: rackX + 380 + (devCount % 2) * 260,
-        y: rackY + (devCount * 140),
-      };
+
+    const aliases = getDevicePositionAliases(deviceId, currentCustomMap, allAvailableDevices);
+
+    let existingPos: { x: number; y: number } | undefined;
+    for (const a of aliases) {
+      if (currentPositions[a] && typeof currentPositions[a].x === 'number') {
+        existingPos = currentPositions[a];
+        break;
+      }
+      if (currentPhysicalPositions[a] && typeof currentPhysicalPositions[a].x === 'number') {
+        existingPos = currentPhysicalPositions[a];
+        break;
+      }
     }
+
+    const rackX = targetRack ? targetRack.x : 200;
+    const rackY = targetRack ? targetRack.y : 200;
+    const devCount = targetRack?.devices.length || 0;
+    const initialPos = existingPos || {
+      x: rackX + 380 + (devCount % 2) * 260,
+      y: rackY + (devCount * 140),
+    };
+
+    aliases.forEach((a) => {
+      currentPositions[a] = initialPos;
+      currentPhysicalPositions[a] = initialPos;
+    });
 
     const updatedMap: CustomTopologyMap = {
       ...currentCustomMap,
       racks: updatedRacks,
       deviceIds: newDeviceIds,
       devicePositions: currentPositions,
+      physicalPositions: currentPhysicalPositions,
       updatedAt: new Date().toISOString(),
     };
     saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
@@ -2745,71 +2921,44 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       // In Custom Map mode
       const mapDeviceIds = currentCustomMap.deviceIds || [];
 
-      if (globalDeviceViewMode === 'physical') {
-        mapDeviceIds.forEach((id, index) => {
-          const cleanId = id.replace(/^hw-/, '').replace(/^radio-/, '');
-          const physPos =
-            currentCustomMap.physicalPositions?.[id] ||
-            currentCustomMap.physicalPositions?.[cleanId] ||
-            currentCustomMap.devicePositions?.[id] ||
-            currentCustomMap.devicePositions?.[cleanId];
+      mapDeviceIds.forEach((id, index) => {
+        const aliases = getDevicePositionAliases(id, currentCustomMap, allAvailableDevices);
+        const resolved = resolveDevicePosition(id, currentCustomMap, globalDeviceViewMode, allAvailableDevices);
 
-          if (physPos) {
-            pos.set(id, physPos);
-            pos.set(cleanId, physPos);
-          } else {
-            const fallbackPos = {
-              x: 180 + (index % 4) * 280,
-              y: 180 + Math.floor(index / 4) * 220,
-            };
-            pos.set(id, fallbackPos);
-            pos.set(cleanId, fallbackPos);
-          }
-        });
-      } else {
-        mapDeviceIds.forEach((id, index) => {
-          const cleanId = id.replace(/^hw-/, '').replace(/^radio-/, '');
-          const cardPos =
-            currentCustomMap.devicePositions?.[id] ||
-            currentCustomMap.devicePositions?.[cleanId];
-
-          if (cardPos) {
-            pos.set(id, cardPos);
-            pos.set(cleanId, cardPos);
-          } else {
-            const fallbackPos = {
-              x: 180 + (index % 4) * 280,
-              y: 180 + Math.floor(index / 4) * 220,
-            };
-            pos.set(id, fallbackPos);
-            pos.set(cleanId, fallbackPos);
-          }
-        });
-      }
+        if (resolved) {
+          aliases.forEach((a) => pos.set(a, resolved));
+        } else {
+          const fallbackPos = {
+            x: 180 + (index % 4) * 280,
+            y: 180 + Math.floor(index / 4) * 220,
+          };
+          aliases.forEach((a) => pos.set(a, fallbackPos));
+        }
+      });
 
       // Also ensure all devices in customMap.racks have positions!
       if (currentCustomMap.racks) {
         currentCustomMap.racks.forEach((rack) => {
           (rack.devices || []).forEach((dev, devIdx) => {
-            const devId = dev.id;
-            const cleanId = dev.id.replace(/^hw-/, '');
-            const existing =
-              (globalDeviceViewMode === 'physical'
-                ? currentCustomMap.physicalPositions?.[devId] || currentCustomMap.physicalPositions?.[cleanId]
-                : currentCustomMap.devicePositions?.[devId] || currentCustomMap.devicePositions?.[cleanId]) ||
-              (currentCustomMap.devicePositions && (currentCustomMap.devicePositions[devId] || currentCustomMap.devicePositions[cleanId])) ||
-              pos.get(devId) ||
-              pos.get(cleanId);
+            const devAliases = getDevicePositionAliases(dev.id, currentCustomMap, allAvailableDevices);
+            let existing: { x: number; y: number } | undefined;
+            for (const a of devAliases) {
+              if (pos.has(a)) {
+                existing = pos.get(a);
+                break;
+              }
+            }
+            if (!existing) {
+              existing = resolveDevicePosition(dev.id, currentCustomMap, globalDeviceViewMode, allAvailableDevices);
+            }
             if (existing) {
-              pos.set(devId, existing);
-              pos.set(cleanId, existing);
+              devAliases.forEach((a) => pos.set(a, existing!));
             } else {
               const defaultRackPos = {
                 x: rack.x + 440 + (devIdx % 2) * 260,
                 y: rack.y + devIdx * 140,
               };
-              pos.set(devId, defaultRackPos);
-              pos.set(cleanId, defaultRackPos);
+              devAliases.forEach((a) => pos.set(a, defaultRackPos));
             }
           });
         });
@@ -2819,25 +2968,25 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       if (currentCustomMap.towers) {
         currentCustomMap.towers.forEach((tower) => {
           (tower.devices || []).forEach((dev, devIdx) => {
-            const devId = dev.id;
-            const cleanId = dev.id.replace(/^radio-/, '');
-            const existing =
-              (globalDeviceViewMode === 'physical'
-                ? currentCustomMap.physicalPositions?.[devId] || currentCustomMap.physicalPositions?.[cleanId]
-                : currentCustomMap.devicePositions?.[devId] || currentCustomMap.devicePositions?.[cleanId]) ||
-              (currentCustomMap.devicePositions && (currentCustomMap.devicePositions[devId] || currentCustomMap.devicePositions[cleanId])) ||
-              pos.get(devId) ||
-              pos.get(cleanId);
+            const devAliases = getDevicePositionAliases(dev.id, currentCustomMap, allAvailableDevices);
+            let existing: { x: number; y: number } | undefined;
+            for (const a of devAliases) {
+              if (pos.has(a)) {
+                existing = pos.get(a);
+                break;
+              }
+            }
+            if (!existing) {
+              existing = resolveDevicePosition(dev.id, currentCustomMap, globalDeviceViewMode, allAvailableDevices);
+            }
             if (existing) {
-              pos.set(devId, existing);
-              pos.set(cleanId, existing);
+              devAliases.forEach((a) => pos.set(a, existing!));
             } else {
               const defaultTowerPos = {
                 x: tower.x + 480,
                 y: tower.y + devIdx * 120,
               };
-              pos.set(devId, defaultTowerPos);
-              pos.set(cleanId, defaultTowerPos);
+              devAliases.forEach((a) => pos.set(a, defaultTowerPos));
             }
           });
         });
@@ -2846,23 +2995,24 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       // Universal Fallback for any other devices in custom map mode so no node is ever skipped
       let unposIdx = 0;
       allAvailableDevices.forEach((n) => {
-        if (!pos.has(n.id)) {
-          const cleanId = n.id.replace(/^hw-/, '').replace(/^radio-/, '');
-          const existing =
-            (globalDeviceViewMode === 'physical'
-              ? currentCustomMap.physicalPositions?.[n.id] || currentCustomMap.physicalPositions?.[cleanId]
-              : currentCustomMap.devicePositions?.[n.id] || currentCustomMap.devicePositions?.[cleanId]) ||
-            (currentCustomMap.devicePositions && (currentCustomMap.devicePositions[n.id] || currentCustomMap.devicePositions[cleanId])) ||
-            pos.get(cleanId);
+        const aliases = getDevicePositionAliases(n.id, currentCustomMap, allAvailableDevices);
+        let hasAny = false;
+        for (const a of aliases) {
+          if (pos.has(a)) {
+            hasAny = true;
+            break;
+          }
+        }
+        if (!hasAny) {
+          const existing = resolveDevicePosition(n.id, currentCustomMap, globalDeviceViewMode, allAvailableDevices);
           if (existing) {
-            pos.set(n.id, existing);
-            pos.set(cleanId, existing);
+            aliases.forEach((a) => pos.set(a, existing));
           } else {
-            pos.set(n.id, {
+            const fallback = {
               x: 180 + (unposIdx % 4) * 280,
               y: 200 + Math.floor(unposIdx / 4) * 220,
-            });
-            pos.set(cleanId, pos.get(n.id)!);
+            };
+            aliases.forEach((a) => pos.set(a, fallback));
             unposIdx++;
           }
         }
@@ -2870,9 +3020,9 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
 
       // While actively dragging a node, apply its real-time drag position
       if (draggingNodeId && customPositions[draggingNodeId]) {
-        pos.set(draggingNodeId, customPositions[draggingNodeId]);
-        const cleanId = draggingNodeId.replace(/^hw-/, '').replace(/^radio-/, '');
-        pos.set(cleanId, customPositions[draggingNodeId]);
+        const dragPos = customPositions[draggingNodeId];
+        const dragAliases = getDevicePositionAliases(draggingNodeId, currentCustomMap, allAvailableDevices);
+        dragAliases.forEach((a) => pos.set(a, dragPos));
       }
 
       return pos;
@@ -3212,20 +3362,28 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         [devCleanId]: pos,
       }));
 
-      // If in custom map, ensure the device is in deviceIds so the card is rendered
+      // If in custom map, ensure the device is in deviceIds so the card is rendered and all aliases updated
       if (currentCustomMap && activeMapId !== 'default') {
         const deviceIds = currentCustomMap.deviceIds || [];
-        if (!deviceIds.includes(canonicalId) && !deviceIds.includes(dev.id)) {
-          const updatedCustomMap = {
-            ...currentCustomMap,
-            deviceIds: [...deviceIds, canonicalId],
-            devicePositions: {
-              ...(currentCustomMap.devicePositions || {}),
-              [canonicalId]: pos,
-            },
-          };
-          saveCustomMaps(customMaps.map((m) => (m.id === currentCustomMap.id ? updatedCustomMap : m)));
-        }
+        const aliases = getDevicePositionAliases(dev.id, currentCustomMap, allAvailableDevices);
+        const posUpdates: Record<string, { x: number; y: number }> = {};
+        aliases.forEach((a) => {
+          posUpdates[a] = pos;
+        });
+        const updatedCustomMap: CustomTopologyMap = {
+          ...currentCustomMap,
+          deviceIds: Array.from(new Set([...deviceIds, canonicalId, dev.id, devCleanId])),
+          devicePositions: {
+            ...(currentCustomMap.devicePositions || {}),
+            ...posUpdates,
+          },
+          physicalPositions: {
+            ...(currentCustomMap.physicalPositions || {}),
+            ...posUpdates,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+        saveCustomMaps(customMaps.map((m) => (m.id === currentCustomMap.id ? updatedCustomMap : m)));
       }
 
       const scale = Math.max(0.7, Math.min(1.2, zoom || 1));
@@ -3447,47 +3605,51 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
               const targetMap = prevMaps.find((m) => m.id === activeMapId);
               if (!targetMap) return prevMaps;
 
-              let updatedMap: CustomTopologyMap;
-              if (globalDeviceViewMode === 'physical') {
-                updatedMap = {
-                  ...targetMap,
-                  physicalPositions: {
-                    ...(targetMap.physicalPositions || {}),
-                    [finalCoords.id]: { x: finalCoords.x, y: finalCoords.y },
-                    [cleanId]: { x: finalCoords.x, y: finalCoords.y },
-                  },
-                  updatedAt: new Date().toISOString(),
-                };
-              } else {
-                updatedMap = {
-                  ...targetMap,
-                  devicePositions: {
-                    ...(targetMap.devicePositions || {}),
-                    [finalCoords.id]: { x: finalCoords.x, y: finalCoords.y },
-                    [cleanId]: { x: finalCoords.x, y: finalCoords.y },
-                  },
-                  updatedAt: new Date().toISOString(),
-                };
-              }
+              const aliases = getDevicePositionAliases(draggingNodeId, targetMap, allAvailableDevices);
+              const posUpdates: Record<string, { x: number; y: number }> = {};
+              aliases.forEach((aId) => {
+                posUpdates[aId] = { x: finalCoords.x, y: finalCoords.y };
+              });
+
+              const updatedMap: CustomTopologyMap = {
+                ...targetMap,
+                devicePositions: {
+                  ...(targetMap.devicePositions || {}),
+                  ...posUpdates,
+                },
+                physicalPositions: {
+                  ...(targetMap.physicalPositions || {}),
+                  ...posUpdates,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+
               const newMaps = prevMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m));
               saveCustomMaps(newMaps);
               return newMaps;
             });
 
-            // Clean up temporary drag position
+            // Clean up temporary drag position for all aliases
             setCustomPositions((prev) => {
               const next = { ...prev };
-              delete next[draggingNodeId];
-              delete next[cleanId];
+              const aliases = getDevicePositionAliases(draggingNodeId, currentCustomMap, allAvailableDevices);
+              aliases.forEach((aId) => {
+                delete next[aId];
+              });
               return next;
             });
           } else if (finalCoords) {
             // Default map
+            const aliases = getDevicePositionAliases(draggingNodeId, null, allAvailableDevices);
+            const posUpdates: Record<string, { x: number; y: number }> = {};
+            aliases.forEach((aId) => {
+              posUpdates[aId] = { x: finalCoords.x, y: finalCoords.y };
+            });
+
             setCustomPositions((latest) => {
               const updated = {
                 ...latest,
-                [finalCoords.id]: { x: finalCoords.x, y: finalCoords.y },
-                [cleanId]: { x: finalCoords.x, y: finalCoords.y },
+                ...posUpdates,
               };
               saveNodePositions(updated);
               return updated;

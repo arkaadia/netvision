@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.60.0';
+export const APP_VERSION = '1.60.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.60.1',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'رفع مشکل پرش و بازگشت موقعیت کارت‌ها در نمای شماتیک پس از افزودن تجهیزات از انبار به رک',
+    title_en: 'Fix Device Card Position Reset & Persistence After Mounting Hardware from Inventory to Rack in Schematic View',
+    changes: [
+      'حل مشکل پرش و بازگشت موقعیت کارت (Card Position Reversion) هنگام جابجایی تجهیزاتی که از انبار سخت‌افزار به رک در نمای فیزیکی اضافه شده بودند.',
+      'طراحی سیستم جامع تفکیک و تطبیق شناسه‌ها و نام‌های مستعار (Identifier Aliases Synchronization) شامل شناسه‌های خام اینونتوری، پیشوندهای hw-، پیشوندهای radio- و شناسه‌های تمیز در سراسر استیت‌های محلی و پایگاه داده.',
+      'یکپارچه‌سازی و همگام‌سازی موقعیت‌ها در هر دو ساختار داده devicePositions و physicalPositions در زمان ذخیره سخت‌افزار، جابجایی درگ‌اند‌دراپ و ترنزیشن بین ویوها.',
+      'پاکسازی دقیق و کامل شناسه‌های مستعار از استیت موقت customPositions پس از پایان درگ برای جلوگیری از تداخل موقعیت‌های موقت با دیتای ماندگار.',
+      'رعایت کامل استانداردهای بین‌المللی‌سازی و عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization Rule).'
+    ],
+    changes_en: [
+      'Resolved device card position reversion defect where hardware mounted to a rack from inventory in physical view would revert to previous coordinates when moved in card view.',
+      'Engineered an identifier aliases synchronization engine mapping base clean inventory IDs, hw- prefixes, radio- prefixes, and device IDs across local state and persistent storage.',
+      'Synchronized coordinates across both devicePositions and physicalPositions during hardware insertion, drag-and-drop mouse up, and view transitions.',
+      'Ensured complete cleanup of temporary drag coordinates across all alias keys from customPositions to prevent stale layout conflicts.',
+      'Maintained 100% strict localization compliance with complete Persian/English symmetry and zero untranslated content in English mode.'
+    ]
+  },
   {
     version: '1.60.0',
     releaseDate: '2026-09-16',
