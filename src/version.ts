@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.1';
+export const APP_VERSION = '1.61.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.2',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'نمایش پاپ‌آپ و تولتیپ تعاملی سرعت پورت هنگام هاور (Hover Speed Tooltip)',
+    title_en: 'Display Interactive Port Speed Tooltip on Hover in Graphical Port Faceplates',
+    changes: [
+      'افزودن نمایش زنده و برجسته سرعت پورت (مانند 100 Mbps، 1 Gbps، 10 Gbps) به پاپ‌آپ شناور و تولتیپ اختصاصی هنگام حرکت موس (Hover) روی پورت‌های گرافیکی در مودال پورت.',
+      'نمایش همزمان مشخصات کلیدی پورت شامل وضعیت لینک (UP/DOWN/DISABLED)، سرعت، شماره VLAN یا مود ترانک و دستگاه متصل به صورت شیک و مدرن.',
+      'همگام‌سازی ویژگی نیتیو title و پاپ‌آپ شناور واکنش‌گرا بدون تداخل با سایر بخش‌های شاسی پورت.'
+    ],
+    changes_en: [
+      'Added prominent real-time port speed display (e.g., 100 Mbps, 1 Gbps, 10 Gbps) to the floating interactive tooltip and native popup on mouse hover across graphical ports in the Port Modal.',
+      'Simultaneously displayed key interface metrics including link status (UP/DOWN/DISABLED), link speed, VLAN ID / Trunk mode, and connected device in a clean floating card.',
+      'Synchronized native HTML title attributes and interactive floating backdrop popovers across all graphical switch faceplates.'
+    ]
+  },
   {
     version: '1.61.1',
     releaseDate: '2026-09-16',

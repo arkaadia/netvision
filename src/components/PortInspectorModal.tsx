@@ -676,7 +676,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
               <div className="py-6 text-center text-slate-500 text-xs">{isEn ? 'No active ports recorded.' : 'پورت فعالی ثبت نشده است.'}</div>
             ) : (
               <div className="switch-faceplate-chassis rounded-xl p-3 border border-slate-800 shadow-inner">
-                <div className="switch-faceplate-grid rounded-lg p-2.5 overflow-x-auto border border-slate-850">
+                <div className="switch-faceplate-grid rounded-lg px-2.5 pb-2.5 pt-7 overflow-x-auto border border-slate-850">
                   <div className="flex flex-wrap gap-2 justify-start min-w-[500px]">
                     {ports.map((port, pIdx) => {
                       const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
