@@ -555,7 +555,7 @@ async function startServer() {
   const server = http.createServer(app);
 
   // Setup native WebSocket terminal engine for interactive SSH/CLI sessions
-  setupTerminalWebSocket(server, PYTHON_PORT, projectRoot);
+  setupTerminalWebSocket(server, PYTHON_PORT, projectRoot, PYTHON_WS_PORT);
 
   server.listen(PORT, HOST, () => {
     console.log(`Node/Express frontend + proxy running on http://${HOST}:${PORT}`);

@@ -1,7 +1,8 @@
 """
 Network Terminal Session Manager
-Provides real, interactive SSH and Telnet shell sessions for network devices
-streamed over WebSocket with strict session lifecycle management.
+Provides real, interactive SSH (via Paramiko) and Telnet shell sessions for network devices
+streamed over WebSocket with strict session lifecycle management, credential decryption,
+and automated fallback for legacy Cisco algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa).
 """
 import os
 import sys
@@ -9,16 +10,38 @@ import time
 import socket
 import select
 import threading
-import asyncio
-import json
 import uuid
 import re
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Tuple
+
+# Ensure parent and backend directories are in sys.path
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_backend_dir = os.path.dirname(_current_dir)
+for p in [_backend_dir, _current_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+try:
+    from backend.security.crypto import decrypt_credential
+except ImportError:
+    try:
+        from security.crypto import decrypt_credential
+    except ImportError:
+        def decrypt_credential(v): return v or ""
+
+# Try importing paramiko
+try:
+    import paramiko
+    HAS_PARAMIKO = True
+except ImportError:
+    HAS_PARAMIKO = False
+    paramiko = None
+
 
 class NetworkTerminalSession:
     """
-    Manages an active, interactive bidirectional session to a real network device
-    via either SSH (paramiko interactive shell pty) or Telnet.
+    Manages an active, real interactive bidirectional session to a physical/virtual network device
+    via either SSH (paramiko interactive shell PTY) or Telnet.
     Lifecycle: OPEN -> CONNECTING -> CONNECTED -> ACTIVE -> CLOSING -> CLOSED
     """
     def __init__(
@@ -34,44 +57,84 @@ class NetworkTerminalSession:
         cols: int = 120,
         rows: int = 36,
         on_data_callback: Optional[Callable[[str], Any]] = None,
-        on_close_callback: Optional[Callable[[], Any]] = None
+        on_close_callback: Optional[Callable[[], Any]] = None,
+        on_status_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
     ):
         self.session_id = f"term-{uuid.uuid4().hex[:8]}"
         self.device_id = device_id
-        self.host = host
-        self.port = port
+        self.host = host.strip() if host else "127.0.0.1"
+        self.port = int(port) if port else (23 if protocol.lower() == "telnet" else 22)
         self.protocol = protocol.lower()  # 'ssh' or 'telnet'
-        self.username = username
-        self.password = password
-        self.enable_password = enable_password
-        self.platform = platform
-        self.cols = cols
-        self.rows = rows
+        self.username = username.strip() if username else "admin"
+        
+        # Transparently decrypt stored passwords if encrypted with Fernet
+        self.password = decrypt_credential(password)
+        self.enable_password = decrypt_credential(enable_password)
+        
+        self.platform = (platform or "cisco_ios_xe").lower()
+        self.cols = max(20, min(500, int(cols)))
+        self.rows = max(5, min(200, int(rows)))
         self.on_data_callback = on_data_callback
         self.on_close_callback = on_close_callback
+        self.on_status_callback = on_status_callback
 
-        self.status = "OPEN"  # OPEN, CONNECTING, CONNECTED, ACTIVE, CLOSING, CLOSED
+        self.status = "OPEN"  # OPEN, CONNECTING, CONNECTED, ACTIVE, FAILED, CLOSING, CLOSED
         self.created_at = time.time()
         self.connected_at: Optional[float] = None
         self.last_activity = time.time()
         self.latency_ms = 0.0
         self.banner = ""
         self.error_message = ""
+        self.is_real = False
+        self.used_legacy_algorithms = False
 
         # SSH resources
         self._paramiko_client = None
+        self._paramiko_transport = None
         self._ssh_channel = None
 
         # Telnet resources
-        self._telnet_client = None
         self._raw_socket = None
 
         self._stop_event = threading.Event()
         self._reader_thread: Optional[threading.Thread] = None
 
+    @property
+    def is_cisco(self) -> bool:
+        return "cisco" in self.platform or "catalyst" in self.platform or "ios" in self.platform
+
+    @property
+    def is_mikrotik(self) -> bool:
+        return "mikrotik" in self.platform or "routeros" in self.platform
+
+    def notify_status(self, status: str, **kwargs):
+        """Sends structured status notification to callback."""
+        self.status = status
+        if self.on_status_callback:
+            try:
+                payload = {
+                    "type": "status",
+                    "status": status.lower(),
+                    "session_id": self.session_id,
+                    "device_id": self.device_id,
+                    "host": self.host,
+                    "port": self.port,
+                    "username": self.username,
+                    "protocol": self.protocol,
+                    "platform": self.platform,
+                    "is_real": self.is_real,
+                    "legacy_algorithms": self.used_legacy_algorithms,
+                    "latency_ms": self.latency_ms,
+                    **kwargs
+                }
+                self.on_status_callback(payload)
+            except Exception as e:
+                print(f"[NetworkTerminal] Status callback error: {e}")
+
     def connect(self) -> bool:
         """Establishes real connection to the device. Returns True if connected, False on failure."""
         self.status = "CONNECTING"
+        self.notify_status("connecting", message=f"Initiating real {self.protocol.upper()} connection to {self.host}:{self.port}...")
         start_t = time.time()
 
         if self.protocol == "telnet":
@@ -79,74 +142,200 @@ class NetworkTerminalSession:
         else:
             return self._connect_ssh(start_t)
 
-    def _connect_ssh(self, start_t: float) -> bool:
-        import paramiko
-        try:
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    def _connect_ssh_transport(self, use_legacy: bool, timeout: float = 6.0) -> Tuple[Any, Any]:
+        """
+        Creates a raw socket and Paramiko Transport with optional legacy Cisco algorithm enablement.
+        Returns (channel, transport).
+        """
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect((self.host, self.port))
 
-            # Attempt real SSH connection
-            client.connect(
-                hostname=self.host,
-                port=self.port,
-                username=self.username,
-                password=self.password,
-                timeout=8.0,
-                banner_timeout=8.0,
-                auth_timeout=8.0,
-                look_for_keys=False,
-                allow_agent=False
+        transport = paramiko.Transport(sock)
+        sec = transport.get_security_options()
+
+        if use_legacy:
+            # Enable older Cisco 2960 / Catalyst legacy algorithms
+            legacy_kex = (
+                'diffie-hellman-group1-sha1',
+                'diffie-hellman-group14-sha1',
+                'diffie-hellman-group-exchange-sha1',
+                'diffie-hellman-group-exchange-sha256',
             )
+            sec.kex = legacy_kex + tuple(k for k in sec.kex if k not in legacy_kex)
 
-            # Invoke real interactive pseudo-terminal (PTY)
-            channel = client.invoke_shell(term="xterm-256color", width=self.cols, height=self.rows)
-            channel.settimeout(0.0)  # non-blocking reads
+            legacy_keys = ('ssh-rsa', 'ssh-dss')
+            sec.key_types = legacy_keys + tuple(k for k in sec.key_types if k not in legacy_keys)
 
-            transport = client.get_transport()
-            banner = ""
-            if transport:
-                raw_banner = transport.get_banner()
-                if raw_banner:
-                    banner = raw_banner.decode("utf-8", errors="ignore") if isinstance(raw_banner, bytes) else str(raw_banner)
+            legacy_ciphers = (
+                'aes128-cbc',
+                '3des-cbc',
+                'aes192-cbc',
+                'aes256-cbc',
+                'aes128-ctr',
+                'aes192-ctr',
+                'aes256-ctr',
+            )
+            sec.ciphers = legacy_ciphers + tuple(c for c in sec.ciphers if c not in legacy_ciphers)
 
-            self.latency_ms = round((time.time() - start_t) * 1000, 1)
-            self._paramiko_client = client
-            self._ssh_channel = channel
-            self.banner = banner or f"SSH-2.0 Real Connection ({self.platform})"
-            self.connected_at = time.time()
-            self.last_activity = time.time()
-            self.status = "CONNECTED"
+        transport.start_client(timeout=timeout)
 
-            # Start reader thread to stream device output to WebSocket
-            self._reader_thread = threading.Thread(target=self._ssh_reader_loop, daemon=True)
-            self._reader_thread.start()
+        # Authenticate password with keyboard-interactive fallback
+        auth_success = False
+        try:
+            transport.auth_password(username=self.username, password=self.password)
+            auth_success = transport.is_authenticated()
+        except paramiko.BadAuthenticationType:
+            # Fallback to interactive authentication
+            def interactive_handler(title, instructions, prompt_list):
+                return [self.password for _ in prompt_list]
+            try:
+                transport.auth_interactive(username=self.username, handler=interactive_handler)
+                auth_success = transport.is_authenticated()
+            except Exception as e:
+                raise paramiko.AuthenticationException(f"Interactive authentication failed: {e}")
 
-            print(f"[NetworkTerminal] SSH session {self.session_id} connected to {self.host}:{self.port} (user: {self.username})")
-            return True
+        if not auth_success:
+            raise paramiko.AuthenticationException(f"Invalid username or password for user '{self.username}'")
 
-        except paramiko.AuthenticationException as e:
-            self.error_message = f"Authentication failed for user '{self.username}': Invalid credentials"
+        # Open interactive shell channel
+        channel = transport.open_session(timeout=timeout)
+        
+        # PTY terminal configuration
+        # Cisco switches prefer xterm or vt100; MikroTik RouterOS prefers xterm or vt100
+        term_name = "xterm-256color" if self.is_cisco else ("vt100" if self.is_mikrotik else "xterm")
+        channel.get_pty(term=term_name, width=self.cols, height=self.rows)
+        channel.invoke_shell()
+        channel.settimeout(0.0)  # Non-blocking for select() loop
+
+        return channel, transport
+
+    def _connect_ssh(self, start_t: float) -> bool:
+        """
+        Executes real SSH connection with automatic legacy algorithm fallback for Cisco equipment.
+        Never falls back to fake/simulated data.
+        """
+        if not HAS_PARAMIKO:
+            self.error_message = "Paramiko library is not installed on the system."
             self.status = "FAILED"
-            self._cleanup_resources()
+            self._send_error_to_terminal(self.error_message)
+            self.notify_status("failed", error=self.error_message)
             return False
+
+        # Attempt 1: Modern standard algorithms
+        first_error = None
+        channel = None
+        transport = None
+
+        try:
+            channel, transport = self._connect_ssh_transport(use_legacy=False, timeout=6.0)
+            self.used_legacy_algorithms = False
         except (paramiko.SSHException, socket.error, TimeoutError) as e:
-            err_str = str(e)
-            if "refused" in err_str.lower():
-                self.error_message = f"Connection refused by {self.host}:{self.port}"
-            elif "timed out" in err_str.lower() or "timeout" in err_str.lower():
+            first_error = e
+            # If negotiation failed or device is Cisco, retry with legacy algorithms enabled
+            err_msg = str(e).lower()
+            is_algo_error = any(keyword in err_msg for keyword in [
+                "no matching", "kex", "cipher", "key exchange", "incompatible", "algorithm", "disabled"
+            ])
+
+            if self.is_cisco or is_algo_error:
+                print(f"[NetworkTerminal] Modern SSH handshake failed for {self.host}:{self.port} ({e}). Retrying with Cisco legacy algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa)...")
+                if self.on_data_callback:
+                    self.on_data_callback(
+                        f"\r\n\x1b[33m[SSH Fallback]\x1b[0m Negotiating legacy Cisco algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa) with {self.host}...\r\n"
+                    )
+                try:
+                    channel, transport = self._connect_ssh_transport(use_legacy=True, timeout=8.0)
+                    self.used_legacy_algorithms = True
+                    first_error = None
+                except Exception as legacy_err:
+                    first_error = legacy_err
+            else:
+                first_error = e
+        except paramiko.AuthenticationException as e:
+            first_error = e
+        except Exception as e:
+            first_error = e
+
+        if first_error or not channel or not transport:
+            self.status = "FAILED"
+            self.is_real = False
+            self._cleanup_resources()
+
+            err_str = str(first_error) if first_error else "Connection failed"
+            err_lower = err_str.lower()
+
+            if isinstance(first_error, paramiko.AuthenticationException) or "auth" in err_lower or "denied" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH Authentication Failed]\x1b[0m\r\n"
+                    f"Access denied for user '{self.username}' on {self.host}:{self.port}.\r\n"
+                    f"Please verify the username and password in Device Properties.\r\n"
+                )
+                self.error_message = f"Authentication failed for user '{self.username}' on {self.host}:{self.port}"
+            elif "timed out" in err_lower or "timeout" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH Connection Timeout]\x1b[0m\r\n"
+                    f"Could not reach {self.host}:{self.port} within connection timeout.\r\n"
+                    f"Ensure the device is powered on, IP {self.host} is routed, and port {self.port} is open.\r\n"
+                )
                 self.error_message = f"Connection timed out connecting to {self.host}:{self.port}"
-            elif "unreachable" in err_str.lower():
+            elif "refused" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH Connection Refused]\x1b[0m\r\n"
+                    f"Connection refused by {self.host}:{self.port}.\r\n"
+                    f"Verify that SSH server daemon is enabled on this device.\r\n"
+                )
+                self.error_message = f"Connection refused by {self.host}:{self.port}"
+            elif "unreachable" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[Network Unreachable]\x1b[0m\r\n"
+                    f"No route to host {self.host} from the management server container.\r\n"
+                )
                 self.error_message = f"Host unreachable: {self.host}:{self.port}"
             else:
-                self.error_message = f"SSH handshake/connection error: {err_str}"
-            self.status = "FAILED"
-            self._cleanup_resources()
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH Error]\x1b[0m\r\n"
+                    f"Failed to establish live SSH connection to {self.host}:{self.port}:\r\n"
+                    f"{err_str}\r\n"
+                )
+                self.error_message = f"SSH error for {self.host}:{self.port}: {err_str}"
+
+            self._send_error_to_terminal(user_msg)
+            self.notify_status("failed", error=self.error_message)
             return False
-        except Exception as e:
-            self.error_message = f"Failed to connect via SSH to {self.host}:{self.port}: {str(e)}"
-            self.status = "FAILED"
-            self._cleanup_resources()
-            return False
+
+        # Connection successful!
+        self.latency_ms = round((time.time() - start_t) * 1000, 1)
+        self._ssh_channel = channel
+        self._paramiko_transport = transport
+        self.is_real = True
+        self.connected_at = time.time()
+        self.last_activity = time.time()
+        self.status = "CONNECTED"
+
+        # Read banner if present
+        try:
+            raw_banner = transport.get_banner()
+            if raw_banner:
+                self.banner = raw_banner.decode("utf-8", errors="ignore") if isinstance(raw_banner, bytes) else str(raw_banner)
+        except Exception:
+            self.banner = ""
+
+        # Send greeting banner in terminal
+        algo_tag = " [Legacy Cisco Algorithms Active]" if self.used_legacy_algorithms else " [Standard Modern Ciphers]"
+        success_banner = (
+            f"\r\n\x1b[1;32m[LIVE SSH ESTABLISHED]\x1b[0m Connected to {self.host}:{self.port} in {self.latency_ms}ms{algo_tag}\r\n"
+            f"\x1b[90mSession ID: {self.session_id} | User: {self.username} | Platform: {self.platform}\x1b[0m\r\n\r\n"
+        )
+        self._send_error_to_terminal(success_banner)
+
+        # Start streaming reader thread
+        self._reader_thread = threading.Thread(target=self._ssh_reader_loop, daemon=True)
+        self._reader_thread.start()
+
+        print(f"[NetworkTerminal] Live SSH session {self.session_id} established to {self.host}:{self.port} (user: {self.username}, legacy: {self.used_legacy_algorithms})")
+        self.notify_status("connected", message=f"Connected to {self.host}:{self.port}")
+        return True
 
     def _ssh_reader_loop(self):
         """Reads incoming bytes from the real SSH channel and triggers on_data_callback."""
@@ -164,7 +353,7 @@ class NetworkTerminalSession:
                         text = data.decode("utf-8", errors="replace")
                         if self.on_data_callback:
                             self.on_data_callback(text)
-            except Exception as e:
+            except Exception:
                 break
 
         # Connection ended
@@ -174,7 +363,7 @@ class NetworkTerminalSession:
         """Connects via real interactive Telnet session."""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(8.0)
+            s.settimeout(6.0)
             s.connect((self.host, self.port))
             s.settimeout(None)
 
@@ -182,15 +371,24 @@ class NetworkTerminalSession:
             self._raw_socket = s
             self.connected_at = time.time()
             self.last_activity = time.time()
+            self.is_real = True
             self.status = "CONNECTED"
+
+            self._send_error_to_terminal(
+                f"\r\n\x1b[1;32m[LIVE TELNET ESTABLISHED]\x1b[0m Connected to {self.host}:{self.port} in {self.latency_ms}ms\r\n\r\n"
+            )
 
             self._reader_thread = threading.Thread(target=self._telnet_reader_loop, daemon=True)
             self._reader_thread.start()
 
             print(f"[NetworkTerminal] Telnet session {self.session_id} connected to {self.host}:{self.port}")
+            self.notify_status("connected", message=f"Telnet connected to {self.host}:{self.port}")
             return True
 
         except (socket.error, TimeoutError) as e:
+            self.status = "FAILED"
+            self.is_real = False
+            self._cleanup_resources()
             err_str = str(e)
             if "refused" in err_str.lower():
                 self.error_message = f"Connection refused by {self.host}:{self.port} on Telnet"
@@ -199,20 +397,15 @@ class NetworkTerminalSession:
             elif "unreachable" in err_str.lower():
                 self.error_message = f"Host unreachable: {self.host}:{self.port}"
             else:
-                self.error_message = f"Telnet connection error: {err_str}"
-            self.status = "FAILED"
-            self._cleanup_resources()
-            return False
-        except Exception as e:
-            self.error_message = f"Failed to connect via Telnet to {self.host}:{self.port}: {str(e)}"
-            self.status = "FAILED"
-            self._cleanup_resources()
+                self.error_message = f"Telnet error: {err_str}"
+
+            self._send_error_to_terminal(f"\r\n\x1b[1;31m[Telnet Error]\x1b[0m {self.error_message}\r\n")
+            self.notify_status("failed", error=self.error_message)
             return False
 
     def _telnet_reader_loop(self):
         """Reads incoming bytes from Telnet socket with IAC option handling."""
         sock = self._raw_socket
-        buffer = bytearray()
         login_prompt_sent = False
         pass_prompt_sent = False
 
@@ -233,10 +426,9 @@ class NetworkTerminalSession:
                         if b == 255:  # IAC
                             if i + 1 < len(data):
                                 cmd = data[i + 1]
-                                if cmd in (251, 252, 253, 254):  # WILL, WONT, DO, DONT
+                                if cmd in (251, 252, 253, 254):
                                     if i + 2 < len(data):
                                         opt = data[i + 2]
-                                        # Simple Telnet negotiation reply: reject options or accept echo
                                         try:
                                             if cmd == 253:  # DO -> respond WONT
                                                 sock.sendall(bytes([255, 252, opt]))
@@ -247,7 +439,6 @@ class NetworkTerminalSession:
                                         i += 3
                                         continue
                                 elif cmd == 250:  # SB subnegotiation
-                                    # Skip until SE (240)
                                     se_idx = data.find(b'\xff\xf0', i + 2)
                                     if se_idx != -1:
                                         i = se_idx + 2
@@ -280,13 +471,13 @@ class NetworkTerminalSession:
                             self.write_input(self.password + "\r\n")
                             pass_prompt_sent = True
 
-            except Exception as e:
+            except Exception:
                 break
 
         self.close()
 
     def write_input(self, data: str) -> bool:
-        """Sends raw user input / keystrokes / commands to the device."""
+        """Sends user keystrokes/commands directly to the device channel."""
         if self.status not in ("CONNECTED", "ACTIVE"):
             return False
 
@@ -307,7 +498,7 @@ class NetworkTerminalSession:
         return False
 
     def resize_pty(self, cols: int, rows: int):
-        """Resizes the terminal window PTY (for SSH)."""
+        """Resizes the terminal window PTY."""
         self.cols = max(20, min(500, cols))
         self.rows = max(5, min(200, rows))
         if self.protocol == "ssh" and self._ssh_channel and not self._ssh_channel.closed:
@@ -327,6 +518,8 @@ class NetworkTerminalSession:
         self.status = "CLOSED"
 
         print(f"[NetworkTerminal] Session {self.session_id} cleanly closed for device {self.device_id}")
+        self.notify_status("disconnected", message=f"Session closed for {self.host}:{self.port}")
+        
         if self.on_close_callback:
             try:
                 self.on_close_callback()
@@ -341,6 +534,14 @@ class NetworkTerminalSession:
             except Exception:
                 pass
             self._ssh_channel = None
+
+        # Close Paramiko transport
+        if self._paramiko_transport:
+            try:
+                self._paramiko_transport.close()
+            except Exception:
+                pass
+            self._paramiko_transport = None
 
         # Close Paramiko client
         if self._paramiko_client:
@@ -361,6 +562,14 @@ class NetworkTerminalSession:
             except Exception:
                 pass
             self._raw_socket = None
+
+    def _send_error_to_terminal(self, text: str):
+        if self.on_data_callback:
+            try:
+                self.on_data_callback(text)
+            except Exception:
+                pass
+
 
 # -------------------------------------------------------------
 # Global Active Interactive Terminal Sessions Registry
@@ -428,5 +637,6 @@ class TerminalSessionManager:
 
         for sid in to_close:
             self.close_session(sid)
+
 
 terminal_session_manager = TerminalSessionManager()

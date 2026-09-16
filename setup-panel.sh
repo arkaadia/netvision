@@ -342,7 +342,7 @@ safe_apt_update
 
 log_step "Installing system tools, Nginx web server, and PostgreSQL database engine..."
 safe_apt_install \
-  git curl build-essential python3 python3-pip ca-certificates gnupg lsb-release xz-utils openssl ufw traceroute dnsutils whois iputils-ping \
+  git curl build-essential python3 python3-pip python3-paramiko python3-cryptography python3-websockets ca-certificates gnupg lsb-release xz-utils openssl ufw traceroute dnsutils whois iputils-ping \
   postgresql postgresql-contrib postgresql-client nginx
 
 log_step "Ensuring PostgreSQL service is enabled and started..."

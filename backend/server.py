@@ -90,17 +90,20 @@ try:
     from backend.connections.ssh_manager import connection_manager
     from backend.connections.network_terminal import NetworkTerminalSession, terminal_session_manager
     from backend.vpn import get_vpn_provider
+    from backend.security.crypto import encrypt_credential, decrypt_credential, migrate_database_credentials
 except ImportError:
     try:
         from drivers import get_driver, detect_platform_from_model
         from connections.ssh_manager import connection_manager
         from connections.network_terminal import NetworkTerminalSession, terminal_session_manager
         from vpn import get_vpn_provider
+        from security.crypto import encrypt_credential, decrypt_credential, migrate_database_credentials
     except ImportError:
         from backend.drivers import get_driver, detect_platform_from_model
         from backend.connections.ssh_manager import connection_manager
         from backend.connections.network_terminal import NetworkTerminalSession, terminal_session_manager
         from backend.vpn import get_vpn_provider
+        from backend.security.crypto import encrypt_credential, decrypt_credential, migrate_database_credentials
 
 try:
     from backend.network_tools import (
@@ -2297,7 +2300,10 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             default_port = 23 if conn_proto == "telnet" else 22
             conn_port = int(conn_data.get("port") or body.get("ssh_port") or default_port)
             conn_user = conn_data.get("username") or body.get("ssh_username", "admin")
-            conn_pass = conn_data.get("password") or body.get("ssh_password", "")
+            conn_pass_raw = conn_data.get("password") or body.get("ssh_password", "")
+            conn_pass = encrypt_credential(conn_pass_raw)
+            enable_pass_raw = body.get("enable_password", "")
+            enable_pass = encrypt_credential(enable_pass_raw)
 
             driver = get_driver(platform, connection_mode)
 
@@ -2337,7 +2343,7 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 "ssh_port": conn_port,
                 "ssh_username": conn_user,
                 "ssh_password": conn_pass,
-                "enable_password": body.get("enable_password", ""),
+                "enable_password": enable_pass,
                 "ssh_status": "authenticated",
                 "serial_number": body.get("serial_number", ""),
                 "master_session_id": body.get("master_session_id", "")
@@ -2866,6 +2872,13 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             for k in ["name", "ip", "ssh_host", "connection_protocol", "connection", "platform", "connection_mode", "type", "role", "model", "building", "floor", "unit", "rack", "cdp_enabled", "lldp_enabled", "snmp_community", "is_online", "ssh_port", "ssh_username", "ssh_password", "enable_password", "ssh_status", "total_ports"]:
                 if k in body:
                     device[k] = body[k]
+            if "ssh_password" in body and body["ssh_password"]:
+                device["ssh_password"] = encrypt_credential(body["ssh_password"])
+            if "enable_password" in body and body["enable_password"]:
+                device["enable_password"] = encrypt_credential(body["enable_password"])
+            if "connection" in device and isinstance(device["connection"], dict):
+                if "password" in device["connection"] and device["connection"]["password"]:
+                    device["connection"]["password"] = encrypt_credential(device["connection"]["password"])
             if "ports" in body and isinstance(body["ports"], list):
                 if "ports" not in data:
                     data["ports"] = {}
@@ -3033,7 +3046,19 @@ def start_websocket_server(ws_port: int):
         req_path = path or getattr(websocket, 'path', '') or ''
         parsed_url = urlparse(req_path)
         qs = parse_qs(parsed_url.query)
-        device_id = qs.get("deviceId", qs.get("device_id", [""]))[0].strip()
+
+        # Support /ws/ssh/<device_id> or /ssh/<device_id> or ?deviceId=...
+        device_id = ""
+        path_clean = parsed_url.path.strip('/')
+        parts = path_clean.split('/')
+        if len(parts) >= 3 and parts[0] == 'ws' and parts[1] == 'ssh':
+            device_id = parts[2]
+        elif len(parts) >= 2 and parts[0] == 'ssh':
+            device_id = parts[1]
+
+        if not device_id:
+            device_id = qs.get("deviceId", qs.get("device_id", [""]))[0].strip()
+
         user_role = qs.get("role", qs.get("user_role", ["Super Admin"]))[0].strip()
         req_protocol = qs.get("protocol", [""])[0].strip().lower()
         cols = int(qs.get("cols", [120])[0])
@@ -3050,18 +3075,36 @@ def start_websocket_server(ws_port: int):
                     "error": f"Permission denied for role '{user_role}' to access network terminal.",
                     "code": "PERMISSION_DENIED"
                 }))
+                await asyncio.sleep(1.0)
                 await websocket.close()
                 return
 
             # Lookup device
             data = load_data()
-            device = next((d for d in data.get("devices", []) if d.get("id") == device_id), None)
+            device = next((d for d in data.get("devices", []) if d.get("id") == device_id or d.get("name") == device_id), None)
             if not device:
+                # Also check database_store.json
+                store_file = os.path.join(DATA_DIR, "database_store.json")
+                if os.path.exists(store_file):
+                    try:
+                        with open(store_file, "r", encoding="utf-8") as sf:
+                            sdata = json.load(sf)
+                            device = next((d for d in sdata.get("devices", []) if d.get("id") == device_id or d.get("name") == device_id), None)
+                    except Exception:
+                        pass
+
+            if not device:
+                err_msg = f"Device with ID '{device_id}' was not found in inventory."
                 await websocket.send(json.dumps({
                     "type": "error",
-                    "error": f"Device with ID '{device_id}' was not found in inventory.",
+                    "error": err_msg,
                     "code": "DEVICE_NOT_FOUND"
                 }))
+                await websocket.send(json.dumps({
+                    "type": "data",
+                    "data": f"\r\n\x1b[1;31m[Device Not Found]\x1b[0m {err_msg}\r\n"
+                }))
+                await asyncio.sleep(1.0)
                 await websocket.close()
                 return
 
@@ -3077,11 +3120,17 @@ def start_websocket_server(ws_port: int):
             platform = device.get("platform", "cisco_ios_xe")
 
             if not host:
+                err_msg = f"No Management IP or Host configured for device '{device.get('name', device_id)}'."
                 await websocket.send(json.dumps({
                     "type": "error",
-                    "error": f"No Management IP or Host configured for device '{device.get('name', device_id)}'.",
+                    "error": err_msg,
                     "code": "NO_HOST"
                 }))
+                await websocket.send(json.dumps({
+                    "type": "data",
+                    "data": f"\r\n\x1b[1;31m[No IP Configured]\x1b[0m {err_msg}\r\n"
+                }))
+                await asyncio.sleep(1.0)
                 await websocket.close()
                 return
 
@@ -3137,6 +3186,7 @@ def start_websocket_server(ws_port: int):
             # Connect in thread executor so it doesn't block the asyncio event loop
             connected = await loop.run_in_executor(None, session.connect)
             if not connected:
+                # Real error already printed into terminal via session._send_error_to_terminal
                 await websocket.send(json.dumps({
                     "type": "error",
                     "error": session.error_message or f"Connection failed to {host}:{port} via {protocol.upper()}.",
@@ -3147,13 +3197,17 @@ def start_websocket_server(ws_port: int):
                     "status": "failed",
                     "message": session.error_message or "Connection failed"
                 }))
-                await websocket.close()
+                # Keep websocket open until client disconnects or user closes modal
+                # so the exact error remains readable in the UI
+                async for _ in websocket:
+                    pass
                 return
 
             # Connected notification
             await websocket.send(json.dumps({
                 "type": "status",
                 "status": "connected",
+                "is_real": True,
                 "sessionId": session.session_id,
                 "protocol": protocol,
                 "host": host,
@@ -3161,6 +3215,7 @@ def start_websocket_server(ws_port: int):
                 "username": username,
                 "banner": session.banner,
                 "latency_ms": session.latency_ms,
+                "legacy_algorithms": session.used_legacy_algorithms,
                 "message": f"Connected to {host}:{port} ({session.banner or protocol.upper()})"
             }))
 
@@ -3172,9 +3227,12 @@ def start_websocket_server(ws_port: int):
                     msg = {"type": "input", "data": raw_msg}
 
                 msg_type = msg.get("type", "input")
-                if msg_type in ("input", "stdin"):
+                if msg_type == "ping":
+                    await websocket.send(json.dumps({"type": "pong", "timestamp": int(time.time() * 1000)}))
+                elif msg_type in ("input", "stdin"):
                     data_str = msg.get("data", "")
-                    session.write_input(data_str)
+                    if data_str:
+                        session.write_input(data_str)
                 elif msg_type == "resize":
                     c = int(msg.get("cols", cols))
                     r = int(msg.get("rows", rows))
@@ -3196,7 +3254,7 @@ def start_websocket_server(ws_port: int):
         asyncio.set_event_loop(ws_loop)
         start_server_coro = websockets.serve(terminal_ws_handler, "127.0.0.1", ws_port)
         ws_loop.run_until_complete(start_server_coro)
-        print(f"[Python WS Server] Terminal WebSocket server running on ws://127.0.0.1:{ws_port}")
+        print(f"[Python WS Server] Real Paramiko SSH WebSocket server running on ws://127.0.0.1:{ws_port}")
         ws_loop.run_forever()
 
     t = threading.Thread(target=run_ws_loop, daemon=True)
@@ -3206,7 +3264,16 @@ def run_server(port=5001, host=None):
     if host is None:
         host = os.environ.get("PYTHON_HOST") or os.environ.get("HOST") or '0.0.0.0'
 
-    # Start WebSocket terminal engine on PYTHON_WS_PORT or port + 1
+    # 1. Encrypt any unencrypted passwords in the database on startup
+    try:
+        migrate_database_credentials(DATA_FILE)
+        store_file = os.path.join(DATA_DIR, "database_store.json")
+        if os.path.exists(store_file):
+            migrate_database_credentials(store_file)
+    except Exception as e:
+        print(f"[Server Startup] Credential migration notice: {e}")
+
+    # 2. Start WebSocket terminal engine on PYTHON_WS_PORT or port + 1
     ws_port = int(os.environ.get("PYTHON_WS_PORT", port + 1))
     start_websocket_server(ws_port)
 

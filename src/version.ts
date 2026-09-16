@@ -10,9 +10,34 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.59.1';
+export const APP_VERSION = '1.60.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.60.0',
+    releaseDate: '2026-09-16',
+    type: 'minor',
+    title: 'پیاده‌سازی موتور واقعی ترمینال SSH پایتون با پشتیبانی از الگوریتم‌های قدیمی سیسکو، رمزنگاری اعتبارات و استریم دوطرفه سوکت',
+    title_en: 'Implementation of Real Python Paramiko SSH Engine with Legacy Cisco Algorithms, Fernet Credential Encryption & WebSocket Streaming',
+    changes: [
+      'جایگزینی کامل داده‌های شبیه‌سازی‌شده ترمینال با موتور واقعی SSH و Telnet تحت پایتون (کتابخانه Paramiko) برای برقراری اتصال زنده به تجهیزات شبکه.',
+      'طراحی و پیاده‌سازی مسیر اختصاصی وب‌سوکت (/ws/ssh/:deviceId و /ws/terminal) جهت استریم بی‌درنگ ورودی و خروجی شل تعاملی (PTY).',
+      'پشتیبانی جامع از تجهیزات قدیمی سیسکو (مانند Cisco Catalyst 2960) با مکانیزم Fallback خودکار به الگوریتم‌های diffie-hellman-group1-sha1، ssh-rsa و aes128-cbc در صورت شکست اعتبارسنجی مدرن.',
+      'امن‌سازی کامل اطلاعات کاربری با ماژول رمزنگاری متقارن Fernet (Cryptographic Symmetric Encryption) و ذخیره رمزنگاری‌شده گذرواژه‌ها در پایگاه داده و مهاجرت امن خودکار داده‌های پیشین.',
+      'مدیریت چرخه حیات نشست‌های تعاملی شبکه، تغییر ابعاد PTY متناسب با ترمینال کاربری (Terminal Resize) و پاکسازی و آزادسازی حافظه و سوکت‌ها پس از بستن ترمینال.',
+      'به‌روزرسانی اسکریپت راه‌اندازی setup-panel.sh و نصب پیش‌نیازهای python3-paramiko، python3-cryptography و python3-websockets بر روی سرور.',
+      'رعایت صددرصدی استاندارد بین‌المللی‌سازی و عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization Rule).'
+    ],
+    changes_en: [
+      'Replaced mocked terminal output with a real Python SSH and Telnet engine using Paramiko for direct, live interactive connections to network hardware.',
+      'Implemented dedicated full-duplex WebSocket routes (/ws/ssh/:deviceId and /ws/terminal) for real-time streaming of pseudo-terminal (PTY) standard input and output.',
+      'Integrated comprehensive legacy Cisco support (e.g., Catalyst 2960) featuring automatic algorithm negotiation fallback to diffie-hellman-group1-sha1, ssh-rsa, and aes128-cbc.',
+      'Secured network device credentials using Fernet symmetric encryption with automatic database migration of existing stored passwords and on-the-fly decryption at session start.',
+      'Engineered interactive terminal session management with dynamic PTY window resizing, keepalive heartbeats, and guaranteed resource teardown on disconnect.',
+      'Updated setup-panel.sh script with automated installation of python3-paramiko, python3-cryptography, and python3-websockets system packages.',
+      'Enforced 100% strict localization compliance with complete Persian/English symmetry and zero untranslated content in English mode.'
+    ]
+  },
   {
     version: '1.59.1',
     releaseDate: '2026-09-15',

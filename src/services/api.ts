@@ -311,8 +311,10 @@ export function getTerminalWebSocketUrl(
     if (deviceInfo.ssh_port) query.set('port', String(deviceInfo.ssh_port));
     if (deviceInfo.ssh_username) query.set('username', deviceInfo.ssh_username);
   }
-  return `${wsProto}//${loc.host}/ws/terminal?${query.toString()}`;
+  return `${wsProto}//${loc.host}/ws/ssh/${encodeURIComponent(deviceId)}?${query.toString()}`;
 }
+
+export const getSshWebSocketUrl = getTerminalWebSocketUrl;
 
 export async function closeDeviceTerminalSession(deviceId: string): Promise<{ success: boolean; message: string }> {
   const res = await fetch(`${API_BASE}/devices/${deviceId}/terminal`, {
