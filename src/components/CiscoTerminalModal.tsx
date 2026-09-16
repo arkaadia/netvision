@@ -423,6 +423,71 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     }, 10);
   };
 
+  const lastLineEndedWithNewlineRef = useRef<boolean>(true);
+
+  // Helper to append line
+  const appendLines = (newLines: TerminalLine[]) => {
+    lastLineEndedWithNewlineRef.current = true;
+    setLines((prev) => [...prev, ...newLines]);
+  };
+
+  // Helper to append streaming raw text from SSH terminal, preserving line continuity across chunk boundaries
+  const appendStreamText = (rawChunk: string) => {
+    if (!rawChunk) return;
+    const cleanText = rawChunk.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Strip ANSI escape sequences (colors, cursor positioning, VT100 control codes)
+    const textWithoutAnsi = cleanText.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    if (!textWithoutAnsi) return;
+
+    // Detect remote prompt transitions to sync local cliMode
+    if (textWithoutAnsi.includes('(config-if)#')) {
+      setCliMode('INTERFACE_CONFIG');
+    } else if (textWithoutAnsi.includes('(config)#')) {
+      setCliMode('GLOBAL_CONFIG');
+    } else if (textWithoutAnsi.includes('#') && !textWithoutAnsi.includes('>')) {
+      setCliMode('PRIVILEGED_EXEC');
+    } else if (textWithoutAnsi.includes('>') && !textWithoutAnsi.includes('#')) {
+      setCliMode('USER_EXEC');
+    }
+
+    const segments = textWithoutAnsi.split('\n');
+    const endsWithNewline = textWithoutAnsi.endsWith('\n');
+
+    setLines((prev) => {
+      const updated = [...prev];
+      let startIdx = 0;
+
+      // If the previous chunk did not finish with a newline and there is an existing output line,
+      // append the first segment to that line instead of splitting onto a new line
+      if (!lastLineEndedWithNewlineRef.current && updated.length > 0) {
+        const lastIndex = updated.length - 1;
+        const lastLine = updated[lastIndex];
+        if (lastLine && lastLine.type === 'output') {
+          updated[lastIndex] = {
+            ...lastLine,
+            text: lastLine.text + segments[0],
+          };
+          startIdx = 1;
+        }
+      }
+
+      for (let i = startIdx; i < segments.length; i++) {
+        // If the chunk ended with a newline, the last split element is an empty string; don't add an extra blank line
+        if (i === segments.length - 1 && segments[i] === '' && endsWithNewline) {
+          continue;
+        }
+        updated.push({
+          id: 'ws-out-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          type: 'output',
+          text: segments[i],
+        });
+      }
+
+      lastLineEndedWithNewlineRef.current = endsWithNewline;
+      return updated;
+    });
+  };
+
   // Unified port synchronization over the active SSH tunnel
   const handleSyncPorts = async (silent: boolean = false) => {
     const curDev = deviceRef.current;
@@ -580,32 +645,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
               return;
             }
             if (msg.type === 'data' && msg.data) {
-              const cleanText = msg.data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-              // Strip ANSI escape sequences (colors, cursor positioning, VT100 control codes)
-              const textWithoutAnsi = cleanText.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-
-              // Detect remote prompt transitions to sync local cliMode
-              if (textWithoutAnsi.includes('(config-if)#')) {
-                setCliMode('INTERFACE_CONFIG');
-              } else if (textWithoutAnsi.includes('(config)#')) {
-                setCliMode('GLOBAL_CONFIG');
-              } else if (textWithoutAnsi.includes('#') && !textWithoutAnsi.includes('>')) {
-                setCliMode('PRIVILEGED_EXEC');
-              } else if (textWithoutAnsi.includes('>') && !textWithoutAnsi.includes('#')) {
-                setCliMode('USER_EXEC');
-              }
-
-              // Ensure all raw SSH output coming from the device shell is printed directly and completely to the live terminal
-              const displayText = textWithoutAnsi.replace(/^\n+|\n+$/g, '');
-              if (displayText.trim().length > 0) {
-                appendLines([
-                  {
-                    id: 'ws-out-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-                    type: 'output',
-                    text: displayText,
-                  },
-                ]);
-              }
+              appendStreamText(msg.data);
             } else if (msg.type === 'status') {
               if (msg.status === 'connected') {
                 if (msg.is_real) {
@@ -803,11 +843,6 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       default:
         return `${hostname}>`;
     }
-  };
-
-  // Helper to append line
-  const appendLines = (newLines: TerminalLine[]) => {
-    setLines((prev) => [...prev, ...newLines]);
   };
 
   // Handle Write Memory

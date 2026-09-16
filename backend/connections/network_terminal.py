@@ -334,10 +334,10 @@ class NetworkTerminalSession:
         try:
             if self.is_cisco and self._ssh_channel:
                 time.sleep(0.1)
-                self._ssh_channel.send("terminal length 0\nterminal width 512\n".encode("utf-8"))
+                self._ssh_channel.send("terminal length 0\r\nterminal width 512\r\n".encode("utf-8"))
             elif self.is_mikrotik and self._ssh_channel:
                 time.sleep(0.1)
-                self._ssh_channel.send("/console/set terminal=vt100\n".encode("utf-8"))
+                self._ssh_channel.send("/console/set terminal=vt100\r\n".encode("utf-8"))
         except Exception as e:
             print(f"[NetworkTerminal] Initial paging config send warning: {e}")
 
@@ -361,12 +361,21 @@ class NetworkTerminalSession:
                         if not data:
                             # EOF received from device
                             break
+                        # Read all immediately available bytes to avoid slicing text across multiple frames
+                        while chan.recv_ready():
+                            extra = chan.recv(4096)
+                            if not extra:
+                                break
+                            data += extra
                         self.last_activity = time.time()
                         text = data.decode("utf-8", errors="replace")
                         if self.on_data_callback:
                             self.on_data_callback(text)
-            except Exception:
-                break
+            except Exception as e:
+                # Only exit if the session is stopping or channel is closed
+                if self._stop_event.is_set() or not chan or chan.closed:
+                    break
+                time.sleep(0.01)
 
         # Connection ended
         self.close()

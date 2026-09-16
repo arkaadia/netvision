@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.6';
+export const APP_VERSION = '1.61.7';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.7',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'اصلاح باگ رندر کاراکتر به کاراکتر خروجی‌های اولیه در ترمینال لایو',
+    title_en: 'Fix Character-by-Character Line Splitting in Live Terminal Stream',
+    changes: [
+      'اصلاح پردازش داده‌های جریانی وب‌سوکت در ترمینال‌های سیسکو و میکروتیک جهت پیوستگی کاراکترها روی یک خط واحد تا زمان دریافت کاراکتر سرخط (Newline) و جلوگیری از رندر کاراکترهای دستورات آغازین روی خطوط جداگانه.',
+      'تجهیز حلقه خواندن کانال SSH به بافر خواندن دسته‌ای بایت‌های در صف جهت جلوگیری از تقسیم جریان خروجی به فریم‌های تک‌بایتی.',
+      'ارسال استاندارد دستورات غیرفعال‌سازی صفحه‌بندی (CRLF) در بدو برقراری اتصال SSH.'
+    ],
+    changes_en: [
+      'Fixed WebSocket streaming buffer in Cisco and MikroTik terminals to maintain line continuity across character and packet boundaries until a newline delimiter is received, preventing initial command characters from rendering on separate lines.',
+      'Enhanced SSH reader loop with batch byte buffering to prevent slicing output stream into single-byte frames.',
+      'Enforced standard carriage return line feeds (CRLF) on initial terminal paging configuration commands.'
+    ]
+  },
   {
     version: '1.61.6',
     releaseDate: '2026-09-16',
