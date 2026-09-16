@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.2';
+export const APP_VERSION = '1.61.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.3',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'اصلاح نمایش داده‌های پورت انتخاب‌شده و افزودن مشخصات سرعت در پنل جزئیات',
+    title_en: 'Fix Selected Port Details Panel Synchronization and Add Speed Metrics',
+    changes: [
+      'اصلاح همگام‌سازی پنل جزئیات پورت در مودال پورت‌ها (PortInspectorModal) به طوری که با کلیک روی هر پورت گرافیکی، داده‌های دقیق و مشخصات همان پورت بی‌درنگ نمایش داده شود و بر اثر رندر مجدد والد ریست نشود.',
+      'افزودن کارت اختصاصی سرعت و مشخصات لینک ارتباطی به همراه نمایش مجزای سرعت توافق‌شده (Negotiated Speed) و حداکثر توان سخت‌افزاری پورت (Max Capability Speed).',
+      'حفظ پورت انتخاب‌شده در هنگام بروزرسانی یا دریافت داده‌های جدید سوئیچ به جای بازگشت ناخواسته به اولین پورت.'
+    ],
+    changes_en: [
+      'Fixed port details panel synchronization in PortInspectorModal so clicking any graphical port immediately displays that exact port details without being reset by parent re-renders.',
+      'Added a dedicated Port Speed & Link specification card along with distinct metrics for Negotiated Speed and Maximum Hardware Capability Speed.',
+      'Preserved active port selection across background polling and re-fetches instead of resetting to the first interface.'
+    ]
+  },
   {
     version: '1.61.2',
     releaseDate: '2026-09-16',

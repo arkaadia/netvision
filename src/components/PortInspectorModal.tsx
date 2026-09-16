@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
 import { fetchDevicePorts, updateSwitchPort, writeMemory, batchUpdateSwitchPorts } from '../services/api';
 import { NetworkPortSvg } from './NetworkPortSvg';
@@ -249,10 +249,10 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   };
 
   useEffect(() => {
-    if (device && isOpen) {
+    if (device?.id && isOpen) {
       loadPorts();
     }
-  }, [device, isOpen]);
+  }, [device?.id, isOpen]);
 
   const loadPorts = async () => {
     if (!device) return;
@@ -276,10 +276,21 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       });
       setPorts(normalizedPorts);
       if (normalizedPorts.length > 0) {
-        const firstPort = normalizedPorts[0];
-        const firstId = firstPort.port_id;
-        setSelectedPort(firstPort);
-        setSelectedPortIds(firstId ? [firstId] : []);
+        setSelectedPort((prev) => {
+          if (!prev) return normalizedPorts[0];
+          const prevId = prev.port_id || (prev as any).port || prev.name;
+          const matched = normalizedPorts.find(
+            (p) => (p.port_id || (p as any).port || p.name) === prevId
+          );
+          return matched || normalizedPorts[0];
+        });
+        setSelectedPortIds((prev) => {
+          if (!prev || prev.length === 0) return [normalizedPorts[0].port_id];
+          const validIds = prev.filter((id) =>
+            normalizedPorts.some((p) => (p.port_id || (p as any).port || p.name) === id)
+          );
+          return validIds.length > 0 ? validIds : [normalizedPorts[0].port_id];
+        });
       } else {
         setSelectedPort(null);
         setSelectedPortIds([]);
@@ -295,6 +306,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
     setBatchSuccessMessage(null);
     const pId = port.port_id || (port as any).port || port.name;
     if (!pId) return;
+    const freshPort = ports.find((p) => (p.port_id || (p as any).port || p.name) === pId) || port;
     if (e.ctrlKey || e.metaKey || e.shiftKey) {
       // Multi-selection with Ctrl / Cmd / Shift
       setSelectedPortIds((prev) => {
@@ -308,11 +320,11 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
         }
         return updated;
       });
-      setSelectedPort(port);
+      setSelectedPort(freshPort);
       setIsEditing(false);
     } else {
       // Single select
-      setSelectedPort(port);
+      setSelectedPort(freshPort);
       setSelectedPortIds([pId]);
       setIsEditing(false);
     }
@@ -320,9 +332,52 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
 
   const handleSelectPort = (port: SwitchPort) => {
     const pId = port.port_id || (port as any).port || port.name;
-    setSelectedPort(port);
+    const freshPort = ports.find((p) => (p.port_id || (p as any).port || p.name) === pId) || port;
+    setSelectedPort(freshPort);
     setSelectedPortIds(pId ? [pId] : []);
     setIsEditing(false);
+  };
+
+  const activeSelectedPort = useMemo(() => {
+    if (selectedPort) {
+      const sId = selectedPort.port_id || (selectedPort as any).port || selectedPort.name;
+      const found = ports.find((p) => (p.port_id || (p as any).port || p.name) === sId);
+      if (found) return found;
+      return selectedPort;
+    }
+    if (selectedPortIds && selectedPortIds.length > 0) {
+      const found = ports.find((p) => (p.port_id || (p as any).port || p.name) === selectedPortIds[0]);
+      if (found) return found;
+    }
+    return ports[0] || null;
+  }, [ports, selectedPort, selectedPortIds]);
+
+  const getMaxSpeed = (p?: SwitchPort | null) => {
+    if (!p) return '1 Gbps';
+    if ((p as any).max_speed) return String((p as any).max_speed);
+    const pId = (p.port_id || p.name || '').toLowerCase();
+    const rawSpeed = String(p.speed || '').toLowerCase();
+    if (rawSpeed.includes('10g') || pId.startsWith('te') || pId.includes('tengigabit')) return '10 Gbps';
+    if (pId.startsWith('fo') || pId.includes('fortygigabit')) return '40 Gbps';
+    if (pId.startsWith('hu') || pId.includes('hundredgig')) return '100 Gbps';
+    if (pId.startsWith('fa') || pId.includes('fastethernet')) return '100 Mbps';
+    return '1 Gbps';
+  };
+
+  const getNegotiatedSpeed = (p?: SwitchPort | null) => {
+    if (!p) return isEn ? 'No Link (Down)' : 'عدم برقراری لینک (قطع)';
+    if ((p as any).negotiated_speed) return String((p as any).negotiated_speed);
+    if (p.status !== 'up') {
+      return isEn ? 'No Link (Down)' : 'عدم برقراری لینک (قطع)';
+    }
+    const raw = String(p.speed || '').trim();
+    if (raw === '1000' || raw === 'a-1000') return '1 Gbps';
+    if (raw === '10000' || raw === '10G' || raw === 'a-10000') return '10 Gbps';
+    if (raw === '100' || raw === 'a-100') return '100 Mbps';
+    if (raw === '10' || raw === 'a-10') return '10 Mbps';
+    if (raw.toLowerCase().includes('bps')) return raw;
+    if (raw && raw !== 'auto') return `${raw} Mbps`;
+    return getMaxSpeed(p);
   };
 
   const handleOpenBatchConfirm = () => {
@@ -873,7 +928,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
           )}
 
           {/* Detailed Inspector & Editor Card */}
-          {selectedPort && (
+          {activeSelectedPort && (
             <div className="port-sub-card bg-white/5 border border-white/10 rounded-xl p-3.5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2.5">
@@ -882,40 +937,40 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-white font-mono">{selectedPort.name}</h4>
+                      <h4 className="text-xs font-bold text-white font-mono">{activeSelectedPort.name || activeSelectedPort.port_id}</h4>
                       <span
-                        data-badge={selectedPort.mode === 'trunk' ? 'port-mode-trunk' : 'port-mode-access'}
+                        data-badge={activeSelectedPort.mode === 'trunk' ? 'port-mode-trunk' : 'port-mode-access'}
                         className={`text-[10px] px-2 py-0.5 rounded font-bold font-mono text-white shadow-xs ${
-                          selectedPort.mode === 'trunk'
+                          activeSelectedPort.mode === 'trunk'
                             ? 'port-mode-badge-trunk bg-purple-600 border border-purple-500'
                             : 'port-mode-badge-access bg-indigo-600 border border-indigo-500'
                         }`}
                       >
-                        {selectedPort.mode === 'trunk' ? (isEn ? 'TRUNK' : 'TRUNK (ترانک)') : (isEn ? 'ACCESS' : 'ACCESS (اکسس)')}
+                        {activeSelectedPort.mode === 'trunk' ? (isEn ? 'TRUNK' : 'TRUNK (ترانک)') : (isEn ? 'ACCESS' : 'ACCESS (اکسس)')}
                       </span>
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded font-medium font-mono ${
-                          selectedPort.status === 'up'
+                          activeSelectedPort.status === 'up'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : 'bg-white/5 text-slate-400 border border-white/10'
                         }`}
                       >
-                        {selectedPort.status === 'up' ? (isEn ? 'Connected' : 'فعال (Connected)') : (isEn ? 'Disconnected' : 'غیرفعال (Disconnected)')}
+                        {activeSelectedPort.status === 'up' ? (isEn ? 'Connected' : 'فعال (Connected)') : (isEn ? 'Disconnected' : 'غیرفعال (Disconnected)')}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                      {isEn ? 'Speed' : 'سرعت'}: {selectedPort.speed} • {isEn ? 'Duplex' : 'داپلکس'}: {selectedPort.duplex}
+                      {isEn ? 'Speed' : 'سرعت'}: <span className="text-cyan-300 font-semibold">{getNegotiatedSpeed(activeSelectedPort)}</span> ({isEn ? 'Max' : 'حداکثر'}: {getMaxSpeed(activeSelectedPort)}) • {isEn ? 'Duplex' : 'داپلکس'}: {activeSelectedPort.duplex || 'Auto/Full'}
                     </p>
-                    {selectedPort.description ? (
+                    {activeSelectedPort.description ? (
                       <div className="flex items-center gap-1.5 mt-1 text-[11px] text-amber-300 font-mono bg-amber-500/10 border border-amber-500/25 px-2.5 py-0.5 rounded-lg w-fit">
                         <FileText className="w-3 h-3 text-amber-400 shrink-0" />
                         <span className="text-amber-400/80 font-bold">{isEn ? 'Description:' : 'توضیحات:'}</span>
-                        <span className="text-slate-100 font-semibold">{selectedPort.description}</span>
+                        <span className="text-slate-100 font-semibold">{activeSelectedPort.description}</span>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDescriptionModalPort(selectedPort);
+                            setDescriptionModalPort(activeSelectedPort);
                           }}
                           className="ml-1 text-[10px] text-amber-400/70 hover:text-amber-300 underline cursor-pointer"
                         >
@@ -927,7 +982,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDescriptionModalPort(selectedPort);
+                          setDescriptionModalPort(activeSelectedPort);
                         }}
                         className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 hover:text-amber-300 transition cursor-pointer font-mono"
                       >
@@ -940,7 +995,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
 
                 {!isEditing ? (
                   <button
-                    onClick={() => startEdit(selectedPort)}
+                    onClick={() => startEdit(activeSelectedPort)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-medium transition cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
@@ -968,15 +1023,29 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
 
               {/* View / Edit Mode Form */}
               {!isEditing ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-3 text-xs">
+                  {/* Speed Specification Card */}
+                  <div className="port-sub-card p-3 rounded-xl bg-white/5 border border-white/10">
+                    <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                      {isEn ? 'Port Speed:' : 'سرعت پورت (Speed):'}
+                    </div>
+                    <div className="text-cyan-300 font-bold font-mono text-xs flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>{getNegotiatedSpeed(activeSelectedPort)}</span>
+                    </div>
+                    <div className="text-slate-400 text-[10px] mt-0.5 font-mono">
+                      {isEn ? 'Max Capability' : 'حداکثر سرعت'}: <span className="text-slate-200 font-semibold">{getMaxSpeed(activeSelectedPort)}</span>
+                    </div>
+                  </div>
+
                   {/* Connected Device */}
                   <div className="port-sub-card p-3 rounded-xl bg-white/5 border border-white/10">
                     <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">{isEn ? 'Connected Host / Device:' : 'تجهیز یا هاست متصل:'}</div>
-                    <div className="text-white font-semibold font-mono text-xs truncate" title={selectedPort.connected_device}>
-                      {selectedPort.connected_device || (isEn ? 'No device connected' : 'تجهیزی متصل نیست')}
+                    <div className="text-white font-semibold font-mono text-xs truncate" title={activeSelectedPort.connected_device}>
+                      {activeSelectedPort.connected_device || (isEn ? 'No device connected' : 'تجهیزی متصل نیست')}
                     </div>
                     <div className="text-slate-400 text-[10px] mt-0.5 font-mono">
-                      {isEn ? 'Type' : 'نوع'}: {selectedPort.connected_type || 'Host'}
+                      {isEn ? 'Type' : 'نوع'}: {activeSelectedPort.connected_type || 'Host'}
                     </div>
                   </div>
 
@@ -984,10 +1053,10 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                   <div className="port-sub-card p-3 rounded-xl bg-white/5 border border-white/10">
                     <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">{isEn ? 'Assigned VLAN:' : 'ویلن تخصیص یافته (VLAN):'}</div>
                     <div className="text-indigo-300 font-bold font-mono text-xs">
-                      VLAN {selectedPort.vlan}
+                      VLAN {activeSelectedPort.vlan}
                     </div>
-                    <div className="text-slate-400 text-[10px] mt-0.5 font-mono truncate" title={selectedPort.allowed_vlans}>
-                      {isEn ? 'Allowed' : 'مجاز'}: {selectedPort.allowed_vlans || (isEn ? 'All (1-4094)' : 'همه (1-4094)')}
+                    <div className="text-slate-400 text-[10px] mt-0.5 font-mono truncate" title={activeSelectedPort.allowed_vlans}>
+                      {isEn ? 'Allowed' : 'مجاز'}: {activeSelectedPort.allowed_vlans || (isEn ? 'All (1-4094)' : 'همه (1-4094)')}
                     </div>
                   </div>
 
@@ -997,28 +1066,28 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`font-semibold ${
-                          selectedPort.admin_status === 'enabled' ? 'text-emerald-400' : 'text-amber-400'
+                          activeSelectedPort.admin_status === 'enabled' ? 'text-emerald-400' : 'text-amber-400'
                         }`}
                       >
-                        {selectedPort.admin_status === 'enabled' ? (isEn ? 'Enabled (No Shutdown)' : 'فعال (No Shutdown)') : (isEn ? 'Disabled (Shutdown)' : 'غیرفعال (Shutdown)')}
+                        {activeSelectedPort.admin_status === 'enabled' ? (isEn ? 'Enabled (No Shutdown)' : 'فعال (No Shutdown)') : (isEn ? 'Disabled (Shutdown)' : 'غیرفعال (Shutdown)')}
                       </span>
                     </div>
                     <div className="text-slate-400 text-[10px] mt-0.5 font-mono">
-                      {isEn ? 'Mode' : 'پروتکل'}: {selectedPort.mode === 'trunk' ? '802.1Q Trunk' : 'Access'}
+                      {isEn ? 'Mode' : 'پروتکل'}: {activeSelectedPort.mode === 'trunk' ? '802.1Q Trunk' : 'Access'}
                     </div>
                   </div>
 
                   {/* Cisco Port Security Status */}
                   <div
                     className={`port-sub-card p-3 rounded-xl border transition ${
-                      selectedPort.port_security_enabled
+                      activeSelectedPort.port_security_enabled
                         ? 'bg-emerald-950/30 border-emerald-500/40 shadow-sm'
                         : 'bg-white/5 border-white/10'
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px] mb-0.5">
                       <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isEn ? 'Port Security:' : 'پورت سکیوریتی:'}</span>
-                      {selectedPort.port_security_enabled ? (
+                      {activeSelectedPort.port_security_enabled ? (
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                       ) : (
                         <Shield className="w-3.5 h-3.5 text-slate-500" />
@@ -1027,26 +1096,26 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                     <div className="flex items-center gap-1">
                       <span
                         className={`font-bold font-mono text-xs ${
-                          selectedPort.port_security_enabled ? 'text-emerald-300' : 'text-slate-400'
+                          activeSelectedPort.port_security_enabled ? 'text-emerald-300' : 'text-slate-400'
                         }`}
                       >
-                        {selectedPort.port_security_enabled ? (isEn ? 'Secure' : 'فعال (Secure)') : (isEn ? 'Disabled' : 'غیرفعال (Disabled)')}
+                        {activeSelectedPort.port_security_enabled ? (isEn ? 'Secure' : 'فعال (Secure)') : (isEn ? 'Disabled' : 'غیرفعال (Disabled)')}
                       </span>
                     </div>
-                    {selectedPort.port_security_enabled ? (
+                    {activeSelectedPort.port_security_enabled ? (
                       <div className="text-[10px] text-emerald-300 mt-1 font-mono space-y-0.5">
                         <div className="flex items-center justify-between">
                           <span>
-                            {isEn ? 'Mode' : 'مود'}: {selectedPort.port_security_mode === 'sticky' ? (isEn ? 'Sticky' : 'استیکی') : selectedPort.port_security_mode === 'configured' ? (isEn ? 'Configured' : 'کانفیگور') : (isEn ? 'Dynamic' : 'داینامیک')}
+                            {isEn ? 'Mode' : 'مود'}: {activeSelectedPort.port_security_mode === 'sticky' ? (isEn ? 'Sticky' : 'استیکی') : activeSelectedPort.port_security_mode === 'configured' ? (isEn ? 'Configured' : 'کانفیگور') : (isEn ? 'Dynamic' : 'داینامیک')}
                           </span>
                           <span className="font-bold bg-emerald-500/20 text-emerald-300 px-1 rounded text-[9px] border border-emerald-500/30">
-                            Max: {selectedPort.port_security_max_mac || 1}
+                            Max: {activeSelectedPort.port_security_max_mac || 1}
                           </span>
                         </div>
-                        <div className="text-[9px] text-slate-400 truncate" title={selectedPort.port_security_configured_mac || selectedPort.port_security_learned_macs?.join(', ')}>
-                          MAC: {selectedPort.port_security_mode === 'configured'
-                            ? (selectedPort.port_security_configured_mac || (isEn ? 'Static' : 'دستی'))
-                            : (selectedPort.port_security_learned_macs?.[0] || (isEn ? 'Sticky learned' : 'Sticky کشف‌شده'))}
+                        <div className="text-[9px] text-slate-400 truncate" title={activeSelectedPort.port_security_configured_mac || activeSelectedPort.port_security_learned_macs?.join(', ')}>
+                          MAC: {activeSelectedPort.port_security_mode === 'configured'
+                            ? (activeSelectedPort.port_security_configured_mac || (isEn ? 'Static' : 'دستی'))
+                            : (activeSelectedPort.port_security_learned_macs?.[0] || (isEn ? 'Sticky learned' : 'Sticky کشف‌شده'))}
                         </div>
                       </div>
                     ) : (
@@ -1061,10 +1130,10 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                     <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">{isEn ? 'PoE Status:' : 'توان برق (PoE Status):'}</div>
                     <div className="flex items-center gap-1.5 text-white font-semibold font-mono text-xs">
                       <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{selectedPort.poe_power ? `${selectedPort.poe_power} W` : (isEn ? 'Off' : 'غیرفعال')}</span>
+                      <span>{activeSelectedPort.poe_power ? `${activeSelectedPort.poe_power} W` : (isEn ? 'Off' : 'غیرفعال')}</span>
                     </div>
                     <div className="text-slate-400 text-[10px] mt-0.5 font-mono">
-                      {isEn ? 'Status' : 'وضعیت'}: {selectedPort.poe_status || 'off'}
+                      {isEn ? 'Status' : 'وضعیت'}: {activeSelectedPort.poe_status || 'off'}
                     </div>
                   </div>
                 </div>
