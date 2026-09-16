@@ -2153,6 +2153,7 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                     "device": sanitize_device(device),
                     "ports": normalized_parsed,
                     "is_live": True,
+                    "raw_output": full_output,
                     "sync_source": "ssh_tunnel",
                     "active_count": sum(1 for p in normalized_parsed if p.get("status") == "up"),
                     "inactive_count": sum(1 for p in normalized_parsed if p.get("status") == "down"),

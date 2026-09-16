@@ -581,24 +581,28 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             }
             if (msg.type === 'data' && msg.data) {
               const cleanText = msg.data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+              // Strip ANSI escape sequences (colors, cursor positioning, VT100 control codes)
+              const textWithoutAnsi = cleanText.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+
               // Detect remote prompt transitions to sync local cliMode
-              if (cleanText.includes('(config-if)#')) {
+              if (textWithoutAnsi.includes('(config-if)#')) {
                 setCliMode('INTERFACE_CONFIG');
-              } else if (cleanText.includes('(config)#')) {
+              } else if (textWithoutAnsi.includes('(config)#')) {
                 setCliMode('GLOBAL_CONFIG');
-              } else if (cleanText.includes('#') && !cleanText.includes('>')) {
+              } else if (textWithoutAnsi.includes('#') && !textWithoutAnsi.includes('>')) {
                 setCliMode('PRIVILEGED_EXEC');
-              } else if (cleanText.includes('>') && !cleanText.includes('#')) {
+              } else if (textWithoutAnsi.includes('>') && !textWithoutAnsi.includes('#')) {
                 setCliMode('USER_EXEC');
               }
 
-              const trimmedText = cleanText.trim();
-              if (trimmedText && trimmedText !== getPrompt().trim()) {
+              // Ensure all raw SSH output coming from the device shell is printed directly and completely to the live terminal
+              const displayText = textWithoutAnsi.replace(/^\n+|\n+$/g, '');
+              if (displayText.trim().length > 0) {
                 appendLines([
                   {
-                    id: 'ws-out-' + Date.now() + '-' + Math.random(),
+                    id: 'ws-out-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
                     type: 'output',
-                    text: trimmedText,
+                    text: displayText,
                   },
                 ]);
               }

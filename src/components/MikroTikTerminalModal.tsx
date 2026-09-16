@@ -421,14 +421,16 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
           }
           if (msg.type === 'data' && msg.data) {
             const cleanText = msg.data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            const trimmedText = cleanText.trim();
-            if (trimmedText && trimmedText !== prompt.trim()) {
+            // Strip ANSI escape sequences (colors, cursor positioning, VT100 control codes)
+            const textWithoutAnsi = cleanText.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+            const displayText = textWithoutAnsi.replace(/^\n+|\n+$/g, '');
+            if (displayText.trim().length > 0) {
               setLines((prev) => [
                 ...prev,
                 {
-                  id: 'ws-out-' + Date.now() + '-' + Math.random(),
+                  id: 'ws-out-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
                   type: 'output',
-                  text: trimmedText,
+                  text: displayText,
                 },
               ]);
             }

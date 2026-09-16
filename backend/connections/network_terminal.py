@@ -329,6 +329,18 @@ class NetworkTerminalSession:
         )
         self._send_error_to_terminal(success_banner)
 
+        # Send initial terminal configuration commands to disable pagination
+        # so show commands (e.g. show running-config, show interfaces status) output fully without hanging on --More--
+        try:
+            if self.is_cisco and self._ssh_channel:
+                time.sleep(0.1)
+                self._ssh_channel.send("terminal length 0\nterminal width 512\n".encode("utf-8"))
+            elif self.is_mikrotik and self._ssh_channel:
+                time.sleep(0.1)
+                self._ssh_channel.send("/console/set terminal=vt100\n".encode("utf-8"))
+        except Exception as e:
+            print(f"[NetworkTerminal] Initial paging config send warning: {e}")
+
         # Start streaming reader thread
         self._reader_thread = threading.Thread(target=self._ssh_reader_loop, daemon=True)
         self._reader_thread.start()

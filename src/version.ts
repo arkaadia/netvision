@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.4';
+export const APP_VERSION = '1.61.5';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.5',
+    releaseDate: '2026-09-16',
+    type: 'patch',
+    title: 'چاپ کامل و مستقیم خروجی‌های زنده دستورات شو در ترمینال لایو SSH',
+    title_en: 'Direct Full Raw Streaming Output for Show Commands in Live SSH Terminal',
+    changes: [
+      'اصلاح منطق دریافت جریان داده وب‌سوکت در ترمینال‌های سیسکو و میکروتیک به طوری که تمامی خروجی‌های خام SSH (از جمله دستورات show running-config، show interfaces status، show ip interface brief و غیره) بدون فیلتر یا حذف مستقیماً در صفحه ترمینال چاپ شوند.',
+      'حذف توالی‌های کنترلی ANSI/VT100 برای خوانایی متن و ارسال خودکار پیکربندی غیرفعال‌سازی صفحه‌بندی (terminal length 0) در اتصال اولیه جهت جلوگیری از توقف خروجی در پرامپت --More--.',
+      'افزودن فیلد خروجی خام (raw_output) در پاسخ همگام‌سازی پورت‌ها برای حفظ یکپارچگی داده‌ها.'
+    ],
+    changes_en: [
+      'Fixed the WebSocket data streaming handlers in Cisco and MikroTik terminals to ensure all raw SSH output (including show running-config, show interfaces status, show ip interface brief, etc.) is printed directly and completely to the terminal buffer without suppression.',
+      'Sanitized VT100/ANSI escape sequences for pristine terminal readability and automatically sent pagination-disabling commands (terminal length 0) on session connect to prevent device output pauses on --More-- prompts.',
+      'Preserved full raw output across port synchronization responses for complete data transparency.'
+    ]
+  },
   {
     version: '1.61.4',
     releaseDate: '2026-09-16',
