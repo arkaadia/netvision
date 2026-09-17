@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Minus, X, Maximize2 } from 'lucide-react';
+import { Minus, X, Maximize2, Minimize2 } from 'lucide-react';
 
 export interface ModalHeaderControlsProps {
   onMinimize?: () => void;
@@ -51,7 +51,11 @@ export const ModalHeaderControls: React.FC<ModalHeaderControlsProps> = ({
           title={maxTip}
           aria-label={maxTip}
         >
-          <Maximize2 className="w-4 h-4" />
+          {isMaximized ? (
+            <Minimize2 className="w-4 h-4" />
+          ) : (
+            <Maximize2 className="w-4 h-4" />
+          )}
         </button>
       )}
 

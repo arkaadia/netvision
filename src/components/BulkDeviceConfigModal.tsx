@@ -126,6 +126,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
     loading: boolean;
   } | null>(null);
   const [copiedLog, setCopiedLog] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Polling ref
   const pollTimerRef = useRef<any>(null);
@@ -344,15 +345,21 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+      className={`fixed inset-0 z-50 flex items-center justify-center ${
+        isFullscreen ? 'p-0' : 'p-2 sm:p-4'
+      } bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div
-        className={`relative w-full max-w-6xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl border ${
+        className={`relative w-full ${
+          isFullscreen
+            ? 'h-full max-h-screen rounded-none border-none'
+            : 'max-w-6xl max-h-[92vh] rounded-2xl border'
+        } flex flex-col shadow-2xl ${
           isLightMode
             ? 'bg-slate-50 border-slate-300 text-slate-900'
             : 'bg-slate-900/95 border-cyan-500/30 text-slate-100'
-        } overflow-hidden backdrop-blur-xl transition-all`}
+        } overflow-hidden backdrop-blur-xl transition-all duration-200`}
       >
         {/* Modal Header */}
         <div
@@ -387,6 +394,8 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
           <ModalHeaderControls
             onMinimize={onMinimize}
             onClose={onClose}
+            onMaximizeToggle={() => setIsFullscreen((prev) => !prev)}
+            isMaximized={isFullscreen}
             isLightMode={isLightMode}
             isEn={isEn}
             minimizeTooltip={isEn ? 'Minimize to bottom dock' : 'مینیمایز به نوار داک'}

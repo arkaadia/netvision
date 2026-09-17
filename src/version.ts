@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.69.3';
+export const APP_VERSION = '1.70.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.70.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'افزودن قابلیت تمام‌صفحه (Fullscreen / Maximize) به مودال پیکربندی گروهی تجهیزات',
+    title_en: 'Add Fullscreen / Maximize Mode Support to Bulk Device Configuration Modal',
+    changes: [
+      'تجهیز هدر مودال Bulk Device Configuration به دکمه سوئیچ تمام‌صفحه (Maximize2 / Minimize2) از طریق کامپوننت اشتراکی ModalHeaderControls.',
+      'افزودن انیمیشن روان و انتقال ابعاد کادر به حالت تمام‌صفحه (100% عرض و ارتفاع صفحه نمایش) برای راحتی مشاهده لاگ‌ها، مقایسه Diff دستورات و لیست قالب‌ها.',
+      'سازگاری کامل با جهت راست‌چین (RTL) و چپ‌چین (LTR) و سوئیچ آیکون و راهنمای تول‌تیپ به خروج از تمام‌صفحه هنگام فعال بودن.',
+      'بهبود استایل و واکنش‌گرایی دکمه‌های کنترلی هدر مودال با آیکون‌های متناسب وضعیت.'
+    ],
+    changes_en: [
+      'Equipped Bulk Device Configuration modal header with Fullscreen / Maximize toggle (Maximize2 / Minimize2) using shared ModalHeaderControls.',
+      'Implemented smooth transitions expanding modal to 100% viewport width and height for optimal viewing of CLI diffs, logs, and templates.',
+      'Full compatibility with RTL and LTR layouts with contextual tooltips and dynamic icon toggle between Maximize and Exit Fullscreen.',
+      'Enhanced responsive modal control styling across dark and light themes.'
+    ]
+  },
   {
     version: '1.69.3',
     releaseDate: '2026-09-17',
