@@ -91,6 +91,29 @@ ensure_system_swap() {
   total_swap_mb=${total_swap_mb:-0}
   total_ram_mb=${total_ram_mb:-0}
 
+  # 1. Expand Process Stack and File Descriptor Limits (Prevents SIGBUS / AST recursion limit)
+  ulimit -s 65536 2>/dev/null || ulimit -s unlimited 2>/dev/null || true
+  ulimit -n 65536 2>/dev/null || ulimit -n 4096 2>/dev/null || true
+  ulimit -v unlimited 2>/dev/null || true
+  ulimit -m unlimited 2>/dev/null || true
+
+  # 2. Kernel inotify and file-max adjustments
+  sysctl -w fs.inotify.max_user_watches=524288 2>/dev/null || true
+  sysctl -w fs.inotify.max_user_instances=1024 2>/dev/null || true
+  sysctl -w fs.file-max=2097152 2>/dev/null || true
+
+  # 3. Guard Shared Memory (/dev/shm) to prevent mmap / POSIX shm SIGBUS errors
+  if [ -d /dev/shm ]; then
+    local shm_size_mb
+    shm_size_mb=$(df -m /dev/shm 2>/dev/null | awk 'NR==2 {print $2}')
+    shm_size_mb=${shm_size_mb:-0}
+    if [ "$shm_size_mb" -lt 1024 ]; then
+      echo -e "${YELLOW}افزایش ظرفیت حافظه مشترک (/dev/shm) به ۲ گیگابایت جهت جلوگیری از کرش SIGBUS...${NC}"
+      mount -o remount,size=2G /dev/shm 2>/dev/null || true
+    fi
+  fi
+
+  # 4. Swap allocation for systems with low swap
   if [ "$total_swap_mb" -lt 1500 ]; then
     echo -e "${YELLOW}فضای Swap حافظه ناکافی است (${total_swap_mb}MB). جهت جلوگیری از خطای Bus error و کمبود رم در زمان کامپایل، ۲ گیگابایت Swap موقت ایجاد می‌شود...${NC}"
 
@@ -121,6 +144,9 @@ ensure_system_swap() {
     fi
   fi
 }
+ensure_system_resources() {
+  ensure_system_swap
+}
 
 # Color definitions for output
 CYAN='\033[0;36m'
@@ -137,7 +163,7 @@ echo -e "${CYAN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║                                                                  ║"
 echo "║     🌐  NetTopology - Enterprise Network Management Panel        ║"
-echo "║     🚀  Version: 1.61.10 (Production Stable)                     ║"
+echo "║     🚀  Version: 1.61.11 (Production Stable)                     ║"
 echo "║     🛡️  Cisco Port Security & CDP/LLDP Topology Visualizer       ║"
 echo "║     🎨  Spatial Cyber Neon & Multi-Theme Network Studio          ║"
 echo "║                                                                  ║"
@@ -371,27 +397,47 @@ fi
 echo ""
 echo -e "${BLUE}[4/6]${NC} ${BOLD}نصب وابستگی‌های پروژه و بیلد نهایی پنل (Building NetTopology)...${NC}"
 
-# Ensure system has enough swap and memory to prevent Bus error / OOM
-ensure_system_swap
+# Ensure system has enough swap, shm and ulimits to prevent Bus error / OOM
+ensure_system_resources
 
 # Ensure correct permissions
 chown -R "$SUDO_USER:$SUDO_USER" "$APP_DIR" 2>/dev/null || true
 
-export NODE_OPTIONS="--max-old-space-size=2048"
-export TMPDIR="${TMPDIR:-/tmp}"
-mkdir -p "$TMPDIR" 2>/dev/null || true
-rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* 2>/dev/null || true
+# Dynamic memory sizing based on detected system RAM
+SYS_MEM_MB=0
+if [ -f /proc/meminfo ]; then
+  SYS_MEM_MB=$(grep -i MemTotal /proc/meminfo | awk '{print int($2/1024)}')
+elif command -v free &>/dev/null; then
+  SYS_MEM_MB=$(free -m 2>/dev/null | awk '/Mem:/ {print $2}')
+fi
+SYS_MEM_MB=${SYS_MEM_MB:-1024}
+
+NODE_HEAP_MB=2048
+if [ "$SYS_MEM_MB" -ge 4000 ]; then
+  NODE_HEAP_MB=4096
+elif [ "$SYS_MEM_MB" -le 1500 ]; then
+  NODE_HEAP_MB=1536
+fi
+
+mkdir -p "$APP_DIR/.tmp"
+chmod 777 "$APP_DIR/.tmp" 2>/dev/null || true
+export TMPDIR="$APP_DIR/.tmp"
+export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB} --stack-size=4096"
+rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* "$APP_DIR/.tmp"/* 2>/dev/null || true
 
 # Run npm install
 if [ -n "$SUDO_USER" ]; then
-  su - "$SUDO_USER" -c "cd '$APP_DIR' && npm install"
+  su - "$SUDO_USER" -c "cd '$APP_DIR' && export TMPDIR='$APP_DIR/.tmp' && npm install"
 else
   npm install
 fi
 
+SYS_ARCH=$(uname -m)
 BUILD_OK=false
+
+# Tier 1: Standard npm run build
 if [ -n "$SUDO_USER" ]; then
-  if su - "$SUDO_USER" -c "cd '$APP_DIR' && export NODE_OPTIONS='--max-old-space-size=2048' && npm run build"; then
+  if su - "$SUDO_USER" -c "cd '$APP_DIR' && export TMPDIR='$APP_DIR/.tmp' && export NODE_OPTIONS='--max-old-space-size=${NODE_HEAP_MB} --stack-size=4096' && npm run build"; then
     BUILD_OK=true
   fi
 else
@@ -400,18 +446,36 @@ else
   fi
 fi
 
+# Tier 2: Staged compilation with native binding repair
 if [ "$BUILD_OK" = false ]; then
-  echo -e "${YELLOW}کامپایل اولیه به دلیل محدودیت رم با مشکل مواجه شد. در حال اجرای بیلد دومرحله‌ای سبک...${NC}"
-  export NODE_OPTIONS="--max-old-space-size=1536"
-  rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" 2>/dev/null || true
+  echo -e "${YELLOW}کامپایل استاندارد با محدودیت مواجه شد. در حال بهینه‌سازی باینری‌ها و اجرای بیلد دومرحله‌ای...${NC}"
+  rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* "$APP_DIR/.tmp"/* 2>/dev/null || true
   
+  if [ "$SYS_ARCH" = "x86_64" ]; then
+    npm install --no-save @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 2>/dev/null || true
+  elif [ "$SYS_ARCH" = "aarch64" ] || [ "$SYS_ARCH" = "arm64" ]; then
+    npm install --no-save @rollup/rollup-linux-arm64-gnu @esbuild/linux-arm64 2>/dev/null || true
+  fi
+  npm rebuild 2>/dev/null || true
+
+  if npx vite build --emptyOutDir && npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs; then
+    BUILD_OK=true
+  fi
+fi
+
+# Tier 3: Universal WebAssembly Engine Fallback
+if [ "$BUILD_OK" = false ]; then
+  echo -e "${YELLOW}در حال اجرای کامپایلر ایزوله WebAssembly (@rollup/wasm-node)...${NC}"
+  rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* "$APP_DIR/.tmp"/* 2>/dev/null || true
+  npm install --no-save @rollup/wasm-node 2>/dev/null || true
+
   if npx vite build --emptyOutDir && npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs; then
     BUILD_OK=true
   fi
 fi
 
 if [ "$BUILD_OK" = false ]; then
-  echo -e "${RED}خطا: کامپایل پروژه ناموفق بود. لطفاً از وجود حداقل ۱ گیگابایت حافظه اطمینان حاصل کنید.${NC}"
+  echo -e "${RED}خطا: کامپایل پروژه ناموفق بود. لطفاً از وجود فضای دیسک کافی اطمینان حاصل کنید.${NC}"
   exit 1
 fi
 

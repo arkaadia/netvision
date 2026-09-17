@@ -25,6 +25,11 @@ export default defineConfig(() => {
               if (id.includes('motion')) return 'vendor-motion';
               return 'vendor-core';
             }
+            if (id.includes('src/version.ts')) return 'app-version';
+            if (id.includes('src/components/SchematicTopologyView')) return 'view-schematic';
+            if (id.includes('src/components/CiscoTerminalModal') || id.includes('src/components/MikroTikTerminalModal')) return 'modal-terminals';
+            if (id.includes('src/components/AddDeviceModal') || id.includes('src/components/EditDeviceModal') || id.includes('src/components/PortInspectorModal')) return 'modal-device-mgmt';
+            if (id.includes('src/components/TopologyDiscoveryModal') || id.includes('src/components/CaptureConfigModal')) return 'modal-discovery';
           },
         },
       },

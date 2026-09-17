@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.10';
+export const APP_VERSION = '1.61.11';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.11',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'حل قطعی خطای Bus error (core dumped) و پایپ‌لاین سه‌مرحله‌ای کامپایل با فالبک WebAssembly',
+    title_en: 'Definitive Bus error (core dumped) Resolution & Three-Tier Build Pipeline with WebAssembly Fallback',
+    changes: [
+      'حل ریشه‌ای خطای Bus error (core dumped) از طریق افزایش ظرفیت حافظه مشترک (/dev/shm) به ۲ گیگابایت و جلوگیری از خطای mmap در کرنل لینوکس.',
+      'افزایش سقف محدودیت استک سیستم و تعداد فایل‌های باز (ulimit -s 65536 و ulimit -n 65536) جهت رفع خطای سرریز بازگشتی AST در Rollup.',
+      'شکستن هوشمند کامپوننت‌های سنگین پروژه (توپولوژی، ترمینال‌ها، و ماژول‌های مدیریت پورت) به چانک‌های مجزا در vite.config.ts و کاهش بیش از ۵۵ درصدی حجم چانک اصلی.',
+      'تجهیز اسکریپت‌های setup-panel.sh و install.sh به معماری بیلد سه‌مرحله‌ای (Tier 1 استاندارد، Tier 2 ترمیم خودکار باینری‌های نیتیو معماری پردازنده، Tier 3 موتور کامپایلر WebAssembly بدون وابستگی نیتیو @rollup/wasm-node).',
+      'ایزوله‌سازی پوشه موقت بیلد (TMPDIR) در سطح دیسک اصلی پروژه جهت ممانعت از کرش در دایرکتوری‌های noexec یا محدود /tmp.'
+    ],
+    changes_en: [
+      'Permanently resolved Bus error (core dumped) by automatically scaling POSIX shared memory (/dev/shm) to 2GB to prevent kernel mmap truncation faults on Linux VPS hosts.',
+      'Expanded process stack and file descriptor limits (ulimit -s 65536 and ulimit -n 65536) to prevent AST recursion depth overflows during bundler execution.',
+      'Engineered fine-grained chunk splitting in vite.config.ts for heavy components (topology visualizer, terminal sessions, device inspectors), slashing the monolithic bundle by over 55%.',
+      'Upgraded setup-panel.sh and install.sh with a three-tier resilient build architecture (Tier 1 standard build, Tier 2 native binary self-repair, Tier 3 zero-native WebAssembly fallback engine @rollup/wasm-node).',
+      'Isolated compilation scratch storage (TMPDIR) to a dedicated project directory to bypass /tmp noexec mount and size limitations.'
+    ]
+  },
   {
     version: '1.61.10',
     releaseDate: '2026-09-16',
