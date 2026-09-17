@@ -1033,12 +1033,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
 
       wsRef.current.send(JSON.stringify({ type: 'input', data: trimmed + '\r\n' }));
       if (
-        cmdLower.startsWith('sh ip int') ||
-        cmdLower.startsWith('show ip int') ||
-        cmdLower.startsWith('sh int stat') ||
-        cmdLower.startsWith('show int') ||
-        cmdLower === 'sh run' ||
-        cmdLower === 'show running-config' ||
+        cmdLower.startsWith('sh ') ||
+        cmdLower.startsWith('show ') ||
         cmdLower === 'write memory' ||
         cmdLower === 'wr' ||
         cmdLower.startsWith('copy run') ||
@@ -1076,12 +1072,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             { id: String(Date.now() + 1), type: 'output', text: res.output || '(Command executed on device)' },
           ]);
           if (
-            cmdLower.startsWith('sh ip int') ||
-            cmdLower.startsWith('show ip int') ||
-            cmdLower.startsWith('sh int stat') ||
-            cmdLower.startsWith('show int') ||
-            cmdLower === 'sh run' ||
-            cmdLower === 'show running-config' ||
+            cmdLower.startsWith('sh ') ||
+            cmdLower.startsWith('show ') ||
             cmdLower === 'write memory' ||
             cmdLower === 'wr' ||
             cmdLower.startsWith('copy run') ||
@@ -1420,6 +1412,25 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     }
 
     // 9. Show Commands
+    if (
+      cmdLower.startsWith('sh ip int') ||
+      cmdLower.startsWith('show ip int') ||
+      cmdLower.startsWith('sh int stat') ||
+      cmdLower.startsWith('show int') ||
+      cmdLower.startsWith('sh vlan') ||
+      cmdLower.startsWith('show vlan') ||
+      cmdLower === 'sh run' ||
+      cmdLower === 'show running-config' ||
+      cmdLower.startsWith('show mac') ||
+      cmdLower.startsWith('sh mac') ||
+      cmdLower.startsWith('show cdp') ||
+      cmdLower.startsWith('sh cdp') ||
+      cmdLower.startsWith('show port-sec') ||
+      cmdLower.startsWith('sh port-sec')
+    ) {
+      setTimeout(() => handleSyncPorts(true), 300);
+    }
+
     if (cmdLower === 'show ip interface brief' || cmdLower === 'sh ip int br' || cmdLower === 'sh ip int brief') {
       const output = formatShowIpIntBrief(ports, device);
       appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);

@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.62.1';
+export const APP_VERSION = '1.62.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.62.2',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'ارتقای نحوه نمایش دستورات show در کنسول ترمینال سیسکو و همگام‌سازی بلادرنگ وضعیت اینترفیس‌ها',
+    title_en: 'Enhanced Cisco CLI show Commands Output and Real-time Interface State Synchronization',
+    changes: [
+      'اصلاح و یکپارچه‌سازی متد اجرای دستورات با پیشوند show/sh در ترمینال تعاملی سیسکو به نحوی که خروجی متنی دستورات به صورت کامل، یکپارچه، بدون صفحه‌بندی (no more pagination) و درست همانند ترمینال استاندارد Cisco IOS/IOS-XE مستقیماً در کنسول نمایش داده شود.',
+      'همگام‌سازی و اجرای خودکار فرآیند استعلام پورت‌ها و اینترفیس‌های پنل بالای ترمینال بلافاصله پس از ثبت و اجرای هرگونه دستور بررسی وضعیت (show commands) در تمامی مدهای ترمینال سخت‌افزاری و شبیه‌ساز.',
+      'حفظ پیکربندی terminal length 0 در ابتدای نشست جهت اطمینان از ارسال کامل دیتای خروجی بدون وقفه روی سوکت یا استریم زنده.'
+    ],
+    changes_en: [
+      'Unified show and sh command execution in Cisco CLI terminal to display full raw text output directly in the console with zero pagination (terminal length 0), matching authentic Cisco IOS/IOS-XE terminal behavior.',
+      'Automated real-time background synchronization of ports and interface states in the top status bar upon executing any show or diagnostic command across live SSH and simulated modes.',
+      'Retained terminal length 0 configuration at session start to ensure complete uninterrupted output stream without more prompts.'
+    ]
+  },
   {
     version: '1.62.1',
     releaseDate: '2026-09-17',
