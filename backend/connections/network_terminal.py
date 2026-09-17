@@ -33,6 +33,14 @@ except ImportError:
 try:
     import paramiko
     HAS_PARAMIKO = True
+    try:
+        from .ssh_compat import ensure_paramiko_compatibility
+    except ImportError:
+        try:
+            from connections.ssh_compat import ensure_paramiko_compatibility
+        except ImportError:
+            from ssh_compat import ensure_paramiko_compatibility
+    ensure_paramiko_compatibility()
 except ImportError:
     HAS_PARAMIKO = False
     paramiko = None

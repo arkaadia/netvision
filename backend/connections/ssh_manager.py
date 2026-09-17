@@ -143,41 +143,31 @@ class SSHConnectionManager:
 
         try:
             import paramiko
+            try:
+                from .ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
+            except ImportError:
+                try:
+                    from connections.ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
+                except ImportError:
+                    from ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
+
+            ensure_paramiko_compatibility()
+
             p_client = paramiko.SSHClient()
             p_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
-            try:
-                p_client.connect(
-                    hostname=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    timeout=5.0,
-                    look_for_keys=False,
-                    allow_agent=False
-                )
-                connected = True
-            except Exception as e_first:
-                # If first attempt fails (e.g. legacy Cisco switch with older key exchange/ciphers), retry with disabled_algorithms
-                if "cisco" in platform.lower() or any(k in str(e_first).lower() for k in ["kex", "algorithm", "no matching", "cipher", "negotiat"]):
-                    try:
-                        p_client.connect(
-                            hostname=host,
-                            port=port,
-                            username=username,
-                            password=password,
-                            timeout=6.0,
-                            look_for_keys=False,
-                            allow_agent=False,
-                            disabled_algorithms=dict(pubkeys=[])
-                        )
-                        connected = True
-                    except Exception as e_sec:
-                        err_msg = str(e_sec)
-                        connected = False
-                else:
-                    err_msg = str(e_first)
-                    connected = False
+            connected, err = connect_ssh_device(
+                p_client,
+                hostname=host,
+                port=port,
+                username=username,
+                password=password,
+                timeout=6.0,
+                banner_timeout=6.0,
+                auth_timeout=6.0
+            )
+            if not connected:
+                err_msg = str(err or "SSH Connection Failed")
 
             if connected:
                 transport = p_client.get_transport()

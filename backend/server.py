@@ -25,6 +25,21 @@ except ImportError:
     except ImportError:
         execute_real_hardware_probe = None
 
+try:
+    from backend.connections.ssh_compat import ensure_paramiko_compatibility, connect_ssh_device
+except ImportError:
+    try:
+        from connections.ssh_compat import ensure_paramiko_compatibility, connect_ssh_device
+    except ImportError:
+        try:
+            from ssh_compat import ensure_paramiko_compatibility, connect_ssh_device
+        except ImportError:
+            ensure_paramiko_compatibility = lambda: False
+            connect_ssh_device = None
+
+if ensure_paramiko_compatibility:
+    ensure_paramiko_compatibility()
+
 # Global active SSH sessions registry: session_id -> session dict
 ACTIVE_SSH_SESSIONS = {}
 ACTIVE_SESSIONS_LOCK = threading.Lock()
@@ -2441,15 +2456,31 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                     import paramiko
                     p_client = paramiko.SSHClient()
                     p_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    p_client.connect(
-                        hostname=ip,
-                        port=port,
-                        username=user,
-                        password=pwd,
-                        timeout=3.0,
-                        allow_agent=False,
-                        look_for_keys=False
-                    )
+                    
+                    if connect_ssh_device:
+                        auth_ok, auth_err = connect_ssh_device(
+                            p_client,
+                            hostname=ip,
+                            port=port,
+                            username=user,
+                            password=pwd,
+                            timeout=5.0,
+                            banner_timeout=5.0,
+                            auth_timeout=5.0
+                        )
+                        if not auth_ok:
+                            error_msg = f"Authentication check: {auth_err}"
+                    else:
+                        p_client.connect(
+                            hostname=ip,
+                            port=port,
+                            username=user,
+                            password=pwd,
+                            timeout=5.0,
+                            allow_agent=False,
+                            look_for_keys=False
+                        )
+
                     transport = p_client.get_transport()
                     if transport and transport.is_authenticated():
                         sec_opt = transport.get_security_options()

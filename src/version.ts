@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.72.0';
+export const APP_VERSION = '1.72.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.72.1',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'رفع خطای ناسازگاری الگوریتم‌های تبادل کلید SSH (KEX) در سوئیچ‌های سیسکو و تجهیزات شبکه قدیمی',
+    title_en: 'Fix Incompatible SSH Peer KEX Algorithm Error on Cisco Catalyst & Legacy Network Devices',
+    changes: [
+      'حل خطای Incompatible ssh peer (no acceptable kex algorithm) هنگام تست اتصال SSH در فرم ثبت دستگاه جدید (Register New Network Device).',
+      'ایجاد ماژول سازگاری جامع SSH (ssh_compat) و تزریق خودکار الگوریتم‌های تبادل کلید قدیمی سیسکو کاتالیست (diffie-hellman-group1-sha1, diffie-hellman-group14-sha1, diffie-hellman-group-exchange-sha1/256).',
+      'پشتیبانی کامل از الگوریتم‌های کلید میزبان و سایفرهای قدیمی نظیر ssh-rsa، ssh-dss، aes128-cbc و 3des-cbc در تمام ماژول‌های کشف خودکار سخت‌افزار، شبیه‌سازها و نشست‌های SSH.',
+      'افزودن مکانیسم چند لایه بازیابی (Multi-tier fallback) با سوکت مستقیم Transport و پشتیبانی خودکار از احراز هویت تعاملی (keyboard-interactive) در صورت رد پسورد مستقیم.'
+    ],
+    changes_en: [
+      'Fixed "Incompatible ssh peer (no acceptable kex algorithm)" error when testing SSH connections in the Register New Network Device modal.',
+      'Introduced a dedicated enterprise SSH compatibility layer (ssh_compat) injecting legacy Cisco Catalyst key exchange algorithms (diffie-hellman-group1-sha1, diffie-hellman-group14-sha1, diffie-hellman-group-exchange-sha1/256).',
+      'Comprehensive support for legacy host key types and ciphers including ssh-rsa, ssh-dss, aes128-cbc, and 3des-cbc across hardware discovery, connection managers, and terminal sessions.',
+      'Added multi-tier fallback architecture via raw Transport sockets and automated keyboard-interactive authentication fallback when standard password auth is refused.'
+    ]
+  },
   {
     version: '1.72.0',
     releaseDate: '2026-09-17',

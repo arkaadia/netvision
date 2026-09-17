@@ -479,38 +479,42 @@ def execute_real_hardware_probe(
             "message": err_msg_en if is_en else err_msg_fa
         }
 
-    # 2. Real Paramiko SSH Tunnel
+    # 2. Real Paramiko SSH Tunnel with Legacy Cisco & Network Device Compatibility
     import paramiko
+    try:
+        from .ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
+    except ImportError:
+        try:
+            from connections.ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
+        except ImportError:
+            from ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
+
+    ensure_paramiko_compatibility()
+
     p_client = paramiko.SSHClient()
     p_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
-    # Configure broad ciphers & key exchanges
     session_id = f"sess-master-{uuid.uuid4().hex[:8]}"
     raw_output_accumulated = ""
     banner = ""
     
-    try:
-        p_client.connect(
-            hostname=ip,
-            port=port,
-            username=username,
-            password=password,
-            timeout=5.0,
-            banner_timeout=5.0,
-            auth_timeout=5.0,
-            allow_agent=False,
-            look_for_keys=False
-        )
-        transport = p_client.get_transport()
-        if transport and transport.is_authenticated():
-            b = transport.get_banner()
-            if b:
-                banner = b.decode('utf-8', errors='ignore') if isinstance(b, bytes) else str(b)
-        else:
-            raise Exception("Authentication completed without active session.")
-    except Exception as auth_ex:
-        p_client.close()
-        clean_err = str(auth_ex)
+    conn_ok, conn_err = connect_ssh_device(
+        p_client,
+        hostname=ip,
+        port=port,
+        username=username,
+        password=password,
+        timeout=6.0,
+        banner_timeout=6.0,
+        auth_timeout=6.0
+    )
+
+    if not conn_ok:
+        try:
+            p_client.close()
+        except Exception:
+            pass
+        clean_err = str(conn_err or "Connection failed")
         err_en = f"SSH Authentication failed on {ip}:{port} for user '{username}': {clean_err}"
         err_fa = f"احراز هویت SSH در {ip}:{port} برای کاربر '{username}' ناموفق بود: {clean_err}"
         return {
@@ -523,6 +527,15 @@ def execute_real_hardware_probe(
             "error": err_en if is_en else err_fa,
             "message": err_en if is_en else err_fa
         }
+
+    try:
+        transport = p_client.get_transport()
+        if transport and transport.is_authenticated():
+            b = transport.get_banner()
+            if b:
+                banner = b.decode('utf-8', errors='ignore') if isinstance(b, bytes) else str(b)
+    except Exception:
+        pass
 
     # 3. Interactive Shell & Command Execution
     try:
