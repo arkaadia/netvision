@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.3';
+export const APP_VERSION = '1.66.4';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.4',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'حذف دکمه قطع اتصال/حذف لینک از روی کارت یادداشت چسبان',
+    title_en: 'Remove Unlink/Disconnect Button from Sticky Note Card',
+    changes: [
+      'حذف دکمه قطع اتصال (Unlink) از روی نشانگر دیوایس متصل در کارت یادداشت چسبان (Sticky Note) جهت جلوگیری از قطع ناخواسته ارتباط یادداشت با دیوایس.',
+      'غیرفعال‌سازی گزینه بدون اتصال (شناور آزاد) در منوی کشویی برای یادداشت‌هایی که قبلاً به یک دیوایس متصل شده‌اند.',
+      'رعایت کامل قانون عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization).'
+    ],
+    changes_en: [
+      'Removed the unlink/disconnect button from the linked device badge on sticky note cards to prevent accidental link removals.',
+      'Disabled the unlinked (float freely) option from the dropdown menu for sticky notes that are already linked to a device.',
+      'Fully adhered to strict localization rules ensuring zero Persian text when English mode is active.'
+    ]
+  },
   {
     version: '1.66.3',
     releaseDate: '2026-09-17',

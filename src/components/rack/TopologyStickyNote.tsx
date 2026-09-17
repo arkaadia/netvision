@@ -328,18 +328,16 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
                 </button>
               </div>
               <div className="max-h-36 overflow-y-auto space-y-1">
-                <button
-                  type="button"
-                  onClick={() => handleLinkDevice(undefined)}
-                  className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between ${
-                    !note.linkedDeviceId
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'hover:bg-white/10 text-slate-300'
-                  }`}
-                >
-                  <span>{isEn ? '— None (Float Freely) —' : '— بدون اتصال (شناور آزاد) —'}</span>
-                  {!note.linkedDeviceId && <Check className="w-3 h-3" />}
-                </button>
+                {!note.linkedDeviceId && (
+                  <button
+                    type="button"
+                    onClick={() => handleLinkDevice(undefined)}
+                    className="w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between bg-blue-600 text-white font-bold"
+                  >
+                    <span>{isEn ? '— None (Float Freely) —' : '— بدون اتصال (شناور آزاد) —'}</span>
+                    <Check className="w-3 h-3" />
+                  </button>
+                )}
                 {availableDevices.map((dev) => (
                   <button
                     key={dev.id}
@@ -367,25 +365,17 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
       {/* Linked Device Badge (if linked) */}
       {linkedDevice && (
         <div
-          className="mx-2 mt-1.5 px-2 py-0.5 rounded-md bg-black/10 flex items-center justify-between text-[9px] font-mono border border-black/15"
+          className="mx-2 mt-1.5 px-2 py-0.5 rounded-md bg-black/10 flex items-center text-[9px] font-mono border border-black/15"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             onClick={() => onFocusDevice && onFocusDevice(linkedDevice.id)}
-            className="flex items-center gap-1 font-bold truncate hover:underline"
+            className="w-full flex items-center gap-1 font-bold truncate hover:underline cursor-pointer"
             title={isEn ? 'Focus Device on Canvas' : 'مشاهده دیوایس متصل'}
           >
             <Link2 className="w-2.5 h-2.5 flex-shrink-0" />
             <span className="truncate">{linkedDevice.name}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLinkDevice(undefined)}
-            className="p-0.5 hover:bg-black/15 rounded text-rose-700"
-            title={isEn ? 'Unlink' : 'قطع اتصال'}
-          >
-            <X className="w-2.5 h-2.5" />
           </button>
         </div>
       )}
