@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.4';
+export const APP_VERSION = '1.66.5';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.5',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'اصلاح منطق بستن مودال یادداشت تجهیزات و افزودن هشدار تغییرات ذخیره‌نشده',
+    title_en: 'Fix Device Sticky Note Modal Close Logic and Add Unsaved Changes Confirmation',
+    changes: [
+      'اصلاح رفتار دکمه بستن (Close / Cancel / کلیک روی پس‌زمینه) در مودال یادداشت تجهیز شبکه؛ در صورت عدم وجود متن یا باز شدن اولیه بدون یادداشت، پنجره بلافاصله و بدون خطا بسته می‌شود.',
+      'افزودن پنجره هشدار و تایید ذخیره‌سازی تغییرات (Unsaved Changes) در صورتی که کاربر متن یا محتوای یادداشت را ویرایش کرده باشد، با گزینه‌های ذخیره و خروج، خروج بدون ذخیره و ادامه ویرایش.',
+      'جلوگیری از تلاش‌های ناموفق برای ذخیره‌سازی خودکار یادداشت‌های خالی هنگام بستن پنجره.',
+      'رعایت کامل قانون عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization).'
+    ],
+    changes_en: [
+      'Fixed the close behavior (Close / Cancel / backdrop click) in the Device Sticky Note Modal; if no text was entered or when opened cleanly for the first time, it closes immediately without errors.',
+      'Added an unsaved changes confirmation prompt whenever note content has been modified, providing clear options to Save & Close, Discard Changes, or Keep Editing.',
+      'Prevented unwanted and failing auto-save attempts for empty notes when closing the modal dialog.',
+      'Fully adhered to strict localization rules ensuring zero Persian text when English mode is active.'
+    ]
+  },
   {
     version: '1.66.4',
     releaseDate: '2026-09-17',

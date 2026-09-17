@@ -56,16 +56,24 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Prevent background re-renders or pollings from resetting user inputs while typing
   const isInitializedRef = useRef(false);
   const activeDeviceKeyRef = useRef<string | null>(null);
+  const initialValuesRef = useRef({
+    title: '',
+    content: '',
+    color: 'yellow' as StickyNoteColor,
+    isNew: true,
+  });
 
   useEffect(() => {
     if (!isOpen) {
       isInitializedRef.current = false;
       activeDeviceKeyRef.current = null;
+      setShowUnsavedPrompt(false);
       return;
     }
 
@@ -74,24 +82,67 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
       isInitializedRef.current = true;
       activeDeviceKeyRef.current = deviceKey;
       if (existingNote) {
-        setTitle(existingNote.title || '');
-        setContent(existingNote.content || '');
-        setColor(existingNote.color || 'yellow');
+        const t = existingNote.title || '';
+        const c = existingNote.content || '';
+        const col = existingNote.color || 'yellow';
+        setTitle(t);
+        setContent(c);
+        setColor(col);
+        initialValuesRef.current = { title: t, content: c, color: col, isNew: false };
       } else {
-        setTitle(isEn ? `Note: ${device.name}` : `یادداشت ${device.name}`);
+        const defaultTitle = isEn ? `Note: ${device.name}` : `یادداشت ${device.name}`;
+        setTitle(defaultTitle);
         setContent('');
         setColor('yellow');
+        initialValuesRef.current = { title: defaultTitle, content: '', color: 'yellow', isNew: true };
       }
       setConfirmDelete(false);
+      setShowUnsavedPrompt(false);
       setError(null);
     }
-  }, [isOpen, device?.id, isEn]);
+  }, [isOpen, device?.id, isEn, existingNote]);
 
-  // Keep ref of latest input values for auto-saving on click outside
-  const latestValuesRef = useRef({ title, content, color });
+  const checkHasChanges = () => {
+    const curTitle = title.trim();
+    const curContent = content.trim();
+    const curColor = color;
+
+    if (initialValuesRef.current.isNew) {
+      // If newly opened for device without existing note and content is empty:
+      // No actual note content was entered, so treat as untouched
+      return curContent.length > 0;
+    }
+
+    // For existing notes:
+    const prevTitle = initialValuesRef.current.title.trim();
+    const prevContent = initialValuesRef.current.content.trim();
+    const prevColor = initialValuesRef.current.color;
+
+    return curTitle !== prevTitle || curContent !== prevContent || curColor !== prevColor;
+  };
+
+  const handleRequestClose = () => {
+    if (checkHasChanges()) {
+      setShowUnsavedPrompt(true);
+    } else {
+      onClose();
+    }
+  };
+
   useEffect(() => {
-    latestValuesRef.current = { title, content, color };
-  }, [title, content, color]);
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showUnsavedPrompt) {
+          setShowUnsavedPrompt(false);
+        } else {
+          handleRequestClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, showUnsavedPrompt, title, content, color]);
 
   if (!isOpen || !device) return null;
 
@@ -129,53 +180,6 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
     }
   };
 
-  // Auto-save and close when user clicks outside the modal
-  const handleAutoSaveAndClose = async () => {
-    const curTitle = latestValuesRef.current.title.trim();
-    const curContent = latestValuesRef.current.content.trim();
-    const curColor = latestValuesRef.current.color;
-
-    const prevTitle = (existingNote?.title || '').trim();
-    const prevContent = (existingNote?.content || '').trim();
-    const prevColor = existingNote?.color || 'yellow';
-
-    const hasChanges = curTitle !== prevTitle || curContent !== prevContent || curColor !== prevColor;
-    const hasAnyContent = curTitle.length > 0 || curContent.length > 0;
-
-    if (hasChanges && hasAnyContent) {
-      try {
-        setIsSubmitting(true);
-        setError(null);
-
-        const noteToSave: CustomTopologyStickyNote = {
-          id: existingNote?.id || `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          x: existingNote?.x || 100,
-          y: existingNote?.y || 100,
-          width: existingNote?.width || 230,
-          title: curTitle || undefined,
-          content: curContent,
-          color: curColor,
-          linkedDeviceId: device.id,
-          createdAt: existingNote?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          viewMode: existingNote?.viewMode || 'card',
-        };
-
-        await persistDeviceNoteToDatabase(noteToSave);
-        onSaved?.(noteToSave);
-        onClose();
-        return;
-      } catch (err: any) {
-        setError(err.message || (isEn ? 'Failed to save note' : 'خطا در ذخیره یادداشت'));
-        return;
-      } finally {
-        setIsSubmitting(false);
-      }
-    }
-
-    onClose();
-  };
-
   const handleDelete = async () => {
     if (!existingNote) return;
     if (!confirmDelete) {
@@ -202,14 +206,69 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
       className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-5 modal-backdrop-blur overflow-y-auto"
       data-modal-backdrop="true"
       onClick={(e) => {
-        if (e.target === e.currentTarget) handleAutoSaveAndClose();
+        if (e.target === e.currentTarget) handleRequestClose();
       }}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div
-        className="w-full max-w-2xl bg-slate-900/95 dark:bg-slate-950/95 border border-amber-500/30 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-all animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-2xl bg-slate-900/95 dark:bg-slate-950/95 border border-amber-500/30 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-all animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Unsaved Changes Confirmation Overlay */}
+        {showUnsavedPrompt && (
+          <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-sm rounded-2xl flex items-center justify-center p-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-full max-w-md bg-slate-900 border border-amber-500/50 rounded-xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex-shrink-0">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {isEn ? 'Unsaved Changes' : 'تغییرات ذخیره‌نشده'}
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                    {isEn
+                      ? 'You have modified the note content. To keep your changes, you must save them before exiting.'
+                      : 'متن یا محتوای یادداشت تغییر کرده است. برای حفظ تغییرات باید آن را ذخیره کنید.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowUnsavedPrompt(false)}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 border border-white/10 transition cursor-pointer"
+                >
+                  {isEn ? 'Keep Editing' : 'ادامه ویرایش'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUnsavedPrompt(false);
+                    onClose();
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 transition cursor-pointer"
+                >
+                  {isEn ? 'Discard Changes' : 'خروج بدون ذخیره'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowUnsavedPrompt(false);
+                    await handleSave();
+                  }}
+                  disabled={isSubmitting}
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isEn ? 'Save & Close' : 'ذخیره و بستن'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-amber-500/15 via-slate-800/80 to-slate-900 border-b border-amber-500/20">
           <div className="flex items-center gap-2.5">
@@ -236,10 +295,7 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
             {onMinimize && (
               <button
                 type="button"
-                onClick={async () => {
-                  await handleAutoSaveAndClose();
-                  onMinimize();
-                }}
+                onClick={() => onMinimize()}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
                 title={isEn ? 'Minimize to Dock' : 'کوچک‌سازی به داک'}
               >
@@ -248,9 +304,9 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
             )}
             <button
               type="button"
-              onClick={handleAutoSaveAndClose}
+              onClick={handleRequestClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-              title={isEn ? 'Save and Close' : 'ذخیره و بستن'}
+              title={isEn ? 'Close' : 'بستن'}
             >
               <X className="w-4 h-4" />
             </button>
@@ -448,7 +504,7 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 border border-white/10 transition cursor-pointer"
             >
               {isEn ? 'Cancel' : 'انصراف'}
