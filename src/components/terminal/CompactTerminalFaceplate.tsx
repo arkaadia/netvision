@@ -37,6 +37,15 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
   const [activeHoverPort, setActiveHoverPort] = useState<SwitchPort | null>(null);
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
 
+  const isActuallyMikroTik = Boolean(
+    isMikroTik ||
+    (device?.vendor && device.vendor.toLowerCase().includes('mikrotik')) ||
+    (device?.role && device.role.toLowerCase().includes('mikrotik')) ||
+    (device?.model && device.model.toLowerCase().includes('mikrotik')) ||
+    ((device as any)?.device_type && String((device as any).device_type).toLowerCase().includes('mikrotik')) ||
+    ((device as any)?.os_type && String((device as any).os_type).toLowerCase().includes('routeros'))
+  );
+
   const handleOpenWinBox = (e: React.MouseEvent) => {
     e.stopPropagation();
     const targetHost = (device.ssh_host || device.ip || '').trim();
@@ -196,28 +205,30 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
             </span>
           </button>
 
-          {/* WinBox Native App Launcher Button */}
-          <button
-            type="button"
-            id="faceplate-winbox-btn"
-            onClick={handleOpenWinBox}
-            className={`group/wb flex items-center gap-1.5 text-[10px] font-mono font-bold px-2 py-0.5 rounded transition-all shadow-xs border shrink-0 cursor-pointer ${
-              isLightMode
-                ? 'bg-sky-50 hover:bg-sky-600 text-sky-800 hover:text-white border-sky-300 hover:border-sky-500 shadow-sky-100'
-                : 'bg-sky-950/80 hover:bg-sky-600 text-sky-200 hover:text-white border-sky-600/50 hover:border-sky-400'
-            } active:scale-95`}
-            title={
-              isEn
-                ? `Launch WinBox on your PC for ${device.name || device.ip} (${device.ip || 'No IP'})`
-                : `اجرای نرم‌افزار WinBox نصب شده روی سیستم شما برای ${device.name || device.ip} (${device.ip || 'بدون IP'})`
-            }
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0 group-hover/wb:scale-110 transition-transform" fill="none">
-              <rect x="2" y="2" width="20" height="20" rx="4" fill="#0284c7" />
-              <path d="M6 7h3l2 7 2-5 2 5 2-7h3l-3.5 11h-2.5l-2-5-2 5H9L6 7z" fill="white" />
-            </svg>
-            <span className="font-bold">WinBox</span>
-          </button>
+          {/* WinBox Native App Launcher Button (Strictly for MikroTik only) */}
+          {isActuallyMikroTik && (
+            <button
+              type="button"
+              id="faceplate-winbox-btn"
+              onClick={handleOpenWinBox}
+              className={`group/wb flex items-center gap-1.5 text-[10px] font-mono font-bold px-2 py-0.5 rounded transition-all shadow-xs border shrink-0 cursor-pointer ${
+                isLightMode
+                  ? 'bg-sky-50 hover:bg-sky-600 text-sky-800 hover:text-white border-sky-300 hover:border-sky-500 shadow-sky-100'
+                  : 'bg-sky-950/80 hover:bg-sky-600 text-sky-200 hover:text-white border-sky-600/50 hover:border-sky-400'
+              } active:scale-95`}
+              title={
+                isEn
+                  ? `Launch WinBox on your PC for ${device.name || device.ip} (${device.ip || 'No IP'})`
+                  : `اجرای نرم‌افزار WinBox نصب شده روی سیستم شما برای ${device.name || device.ip} (${device.ip || 'بدون IP'})`
+              }
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0 group-hover/wb:scale-110 transition-transform" fill="none">
+                <rect x="2" y="2" width="20" height="20" rx="4" fill="#0284c7" />
+                <path d="M6 7h3l2 7 2-5 2 5 2-7h3l-3.5 11h-2.5l-2-5-2 5H9L6 7z" fill="white" />
+              </svg>
+              <span className="font-bold">WinBox</span>
+            </button>
+          )}
 
           {/* Status Counts */}
           <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono shrink-0">
@@ -475,8 +486,8 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
         );
       })()}
 
-      {/* WinBox Launcher & Configuration Helper Modal */}
-      {isWinBoxModalOpen && (
+      {/* WinBox Launcher & Configuration Helper Modal (Strictly for MikroTik only) */}
+      {isActuallyMikroTik && isWinBoxModalOpen && (
         <WinBoxLauncherModal
           device={device}
           isOpen={isWinBoxModalOpen}

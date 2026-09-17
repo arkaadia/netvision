@@ -1662,6 +1662,24 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
     return list;
   }, [topology?.nodes, localNodes, inventoryDevices, currentCustomMap?.racks, currentCustomMap?.towers, currentCustomMap?.deviceIds]);
 
+  const handlePromptDeleteStickyNote = useCallback((noteId: string) => {
+    if (!currentCustomMap) return;
+    const noteToDelete = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
+    if (!noteToDelete) return;
+
+    const linkedDev = noteToDelete.linkedDeviceId
+      ? allAvailableDevices.find((d) => d.id === noteToDelete.linkedDeviceId)
+      : undefined;
+
+    setDeleteModalTarget({
+      type: 'note',
+      id: noteToDelete.id,
+      title: noteToDelete.title,
+      content: noteToDelete.content,
+      linkedDeviceName: linkedDev?.name,
+    });
+  }, [currentCustomMap, allAvailableDevices]);
+
   const handleRemoveDeviceFromCustomMap = useCallback((deviceId: string) => {
     if (!currentCustomMap) return;
     const cleanId = deviceId.replace(/^hw-/, '');
@@ -6171,7 +6189,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                     isEn={isEn}
                     availableDevices={allAvailableDevices}
                     onUpdate={handleUpdateStickyNote}
-                    onDelete={handleDeleteStickyNote}
+                    onDelete={handlePromptDeleteStickyNote}
                     onStartDrag={handleStickyNoteStartDrag}
                     onFocusDevice={(devId) => {
                       const p = nodePositions.get(devId) || customPositions[devId];
@@ -8098,6 +8116,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         target={deleteModalTarget}
         onConfirmDeleteDevice={handleConfirmDeleteDevice}
         onConfirmDeleteRack={handleConfirmDeleteRack}
+        onConfirmDeleteStickyNote={handleDeleteStickyNote}
       />
 
       {/* CDP & LLDP Topology Discovery Modal */}

@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.65.0';
+export const APP_VERSION = '1.66.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'محدودسازی دکمه اجرای WinBox منحصراً به ترمینال و مودال پورت میکروتیک و افزودن مودال تایید حذف یادداشت‌ها در نقشه شماتیک',
+    title_en: 'Restrict WinBox Launcher Exclusively to MikroTik Terminal & Port Modals, and Add Confirmation Prompt for Sticky Note Deletions',
+    changes: [
+      'محدودسازی دقیق نمایش دکمه اجرای مستقیم نرم‌افزار WinBox فقط به ترمینال‌ها و مودال مدیریت پورت‌های روتر میکروتیک و حذف کامل آن از ترمینال و پورت مودال سیسکو.',
+      'افزودن دکمه مستقیم اجرای WinBox با پروتکل اختصاصی winbox:// و راهنمای اتصال در نوار ابزار بالای کنسول مدیریت سخت‌افزار و پورت‌های روتر میکروتیک.',
+      'اصلاح فرآیند حذف یادداشت‌ها (Sticky Notes) در نقشه شماتیک توپولوژی؛ جلوگیری از حذف آنی ناخواسته و باز شدن پنجره تایید حذف اختصاصی به همراه پیش‌نمایش متن یادداشت قبل از اعمال نهایی.'
+    ],
+    changes_en: [
+      'Strictly restricted the direct WinBox desktop launcher button to MikroTik terminals and MikroTik port management modals, completely removing it from Cisco terminals and Cisco port modals.',
+      'Integrated a dedicated WinBox launcher button with native winbox:// protocol support and connection guidance directly into the MikroTik hardware & port management console toolbar.',
+      'Added a confirmation dialog for deleting sticky notes on the schematic topology canvas, preventing accidental instant deletion and providing note preview with cancellation options before permanent removal.'
+    ]
+  },
   {
     version: '1.65.0',
     releaseDate: '2026-09-17',

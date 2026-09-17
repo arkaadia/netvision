@@ -160,8 +160,14 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
           {/* Delete Button */}
           <button
             type="button"
-            onClick={() => onDelete(note.id)}
-            className="p-1 rounded hover:bg-rose-500/20 text-rose-800 hover:text-rose-950 transition opacity-70 hover:opacity-100"
+            id={`delete-note-btn-${note.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDelete(note.id);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="p-1 rounded hover:bg-rose-500/20 text-rose-800 hover:text-rose-950 transition opacity-70 hover:opacity-100 cursor-pointer"
             title={isEn ? 'Delete Note' : 'حذف یادداشت'}
           >
             <Trash2 className="w-3.5 h-3.5" />

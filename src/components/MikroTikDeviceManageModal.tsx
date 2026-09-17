@@ -34,6 +34,7 @@ import {
   MikroTikPortConfigUpdates
 } from './MikroTikPortConfigConfirmModal';
 import { MikroTikVPNSuite } from './vpn/MikroTikVPNSuite';
+import { WinBoxLauncherModal } from './terminal/WinBoxLauncherModal';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export interface MikroTikDeviceManageModalProps {
@@ -80,6 +81,7 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
     updates: MikroTikPortConfigUpdates;
   } | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isWinBoxModalOpen, setIsWinBoxModalOpen] = useState(false);
 
   // Edit Port Form State
   const [editAdminStatus, setEditAdminStatus] = useState<'enabled' | 'disabled'>('enabled');
@@ -333,6 +335,52 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Launch WinBox Native Desktop App Button */}
+            <button
+              type="button"
+              id="mikrotik-port-modal-winbox-btn"
+              onClick={() => {
+                const targetHost = (device.ssh_host || device.ip || '').trim();
+                const username = (device.ssh_username || 'admin').trim();
+                const password = device.ssh_password || '';
+                const winboxPort = (device as any)?.winbox_port || 8291;
+                if (targetHost) {
+                  const uri = password
+                    ? `winbox://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${targetHost}:${winboxPort}`
+                    : `winbox://${encodeURIComponent(username)}@${targetHost}:${winboxPort}`;
+                  try {
+                    const a = document.createElement('a');
+                    a.href = uri;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                      if (document.body.contains(a)) document.body.removeChild(a);
+                    }, 300);
+                  } catch (e) {
+                    console.warn('WinBox launch error:', e);
+                  }
+                }
+                setIsWinBoxModalOpen(true);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
+                isLightMode
+                  ? 'bg-sky-50 hover:bg-sky-600 text-sky-800 hover:text-white border-sky-300 hover:border-sky-500 shadow-sky-100'
+                  : 'bg-sky-950/80 hover:bg-sky-600 text-sky-200 hover:text-white border-sky-600/50 hover:border-sky-400'
+              }`}
+              title={
+                isEn
+                  ? `Launch WinBox on your PC for ${device.name || device.ip || 'MikroTik'}`
+                  : `اجرای مستقیم نرم‌افزار WinBox نصب شده روی سیستم شما برای ${device.name || device.ip || 'میکروتیک'}`
+              }
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none">
+                <rect x="2" y="2" width="20" height="20" rx="4" fill="#0284c7" />
+                <path d="M6 7h3l2 7 2-5 2 5 2-7h3l-3.5 11h-2.5l-2-5-2 5H9L6 7z" fill="white" />
+              </svg>
+              <span className="font-mono font-bold">WinBox</span>
+            </button>
+
             {/* Open CLI Terminal Button */}
             <button
               type="button"
@@ -1190,6 +1238,16 @@ ${ports.map((p) => `add bridge=bridge1 interface=${p.port_id} pvid=${p.vlan || 1
             targetPortIds={confirmModal.targetPortIds}
             updates={confirmModal.updates}
             isLoading={isExecuting}
+            isLightMode={isLightMode}
+          />
+        )}
+
+        {/* Direct WinBox Launcher & Setup Modal */}
+        {isWinBoxModalOpen && device && (
+          <WinBoxLauncherModal
+            device={device}
+            isOpen={isWinBoxModalOpen}
+            onClose={() => setIsWinBoxModalOpen(false)}
             isLightMode={isLightMode}
           />
         )}
