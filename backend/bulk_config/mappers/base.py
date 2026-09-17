@@ -6,6 +6,42 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Tuple
 from ..models import CommandStep, IdempotencyResult, ErrorType
 
+def parse_ip_and_mask(ip_input: str, mask_input: str = "255.255.255.0") -> Tuple[str, str, int]:
+    """
+    Parses arbitrary IP and Subnet mask/CIDR inputs into standard components:
+    Returns (clean_ip, dotted_netmask, cidr_prefix)
+    e.g. ("192.168.10.1", "255.255.255.0", 24)
+    """
+    ip_raw = (ip_input or "").strip()
+    mask_raw = (mask_input or "255.255.255.0").strip()
+
+    # Check if IP has CIDR attached (e.g. 192.168.10.1/24)
+    if "/" in ip_raw:
+        parts = ip_raw.split("/", 1)
+        ip_raw = parts[0].strip()
+        mask_raw = parts[1].strip()
+
+    # Parse prefix length
+    clean_mask_str = mask_raw.lstrip("/")
+    if clean_mask_str.isdigit():
+        cidr = max(0, min(32, int(clean_mask_str)))
+        mask_int = (0xFFFFFFFF << (32 - cidr)) & 0xFFFFFFFF
+        dotted = f"{(mask_int >> 24) & 0xFF}.{(mask_int >> 16) & 0xFF}.{(mask_int >> 8) & 0xFF}.{mask_int & 0xFF}"
+        return (ip_raw, dotted, cidr)
+
+    # Parse dotted decimal mask
+    parts = clean_mask_str.split(".")
+    if len(parts) == 4:
+        try:
+            binary = "".join(f"{int(p):08b}" for p in parts)
+            cidr = binary.count("1")
+            return (ip_raw, clean_mask_str, cidr)
+        except ValueError:
+            pass
+
+    # Default fallback /24
+    return (ip_raw, "255.255.255.0", 24)
+
 class BaseOSCommandMapper(ABC):
     platform_id: str = "generic"
     platform_name: str = "Generic OS"

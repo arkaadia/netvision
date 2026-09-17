@@ -5,7 +5,7 @@ Includes pre-checks, idempotency handling, and specific RouterOS error classific
 """
 import re
 from typing import Dict, Any, List, Optional, Tuple
-from .base import BaseOSCommandMapper
+from .base import BaseOSCommandMapper, parse_ip_and_mask
 from ..models import CommandStep, IdempotencyResult, ErrorType
 
 class MikroTikCommandMapper(BaseOSCommandMapper):
@@ -17,12 +17,27 @@ class MikroTikCommandMapper(BaseOSCommandMapper):
         model = (device.get("model") or "").lower()
         firmware = (device.get("firmware") or "").lower()
         name = (device.get("name") or "").lower()
+        vendor = (device.get("vendor") or "").lower()
 
-        if "mikrotik" in platform or "routeros" in platform:
+        if "mikrotik" in platform or "routeros" in platform or "mikrotik" in vendor:
             return True
-        if "mikrotik" in model or "routerboard" in model or "crs" in model or "ccr" in model or "hex" in model or "hap" in model or "rb" in model:
+        if any(kw in model for kw in ["mikrotik", "routerboard", "crs", "css", "ccr", "hex", "hap", "rb"]):
             return True
         if "routeros" in firmware or "mikrotik" in name:
+            return True
+        return False
+
+    def is_crs_or_switch(self, device: Dict[str, Any]) -> bool:
+        """Determines whether the device is a Cloud Router Switch (CRS) or operates in switch mode."""
+        dev_type = (device.get("type") or "").lower()
+        model = (device.get("model") or "").lower()
+        role = (device.get("role") or "").lower()
+
+        if dev_type == "switch":
+            return True
+        if any(kw in model for kw in ["crs", "css"]):
+            return True
+        if "switch" in role:
             return True
         return False
 
@@ -35,7 +50,10 @@ class MikroTikCommandMapper(BaseOSCommandMapper):
         return "/system backup save name=netman_auto_save"
 
     def get_idempotency_check_command(self, template_id: str, params: Dict[str, Any]) -> Optional[str]:
-        if template_id == "create_local_user" or template_id == "delete_local_user":
+        if template_id == "create_vlan" or template_id == "delete_vlan":
+            vlan_id = int(params.get("vlan_id", 10))
+            return f"/interface vlan print where vlan-id={vlan_id}"
+        elif template_id == "create_local_user" or template_id == "delete_local_user":
             username = params.get("username", "").strip()
             return f'/user print where name="{username}"'
         elif template_id == "set_dns_servers":
@@ -48,7 +66,25 @@ class MikroTikCommandMapper(BaseOSCommandMapper):
 
     def evaluate_idempotency(self, template_id: str, params: Dict[str, Any], raw_output: str) -> IdempotencyResult:
         output = (raw_output or "").strip()
-        if template_id == "create_local_user":
+        if template_id == "create_vlan":
+            vlan_id = str(params.get("vlan_id", 10)).strip()
+            if f"vlan-id={vlan_id}" in output or vlan_id in output:
+                return IdempotencyResult(
+                    already_configured=True,
+                    reason_fa=f"اینترفیس VLAN {vlan_id} از قبل در RouterOS ثبت شده است (تنظیمات آی‌پی و Bridge VLAN به‌روزرسانی می‌شود).",
+                    reason_en=f"VLAN {vlan_id} interface already exists in RouterOS; updating IP and Bridge VLAN table.",
+                    should_skip=False
+                )
+        elif template_id == "delete_vlan":
+            vlan_id = str(params.get("vlan_id", 10)).strip()
+            if output == "" or "no items found" in output.lower():
+                return IdempotencyResult(
+                    already_configured=True,
+                    reason_fa=f"وی‌لن {vlan_id} در میکروتیک موجود نیست؛ عملیات حذف با موفقیت رد شد.",
+                    reason_en=f"VLAN {vlan_id} not present in RouterOS; deletion skipped safely.",
+                    should_skip=True
+                )
+        elif template_id == "create_local_user":
             username = params.get("username", "").strip()
             # If user already exists in RouterOS
             if username.lower() in output.lower():
@@ -94,7 +130,81 @@ class MikroTikCommandMapper(BaseOSCommandMapper):
     def map_command(self, template_id: str, params: Dict[str, Any], device: Dict[str, Any]) -> List[CommandStep]:
         steps: List[CommandStep] = []
 
-        if template_id == "create_local_user":
+        if template_id == "create_vlan":
+            vlan_id = int(params.get("vlan_id", 10))
+            vlan_name = (params.get("vlan_name") or f"vlan{vlan_id}").strip().replace(" ", "_")
+            configure_ip = bool(params.get("configure_ip_gateway", False))
+            gw_ip_raw = (params.get("gateway_ip") or "").strip()
+            subnet_mask_raw = (params.get("subnet_mask") or "255.255.255.0").strip()
+            access_ports_raw = (params.get("assign_access_ports") or "").strip()
+            trunk_ports_raw = (params.get("add_to_trunk_ports") or "").strip()
+            parent_iface = (params.get("mikrotik_parent_interface") or "bridge").strip() or "bridge"
+            clean_ip, dotted_mask, cidr = parse_ip_and_mask(gw_ip_raw, subnet_mask_raw)
+            ip_with_cidr = f"{clean_ip}/{cidr}" if clean_ip else ""
+
+            is_crs = self.is_crs_or_switch(device)
+            dev_label = f"MikroTik CRS Switch ({device.get('model') or 'CRS'})" if is_crs else f"MikroTik Router ({device.get('model') or 'RouterOS'})"
+
+            # 1. Create or Update /interface vlan
+            steps.append(CommandStep(
+                name="ensure_mikrotik_vlan_interface",
+                command=f':if ([:len [/interface vlan find vlan-id={vlan_id}]] = 0) do={{ /interface vlan add name="{vlan_name}" vlan-id={vlan_id} interface={parent_iface} comment="NetMan Managed" }} else={{ /interface vlan set [find vlan-id={vlan_id}] name="{vlan_name}" interface={parent_iface} }}',
+                description_fa=f"[{dev_label}] ایجاد/به‌روزرسانی اینترفیس VLAN {vlan_id} به نام «{vlan_name}» روی {parent_iface}",
+                description_en=f"[{dev_label}] Create/update /interface vlan {vlan_id} ('{vlan_name}') on {parent_iface}",
+                mode="exec"
+            ))
+
+            # 2. Configure L3 Gateway IP if requested
+            if configure_ip and clean_ip:
+                steps.append(CommandStep(
+                    name="configure_mikrotik_vlan_ip",
+                    command=f':if ([:len [/ip address find interface="{vlan_name}"]] = 0) do={{ /ip address add address={ip_with_cidr} interface="{vlan_name}" comment="Gateway for VLAN {vlan_id}" }} else={{ /ip address set [find interface="{vlan_name}"] address={ip_with_cidr} }}',
+                    description_fa=f"[{dev_label}] انتساب آدرس IP گیت‌وی {ip_with_cidr} به اینترفیس {vlan_name}",
+                    description_en=f"[{dev_label}] Assign Gateway IP {ip_with_cidr} to interface {vlan_name}",
+                    mode="exec"
+                ))
+
+            # 3. Register in /interface bridge vlan table (Bridge VLAN Filtering)
+            trunk_ports = [p.strip() for p in trunk_ports_raw.split(",") if p.strip()]
+            access_ports = [p.strip() for p in access_ports_raw.split(",") if p.strip()]
+            tagged_ports = [parent_iface] + trunk_ports
+            tagged_str = ",".join(tagged_ports)
+            untagged_str = ",".join(access_ports) if access_ports else ""
+            untagged_arg = f' untagged="{untagged_str}"' if untagged_str else ""
+
+            steps.append(CommandStep(
+                name="configure_mikrotik_bridge_vlan",
+                command=f':if ([:len [/interface bridge find name="{parent_iface}"]] > 0) do={{ :if ([:len [/interface bridge vlan find bridge="{parent_iface}" and vlan-ids~"\\\\b{vlan_id}\\\\b"]] = 0) do={{ /interface bridge vlan add bridge="{parent_iface}" vlan-ids={vlan_id} tagged="{tagged_str}"{untagged_arg} comment="VLAN {vlan_id} Filtering" }} else={{ /interface bridge vlan set [find bridge="{parent_iface}" and vlan-ids~"\\\\b{vlan_id}\\\\b"] tagged="{tagged_str}"{untagged_arg} }} }}',
+                description_fa=f"[{dev_label}] ثبت وی‌لن {vlan_id} در جدول Bridge VLAN Filtering با پورت‌های تگ شده ({tagged_str}){f' و بدون تگ ({untagged_str})' if untagged_str else ''}",
+                description_en=f"[{dev_label}] Register VLAN {vlan_id} in Bridge VLAN table (tagged: {tagged_str}{f', untagged: {untagged_str}' if untagged_str else ''})",
+                mode="exec"
+            ))
+
+            # 4. Set PVID on Access Ports
+            if access_ports:
+                ports_array = ",".join([f'"{p}"' for p in access_ports])
+                steps.append(CommandStep(
+                    name="set_mikrotik_access_pvid",
+                    command=f':foreach p in={{{ports_array}}} do={{ :if ([:len [/interface bridge port find interface=$p]] > 0) do={{ /interface bridge port set [find interface=$p] pvid={vlan_id} }} }}',
+                    description_fa=f"[{dev_label}] تنظیم PVID={vlan_id} روی پورت‌های دسترسی ({','.join(access_ports)})",
+                    description_en=f"[{dev_label}] Set PVID={vlan_id} on bridge access ports ({','.join(access_ports)})",
+                    mode="exec"
+                ))
+
+        elif template_id == "delete_vlan":
+            vlan_id = int(params.get("vlan_id", 10))
+            is_crs = self.is_crs_or_switch(device)
+            dev_label = f"MikroTik CRS Switch ({device.get('model') or 'CRS'})" if is_crs else f"MikroTik Router ({device.get('model') or 'RouterOS'})"
+
+            steps.append(CommandStep(
+                name="delete_mikrotik_vlan",
+                command=f':if ([:len [/interface vlan find vlan-id={vlan_id}]] > 0) do={{ /interface vlan remove [find vlan-id={vlan_id}] }}; :if ([:len [/interface bridge vlan find vlan-ids~"\\\\b{vlan_id}\\\\b"]] > 0) do={{ /interface bridge vlan remove [find vlan-ids~"\\\\b{vlan_id}\\\\b"] }}',
+                description_fa=f"[{dev_label}] حذف کامل اینترفیس VLAN {vlan_id} و رکورد Bridge VLAN از RouterOS",
+                description_en=f"[{dev_label}] Remove VLAN {vlan_id} interface and Bridge VLAN table entry from RouterOS",
+                mode="exec"
+            ))
+
+        elif template_id == "create_local_user":
             username = params.get("username", "").strip()
             password = params.get("password", "").strip()
             priv = int(params.get("privilege_level", 15))

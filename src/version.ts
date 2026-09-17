@@ -10,9 +10,36 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.67.0';
+export const APP_VERSION = '1.68.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.68.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'افزودن امکان ایجاد و مدیریت اصولی وی‌لن (VLAN) با تشخیص خودکار نوع تجهیز در پیکربندی گروهی',
+    title_en: 'Add Principled VLAN Creation & Management with Automatic Hardware Detection in Bulk Configuration',
+    changes: [
+      'افزودن قالب‌های اصولی و مهندسی ایجاد (Create VLAN) و حذف (Delete VLAN) به الگوهای پیکربندی گروهی (Bulk Device Configuration).',
+      'تشخیص هوشمند نوع دستگاه (Device Hardware & Role Awareness) به صورت خودکار بین سوئیچ و روتر در تمامی برندها.',
+      'پیاده‌سازی سینتکس استاندارد برای سوئیچ‌های سیسکو (L2/L3 Switches): ایجاد دیتابیس VLAN، ساخت اینترفیس مجازی SVI (Vlan ID) با آدرس و ساب‌نت مسک دلخواه، انتساب رنج پورت‌های Access و افزودن به لیست مجاز پورت‌های Trunk.',
+      'پیاده‌سازی سناریوی روترهای سیسکو (Router-on-a-Stick): ایجاد زیرواسط (Sub-interface) با کپسوله‌سازی استاندار dot1Q و آی‌پی گیت‌وی لایه سه به صورت خودکار.',
+      'پیاده‌سازی اصولی برای تجهیزات میکروتیک: ایجاد اینترفیس VLAN، اختصاص آدرس IP به صورت CIDR، ثبت استاندارد در جدول Bridge VLAN Filtering و تنظیم خودکار PVID روی پورت‌های Access.',
+      'قابلیت بررسی ادمپوتنت (Idempotency) جهت جلوگیری از ایجاد مجدد یا تغییرات ناخواسته در صورت وجود قبلی VLAN.',
+      'پشتیبانی از انواع فیلدهای فرم شامل سوئیچ‌های بولین تعاملی، گزینشگرها و اعتبارسنجی CIDR و ساب‌نت مسک.',
+      'رعایت صددرصدی استاندارد دو زبانه و عدم وجود هیچ‌گونه متن فارسی در حالت انگلیسی.'
+    ],
+    changes_en: [
+      'Added principled, engineering-grade Create VLAN and Delete VLAN templates to the Bulk Device Configuration suite.',
+      'Built intelligent hardware and role awareness automatically distinguishing between switches and routers across all vendors.',
+      'Implemented standard Cisco Switch syntax: VLAN database registration, Layer 3 SVI (interface Vlan) with IP & subnet mask, access port range assignment, and trunk allowed list integration.',
+      'Implemented standard Cisco Router-on-a-Stick syntax: automatic sub-interface provisioning with IEEE 802.1Q encapsulation and L3 gateway IP.',
+      'Engineered principled MikroTik RouterOS syntax: /interface vlan creation, CIDR IP address assignment, /interface bridge vlan filtering table registration, and access port PVID setting.',
+      'Integrated real-time idempotency checks to prevent redundant changes or conflicts if the VLAN already exists.',
+      'Enhanced parameter form rendering with interactive boolean toggles, custom selectors, and mask validators.',
+      'Strictly enforced bilingual localization compliance with zero Persian text displayed in English mode.'
+    ]
+  },
   {
     version: '1.67.0',
     releaseDate: '2026-09-17',

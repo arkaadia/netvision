@@ -24,6 +24,8 @@ import {
   Cpu,
   Power,
   Lock,
+  GitFork,
+  Trash2,
   ArrowRight,
   Database,
   Info,
@@ -524,10 +526,18 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                       >
                         {cat === 'all'
                           ? isEn ? 'All' : 'همه'
-                          : cat === 'users'
+                          : cat === 'vlan_management'
+                          ? isEn ? 'VLAN' : 'وی‌لن‌ها'
+                          : cat === 'user_management' || cat === 'users'
                           ? isEn ? 'Users' : 'کاربران'
                           : cat === 'network_services'
                           ? isEn ? 'Services' : 'سرویس‌ها'
+                          : cat === 'monitoring_logging'
+                          ? isEn ? 'Monitoring' : 'مانیتورینگ'
+                          : cat === 'system_security'
+                          ? isEn ? 'Security' : 'امنیت'
+                          : cat === 'maintenance_backup'
+                          ? isEn ? 'Backup' : 'پشتیبان‌گیری'
                           : cat === 'system_lifecycle'
                           ? isEn ? 'System' : 'سیستم'
                           : cat === 'operations'
@@ -573,7 +583,9 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                                     : 'bg-white/5 text-slate-400'
                                 }`}
                               >
-                                {tpl.category === 'users' ? (
+                                {tpl.category === 'vlan_management' ? (
+                                  tpl.id === 'delete_vlan' ? <Trash2 className="w-4 h-4" /> : <GitFork className="w-4 h-4" />
+                                ) : tpl.category === 'users' || tpl.category === 'user_management' ? (
                                   <Users className="w-4 h-4" />
                                 ) : tpl.category === 'network_services' ? (
                                   <Network className="w-4 h-4" />
@@ -672,6 +684,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {activeTemplate.parameters.map((param) => {
                             const isRequired = param.required;
+                            const isBoolean = param.type === 'boolean';
                             const isPassword = param.type === 'password';
                             const isSelect = param.type === 'select';
                             const isTextarea = param.type === 'textarea';
@@ -679,14 +692,40 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                             return (
                               <div
                                 key={param.name}
-                                className={`space-y-1 ${isTextarea ? 'sm:col-span-2' : ''}`}
+                                className={`space-y-1 ${isTextarea || isBoolean ? 'sm:col-span-2' : ''}`}
                               >
                                 <label className="block text-xs font-medium text-slate-300">
                                   {isEn ? param.labelEn : param.labelFa}
                                   {isRequired && <span className="text-rose-400 ml-1 font-bold">*</span>}
                                 </label>
 
-                                {isSelect ? (
+                                {isBoolean ? (
+                                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/80 border border-white/10">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setFormParams((prev) => ({
+                                          ...prev,
+                                          [param.name]: !prev[param.name],
+                                        }))
+                                      }
+                                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                        formParams[param.name] ? 'bg-cyan-500' : 'bg-slate-700'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                          formParams[param.name] ? 'translate-x-4' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </button>
+                                    <span className="text-xs text-slate-300">
+                                      {formParams[param.name]
+                                        ? isEn ? 'Enabled (Active)' : 'فعال‌شده (تنظیم می‌شود)'
+                                        : isEn ? 'Disabled (Skipped)' : 'غیرفعال (صرف‌نظر می‌شود)'}
+                                    </span>
+                                  </div>
+                                ) : isSelect ? (
                                   <select
                                     value={formParams[param.name] ?? ''}
                                     onChange={(e) =>

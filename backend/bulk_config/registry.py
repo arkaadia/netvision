@@ -83,6 +83,136 @@ class OSCommandMapperRegistry:
         # Register Predefined Templates catalog
         templates_defs = [
             CommandTemplate(
+                id="create_vlan",
+                category="vlan_management",
+                title="ایجاد و پیکربندی اصولی وی‌لن (Create VLAN)",
+                title_en="Create & Configure VLAN",
+                description="ایجاد مهندسی و استاندارد VLAN با تفکیک دقیق سوئیچ و روتر سیسکو (L2 VLAN / SVI / Dot1Q Sub-interface) و میکروتیک (Bridge VLAN Filtering / Interface VLAN)",
+                description_en="Engineering-grade VLAN creation with dynamic hardware detection for Cisco (Switch L2/SVI vs Router Dot1Q) and MikroTik (Bridge VLAN Filtering / Interface VLAN)",
+                icon="GitFork",
+                parameters=[
+                    {
+                        "name": "vlan_id",
+                        "labelFa": "شناسه عددی وی‌لن (VLAN ID)",
+                        "labelEn": "VLAN ID (1-4094)",
+                        "type": "number",
+                        "required": True,
+                        "placeholder": "e.g. 10, 20, 100",
+                        "default": 10
+                    },
+                    {
+                        "name": "vlan_name",
+                        "labelFa": "نام وی‌لن (VLAN Name)",
+                        "labelEn": "VLAN Name",
+                        "type": "string",
+                        "required": True,
+                        "placeholder": "e.g. DATA_USERS, VOICE, SERVERS_DMZ",
+                        "default": "VLAN_10"
+                    },
+                    {
+                        "name": "configure_ip_gateway",
+                        "labelFa": "پیکربندی گیت‌وی لایه سه (L3 SVI / Gateway IP)",
+                        "labelEn": "Configure L3 SVI / Gateway IP",
+                        "type": "boolean",
+                        "required": False,
+                        "default": False
+                    },
+                    {
+                        "name": "gateway_ip",
+                        "labelFa": "آدرس IP گیت‌وی (در صورت فعال‌سازی لایه سه)",
+                        "labelEn": "Gateway IP Address",
+                        "type": "string",
+                        "required": False,
+                        "placeholder": "e.g. 192.168.10.1",
+                        "default": ""
+                    },
+                    {
+                        "name": "subnet_mask",
+                        "labelFa": "ماسک شبکه یا طول پیشوند (Subnet Mask / CIDR)",
+                        "labelEn": "Subnet Mask or CIDR Prefix",
+                        "type": "string",
+                        "required": False,
+                        "placeholder": "255.255.255.0 or /24",
+                        "default": "255.255.255.0"
+                    },
+                    {
+                        "name": "assign_access_ports",
+                        "labelFa": "انتساب پورت‌های Access (اختیاری)",
+                        "labelEn": "Assign Access Ports (Optional)",
+                        "type": "string",
+                        "required": False,
+                        "placeholder": "Cisco: Gi1/0/1-4 | MikroTik: ether2,ether3",
+                        "default": ""
+                    },
+                    {
+                        "name": "add_to_trunk_ports",
+                        "labelFa": "افزودن به پورت‌های ترانک (Trunk / Tagged Ports - اختیاری)",
+                        "labelEn": "Add to Trunk Ports (Optional)",
+                        "type": "string",
+                        "required": False,
+                        "placeholder": "Cisco: Gi1/0/24 | MikroTik: ether1,sfp-sfpplus1",
+                        "default": ""
+                    },
+                    {
+                        "name": "mikrotik_parent_interface",
+                        "labelFa": "اینترفیس والد در میکروتیک (Parent Bridge / Interface)",
+                        "labelEn": "MikroTik Parent Interface (Bridge)",
+                        "type": "string",
+                        "required": False,
+                        "placeholder": "bridge (recommended) or ether1",
+                        "default": "bridge"
+                    },
+                    {
+                        "name": "cisco_router_parent_interface",
+                        "labelFa": "اینترفیس فیزیکی روتر سیسکو (Router-on-a-Stick Parent)",
+                        "labelEn": "Cisco Router Parent Physical Interface",
+                        "type": "string",
+                        "required": False,
+                        "placeholder": "e.g. GigabitEthernet0/0/0 or GigabitEthernet0/0",
+                        "default": "GigabitEthernet0/0/0"
+                    }
+                ],
+                is_dangerous=False,
+                supports_backup=True,
+                supports_idempotency=True,
+                default_timeout_sec=30,
+                requires_save_step=True
+            ),
+            CommandTemplate(
+                id="delete_vlan",
+                category="vlan_management",
+                title="حذف وی‌لن از تجهیزات (Delete VLAN)",
+                title_en="Delete VLAN from Devices",
+                description="حذف امن و اصولی VLAN از پایگاه داده و اینترفیس‌های تجهیز با حذف خودکار تخصیص‌ها و اینترفیس‌های متناظر",
+                description_en="Safely delete VLAN database definitions, SVI interfaces, and bridge bindings across selected devices",
+                icon="Trash2",
+                parameters=[
+                    {
+                        "name": "vlan_id",
+                        "labelFa": "شناسه عددی وی‌لن جهت حذف (VLAN ID)",
+                        "labelEn": "VLAN ID to Delete",
+                        "type": "number",
+                        "required": True,
+                        "placeholder": "e.g. 10",
+                        "default": 10
+                    },
+                    {
+                        "name": "remove_svi",
+                        "labelFa": "حذف اینترفیس L3 SVI متناظر (no interface Vlan)",
+                        "labelEn": "Remove Associated L3 SVI Interface",
+                        "type": "boolean",
+                        "required": False,
+                        "default": True
+                    }
+                ],
+                is_dangerous=True,
+                confirmation_keyword="DELETE",
+                supports_backup=True,
+                supports_idempotency=True,
+                default_timeout_sec=25,
+                requires_save_step=True
+            ),
+            CommandTemplate(
                 id="create_local_user",
                 category="user_management",
                 title="ایجاد کاربر محلی جدید (Local User)",
