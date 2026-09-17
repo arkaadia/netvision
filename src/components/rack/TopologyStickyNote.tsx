@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CustomTopologyStickyNote, StickyNoteColor, Device } from '../../types';
 import { Trash2, GripHorizontal, Link2, Pin, Check, X } from 'lucide-react';
 
@@ -90,29 +90,95 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
   const [isLinkingOpen, setIsLinkingOpen] = useState(false);
   const palette = COLOR_PALETTES[note.color] || COLOR_PALETTES.yellow;
 
+  // Local state for title and content to prevent premature server sync and overwrites during typing
+  const [localTitle, setLocalTitle] = useState(note.title || '');
+  const [localContent, setLocalContent] = useState(note.content || '');
+  const isFocusedRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const latestValuesRef = useRef({ title: localTitle, content: localContent });
+  useEffect(() => {
+    latestValuesRef.current = { title: localTitle, content: localContent };
+  }, [localTitle, localContent]);
+
+  // Sync from props only when note ID changes or when not actively editing
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setLocalTitle(note.title || '');
+      setLocalContent(note.content || '');
+    }
+  }, [note.id, note.title, note.content]);
+
+  // Commit changes to parent only when user finishes typing or clicks outside
+  const commitChanges = useCallback(() => {
+    const currentTitle = latestValuesRef.current.title;
+    const currentContent = latestValuesRef.current.content;
+    const prevTitle = note.title || '';
+    const prevContent = note.content || '';
+
+    if (currentTitle !== prevTitle || currentContent !== prevContent) {
+      onUpdate({
+        ...note,
+        title: currentTitle,
+        content: currentContent,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }, [note, onUpdate]);
+
+  // Click outside listener: commit changes whenever user clicks anywhere outside this sticky note
+  useEffect(() => {
+    const handleDocumentMouseDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        if (isFocusedRef.current) {
+          isFocusedRef.current = false;
+          commitChanges();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown, true);
+    };
+  }, [commitChanges]);
+
+  const handleBlur = (e: React.FocusEvent) => {
+    if (containerRef.current && containerRef.current.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    isFocusedRef.current = false;
+    commitChanges();
+  };
+
   const linkedDevice = note.linkedDeviceId
     ? availableDevices.find((d) => d.id === note.linkedDeviceId)
     : null;
 
   const handleColorChange = (c: StickyNoteColor) => {
-    onUpdate({ ...note, color: c, updatedAt: new Date().toISOString() });
-  };
-
-  const handleTitleChange = (val: string) => {
-    onUpdate({ ...note, title: val, updatedAt: new Date().toISOString() });
-  };
-
-  const handleContentChange = (val: string) => {
-    onUpdate({ ...note, content: val, updatedAt: new Date().toISOString() });
+    onUpdate({
+      ...note,
+      title: latestValuesRef.current.title,
+      content: latestValuesRef.current.content,
+      color: c,
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const handleLinkDevice = (deviceId?: string) => {
-    onUpdate({ ...note, linkedDeviceId: deviceId, updatedAt: new Date().toISOString() });
+    onUpdate({
+      ...note,
+      title: latestValuesRef.current.title,
+      content: latestValuesRef.current.content,
+      linkedDeviceId: deviceId,
+      updatedAt: new Date().toISOString(),
+    });
     setIsLinkingOpen(false);
   };
 
   return (
     <div
+      ref={containerRef}
       className={`w-[230px] rounded-xl border-2 ${palette.border} ${palette.bg} ${palette.text} ${palette.shadow} select-none transition-all flex flex-col relative group`}
       style={{ minHeight: '150px' }}
     >
@@ -256,16 +322,35 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
         {/* Title Input */}
         <input
           type="text"
-          value={note.title || ''}
-          onChange={(e) => handleTitleChange(e.target.value)}
+          value={localTitle}
+          onChange={(e) => setLocalTitle(e.target.value)}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              commitChanges();
+            }
+          }}
           placeholder={isEn ? 'Note title...' : 'عنوان یادداشت...'}
           className="w-full bg-transparent font-bold text-xs border-b border-black/15 pb-0.5 outline-none placeholder:opacity-50"
         />
 
         {/* Text Area */}
         <textarea
-          value={note.content}
-          onChange={(e) => handleContentChange(e.target.value)}
+          value={localContent}
+          onChange={(e) => setLocalContent(e.target.value)}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              commitChanges();
+              (e.target as HTMLTextAreaElement).blur();
+            }
+          }}
           placeholder={
             isEn
               ? 'Write notes, IP allocations, VLANs, maintenance reminders...'

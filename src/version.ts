@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.1';
+export const APP_VERSION = '1.66.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.2',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'اصلاح رفتار ویرایش یادداشت‌ها و ذخیره‌سازی با کلیک بیرون (Save on Blur / Click Outside)',
+    title_en: 'Fix Sticky Note Editing Behavior with Save-on-Blur and Click-Outside Support',
+    changes: [
+      'اصلاح و پایدارسازی رفتار ویرایش یادداشت‌های نقشه شماتیک توپولوژی (TopologyStickyNote)؛ نگهداری متن و عنوان در استیت محلی جهت جلوگیری از پاک شدن ناخواسته حروف در حین تایپ به دلیل فراخوانی‌های مکرر سرور.',
+      'پیاده‌سازی مکانیزم ذخیره‌سازی خودکار با کلیک به بیرون (Click-Outside) و با خروج فوکوس (onBlur) برای یادداشت‌های روی نقشه بدون ایجاد تاخیر یا پرش.',
+      'اصلاح مودال یادداشت تجهیزات (DeviceStickyNoteModal)؛ جلوگیری از ریست شدن ورودی‌ها در حین تایپ با کنترل رفرنس اولیه، و فعال‌سازی ذخیره‌سازی خودکار هنگام کلیک روی پس‌زمینه (بک‌دراپ) یا بستن پنجره.',
+      'پشتیبانی از کلیدهای میانبر Enter (برای کامیت عنوان) و Ctrl+Enter / Cmd+Enter (برای ذخیره و بستن سریع متن).'
+    ],
+    changes_en: [
+      'Stabilized sticky note text editing on the schematic topology canvas (TopologyStickyNote); buffered inputs in local component state to prevent letters being wiped during typing due to frequent synchronization.',
+      'Implemented automatic save-on-blur and click-outside committing for canvas sticky notes seamlessly without re-render flicker.',
+      'Enhanced the Device Sticky Note Modal (DeviceStickyNoteModal); prevented background polling from resetting user inputs while actively typing, and enabled auto-save when clicking outside the backdrop or closing.',
+      'Added keyboard shortcut support: Enter to commit titles and Ctrl+Enter / Cmd+Enter to quickly save and complete multiline notes.'
+    ]
+  },
   {
     version: '1.66.1',
     releaseDate: '2026-09-17',

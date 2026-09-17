@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -58,8 +58,21 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Prevent background re-renders or pollings from resetting user inputs while typing
+  const isInitializedRef = useRef(false);
+  const activeDeviceKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (isOpen && device) {
+    if (!isOpen) {
+      isInitializedRef.current = false;
+      activeDeviceKeyRef.current = null;
+      return;
+    }
+
+    const deviceKey = `${device?.id}`;
+    if (isOpen && device && (!isInitializedRef.current || activeDeviceKeyRef.current !== deviceKey)) {
+      isInitializedRef.current = true;
+      activeDeviceKeyRef.current = deviceKey;
       if (existingNote) {
         setTitle(existingNote.title || '');
         setContent(existingNote.content || '');
@@ -72,7 +85,13 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
       setConfirmDelete(false);
       setError(null);
     }
-  }, [isOpen, device, existingNote, isEn]);
+  }, [isOpen, device?.id, isEn]);
+
+  // Keep ref of latest input values for auto-saving on click outside
+  const latestValuesRef = useRef({ title, content, color });
+  useEffect(() => {
+    latestValuesRef.current = { title, content, color };
+  }, [title, content, color]);
 
   if (!isOpen || !device) return null;
 
@@ -110,6 +129,53 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
     }
   };
 
+  // Auto-save and close when user clicks outside the modal
+  const handleAutoSaveAndClose = async () => {
+    const curTitle = latestValuesRef.current.title.trim();
+    const curContent = latestValuesRef.current.content.trim();
+    const curColor = latestValuesRef.current.color;
+
+    const prevTitle = (existingNote?.title || '').trim();
+    const prevContent = (existingNote?.content || '').trim();
+    const prevColor = existingNote?.color || 'yellow';
+
+    const hasChanges = curTitle !== prevTitle || curContent !== prevContent || curColor !== prevColor;
+    const hasAnyContent = curTitle.length > 0 || curContent.length > 0;
+
+    if (hasChanges && hasAnyContent) {
+      try {
+        setIsSubmitting(true);
+        setError(null);
+
+        const noteToSave: CustomTopologyStickyNote = {
+          id: existingNote?.id || `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          x: existingNote?.x || 100,
+          y: existingNote?.y || 100,
+          width: existingNote?.width || 230,
+          title: curTitle || undefined,
+          content: curContent,
+          color: curColor,
+          linkedDeviceId: device.id,
+          createdAt: existingNote?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          viewMode: existingNote?.viewMode || 'card',
+        };
+
+        await persistDeviceNoteToDatabase(noteToSave);
+        onSaved?.(noteToSave);
+        onClose();
+        return;
+      } catch (err: any) {
+        setError(err.message || (isEn ? 'Failed to save note' : 'خطا در ذخیره یادداشت'));
+        return;
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    onClose();
+  };
+
   const handleDelete = async () => {
     if (!existingNote) return;
     if (!confirmDelete) {
@@ -136,7 +202,7 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
       className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-5 modal-backdrop-blur overflow-y-auto"
       data-modal-backdrop="true"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleAutoSaveAndClose();
       }}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
@@ -170,7 +236,10 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
             {onMinimize && (
               <button
                 type="button"
-                onClick={onMinimize}
+                onClick={async () => {
+                  await handleAutoSaveAndClose();
+                  onMinimize();
+                }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
                 title={isEn ? 'Minimize to Dock' : 'کوچک‌سازی به داک'}
               >
@@ -179,9 +248,9 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
             )}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleAutoSaveAndClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-              title={isEn ? 'Close' : 'بستن'}
+              title={isEn ? 'Save and Close' : 'ذخیره و بستن'}
             >
               <X className="w-4 h-4" />
             </button>
