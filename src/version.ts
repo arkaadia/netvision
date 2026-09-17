@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.69.2';
+export const APP_VERSION = '1.69.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.69.3',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'اصلاح کامل مهار کادرهای راهنما در تمام لبه‌های مانیتور و جلوگیری قطعی از خروج از صفحه',
+    title_en: 'Strict Viewport Boundary Clamping for Info Popovers Preventing Bottom & Edge Overflow',
+    changes: [
+      'محاسبه دقیق حداکثر ارتفاع (maxHeight) پویا متناسب با فاصله تا لبه پایینی صفحه نمایش.',
+      'وارونه‌سازی خودکار و باز شدن کادر در بالای نشانگر موس در کلیک‌های نیمه پایینی صفحه.',
+      'اعمال مهار قطعی در چهار جهت (بالا، پایین، چپ و راست با حاشیه امن حداقل ۱۲ پیکسل).',
+      'تجهیز کانتینر داخلی به اسکرول روان داخلی (overflow-y-auto) با سرریز صفر در پنجره صفحه نمایش.'
+    ],
+    changes_en: [
+      'Engineered dynamic maxHeight calculation strictly bounded to remaining vertical viewport distance.',
+      'Implemented automatic upward flipping above cursor when clicked in bottom regions of the display.',
+      'Enforced strict 4-way viewport boundary clamping with a guaranteed 12px safety margin from all screen edges.',
+      'Enabled internal smooth scrolling within the popover body, strictly preventing any viewport or container overflow.'
+    ]
+  },
   {
     version: '1.69.2',
     releaseDate: '2026-09-17',
