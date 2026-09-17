@@ -17,6 +17,7 @@ import { MultiTerminalWorkspace } from './components/terminal/MultiTerminalWorks
 import { ApplyTemplateModal } from './components/ApplyTemplateModal';
 import { ReleaseNotesModal } from './components/ReleaseNotesModal';
 import { TopologyDiscoveryModal } from './components/TopologyDiscoveryModal';
+import { BulkDeviceConfigModal } from './components/BulkDeviceConfigModal';
 import { SettingsView } from './components/settings/SettingsView';
 import { AuditLogsView } from './components/logs/AuditLogsView';
 import { NetworkToolsMenu } from './components/tools/NetworkToolsMenu';
@@ -133,6 +134,8 @@ export default function App() {
   const [applyPreselectedTemplateId, setApplyPreselectedTemplateId] = useState<string | undefined>(undefined);
   const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
   const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
+  const [isBulkConfigOpen, setIsBulkConfigOpen] = useState(false);
+  const [bulkConfigDevices, setBulkConfigDevices] = useState<Device[]>([]);
 
   // Network Tools Suite State
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -219,6 +222,7 @@ export default function App() {
     if (id === 'add_device') setIsAddModalOpen(true);
     if (id === 'release_notes') setIsReleaseNotesOpen(true);
     if (id === 'topology_discovery') setIsDiscoveryModalOpen(true);
+    if (id === 'bulk_device_config') setIsBulkConfigOpen(true);
     handleClearAttention();
   };
 
@@ -234,6 +238,10 @@ export default function App() {
     }
     if (id === 'release_notes') setIsReleaseNotesOpen(false);
     if (id === 'topology_discovery') setIsDiscoveryModalOpen(false);
+    if (id === 'bulk_device_config') {
+      setIsBulkConfigOpen(false);
+      setBulkConfigDevices([]);
+    }
     handleClearAttention();
   };
 
@@ -248,6 +256,8 @@ export default function App() {
     setApplyPreselectedTemplateId(undefined);
     setIsReleaseNotesOpen(false);
     setIsDiscoveryModalOpen(false);
+    setIsBulkConfigOpen(false);
+    setBulkConfigDevices([]);
     handleClearAttention();
   }, [handleClearAttention]);
 
@@ -257,6 +267,7 @@ export default function App() {
     if (modalIds.includes('add_device')) setIsAddModalOpen(true);
     if (modalIds.includes('release_notes')) setIsReleaseNotesOpen(true);
     if (modalIds.includes('topology_discovery')) setIsDiscoveryModalOpen(true);
+    if (modalIds.includes('bulk_device_config')) setIsBulkConfigOpen(true);
     setActiveTools((prev) => prev.map((t) => ({ ...t, isMinimized: false })));
     handleClearAttention();
   }, [minimizedModals, handleClearAttention]);
@@ -662,6 +673,10 @@ export default function App() {
               onWriteMemory={handleWriteMemory}
               onRefreshAll={handleRefreshAll}
               isRefreshing={isRefreshing}
+              onOpenBulkConfig={(selected) => {
+                setBulkConfigDevices(selected);
+                setIsBulkConfigOpen(true);
+              }}
             />
           )}
 
@@ -968,6 +983,26 @@ export default function App() {
         onApplyToMap={() => {
           loadData();
         }}
+        isLightMode={panelTheme === 'light'}
+      />
+
+      {/* Bulk Device Configuration Modal (Cisco & MikroTik Real Execution) */}
+      <BulkDeviceConfigModal
+        isOpen={isBulkConfigOpen && !isModalMinimized('bulk_device_config')}
+        devices={bulkConfigDevices}
+        allDevices={devices}
+        onClose={() => handleCloseStandardModal('bulk_device_config')}
+        onMinimize={() =>
+          handleMinimizeStandardModal({
+            id: 'bulk_device_config',
+            labelEn: `Bulk Config (${bulkConfigDevices.length})`,
+            labelFa: `پیکربندی گروهی (${bulkConfigDevices.length})`,
+            badge: `${bulkConfigDevices.length}`,
+            category: 'config',
+          })
+        }
+        onDeviceUpdated={loadData}
+        isEn={isEn}
         isLightMode={panelTheme === 'light'}
       />
 

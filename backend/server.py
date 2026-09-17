@@ -130,6 +130,15 @@ except ImportError:
         check_host_get_nodes
     )
 
+try:
+    from backend.bulk_config import os_mapper_registry, bulk_execution_engine
+except ImportError:
+    try:
+        from bulk_config import os_mapper_registry, bulk_execution_engine
+    except ImportError:
+        os_mapper_registry = None
+        bulk_execution_engine = None
+
 def record_audit_log(data: Dict[str, Any], user: str, device_id: str, device_name: str, action: str, details: str, result: str = "success"):
     logs = data.setdefault("audit_logs", [])
     entry = {
@@ -1238,6 +1247,78 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             self._send_json(200 if res.get("success") else 502, res)
             return
 
+        # -------------------------------------------------------------
+        # Bulk Device Configuration Endpoints
+        # -------------------------------------------------------------
+        if path == "/api/bulk-config/templates":
+            if not os_mapper_registry:
+                self._send_json(500, {"error": "bulk_config module not loaded"})
+                return
+            templates = os_mapper_registry.get_all_templates()
+            self._send_json(200, {"templates": templates})
+            return
+
+        if path == "/api/bulk-config/jobs":
+            if not bulk_execution_engine:
+                self._send_json(500, {"error": "bulk_config engine not loaded"})
+                return
+            jobs = bulk_execution_engine.list_jobs(limit=30)
+            self._send_json(200, {"jobs": jobs})
+            return
+
+        if path.startswith("/api/bulk-config/jobs/") and path.endswith("/export"):
+            parts = path.split("/")
+            job_id = parts[4]
+            query = parse_qs(url.query)
+            fmt = query.get("format", ["csv"])[0].lower()
+            if not bulk_execution_engine:
+                self._send_json(500, {"error": "bulk_config engine not loaded"})
+                return
+            if fmt == "json":
+                job = bulk_execution_engine.get_job(job_id)
+                if not job:
+                    self._send_json(404, {"error": "Job not found"})
+                    return
+                self._send_json(200, job.to_dict())
+            else:
+                csv_data = bulk_execution_engine.export_job_report_csv(job_id)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f"attachment; filename=bulk_report_{job_id}.csv")
+                self.end_headers()
+                self.wfile.write(csv_data.encode("utf-8"))
+            return
+
+        if path.startswith("/api/bulk-config/jobs/"):
+            parts = path.split("/")
+            job_id = parts[4]
+            if not bulk_execution_engine:
+                self._send_json(500, {"error": "bulk_config engine not loaded"})
+                return
+            job = bulk_execution_engine.get_job(job_id)
+            if not job:
+                self._send_json(404, {"error": "Job not found"})
+                return
+            self._send_json(200, job.to_dict())
+            return
+
+        if path.startswith("/api/bulk-config/backups/"):
+            parts = path.split("/")
+            backup_id = parts[4]
+            if not bulk_execution_engine:
+                self._send_json(500, {"error": "bulk_config engine not loaded"})
+                return
+            content = bulk_execution_engine.get_backup_content(backup_id)
+            if content is None:
+                self._send_json(404, {"error": "Backup snapshot not found"})
+                return
+            self._send_json(200, {
+                "backupId": backup_id,
+                "content": content,
+                "length": len(content)
+            })
+            return
+
         if path.startswith("/api/devices/") and path.endswith("/capabilities") and "/vpn/" not in path:
             # /api/devices/:id/capabilities
             parts = path.split("/")
@@ -1716,6 +1797,89 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 return
             res = check_host_get_result(request_id)
             self._send_json(200 if res.get("success") else 502, res)
+            return
+
+        # -------------------------------------------------------------
+        # Bulk Device Configuration POST Endpoints
+        # -------------------------------------------------------------
+        if path == "/api/bulk-config/preview":
+            if not os_mapper_registry:
+                self._send_json(500, {"error": "bulk_config module not loaded"})
+                return
+            template_id = body.get("template_id") or body.get("templateId")
+            params = body.get("params") or body.get("parameters") or {}
+            target_ids = body.get("device_ids") or body.get("deviceIds") or []
+
+            if not template_id:
+                self._send_json(400, {"error": "template_id is required"})
+                return
+            if not target_ids:
+                self._send_json(400, {"error": "device_ids list cannot be empty"})
+                return
+
+            target_devices = [d for d in data.get("devices", []) if d.get("id") in target_ids]
+            try:
+                preview = os_mapper_registry.generate_preview(template_id, params, target_devices)
+                self._send_json(200, {
+                    "templateId": template_id,
+                    "deviceCount": len(target_devices),
+                    "preview": preview
+                })
+            except Exception as ex:
+                self._send_json(400, {"error": str(ex)})
+            return
+
+        if path == "/api/bulk-config/jobs":
+            if not bulk_execution_engine:
+                self._send_json(500, {"error": "bulk_config engine not loaded"})
+                return
+            template_id = body.get("template_id") or body.get("templateId")
+            params = body.get("params") or body.get("parameters") or {}
+            target_ids = body.get("device_ids") or body.get("deviceIds") or []
+            timeout_sec = int(body.get("timeout_sec") or body.get("timeoutSec") or 25)
+            delay_ms = int(body.get("delay_ms") or body.get("delayMs") or 1500)
+            auto_backup = bool(body.get("auto_backup", body.get("autoBackup", True)))
+            save_after_apply = bool(body.get("save_after_apply", body.get("saveAfterApply", True)))
+            danger_conf = str(body.get("danger_confirmation") or body.get("dangerConfirmation") or "")
+
+            if not template_id or not target_ids:
+                self._send_json(400, {"error": "template_id and device_ids are required"})
+                return
+
+            try:
+                job = bulk_execution_engine.create_job(
+                    template_id=template_id,
+                    params=params,
+                    device_ids=target_ids,
+                    timeout_sec=timeout_sec,
+                    delay_ms=delay_ms,
+                    auto_backup=auto_backup,
+                    save_after_apply=save_after_apply,
+                    danger_confirmation=danger_conf
+                )
+                started = bulk_execution_engine.start_job(job.job_id, data.get("devices", []))
+                self._send_json(201, {
+                    "success": started,
+                    "jobId": job.job_id,
+                    "status": job.status,
+                    "message": "Bulk execution job queued and initiated successfully."
+                })
+            except Exception as ex:
+                self._send_json(400, {"error": str(ex)})
+            return
+
+        if path.startswith("/api/bulk-config/jobs/") and path.endswith("/cancel"):
+            parts = path.split("/")
+            job_id = parts[4]
+            if not bulk_execution_engine:
+                self._send_json(500, {"error": "bulk_config engine not loaded"})
+                return
+            success = bulk_execution_engine.cancel_job(job_id)
+            self._send_json(200 if success else 400, {
+                "success": success,
+                "jobId": job_id,
+                "message": "Job cancellation processed." if success else "Could not cancel job."
+            })
             return
 
         # -------------------------------------------------------------

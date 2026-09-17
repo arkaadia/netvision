@@ -10,9 +10,38 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.9';
+export const APP_VERSION = '1.67.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.67.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'افزودن قابلیت پیکربندی گروهی تجهیزات (Bulk Device Configuration) با اجرای واقعی روی سیسکو و میکروتیک',
+    title_en: 'Add Bulk Device Configuration Feature with Real Hardware Execution for Cisco & MikroTik',
+    changes: [
+      'افزودن امکان انتخاب چندگانه (Multi-select Checkboxes) در جدول تجهیزات همراه با نوار ابزار هوشمند فیلتر و انتخاب سریع سیسکو، میکروتیک و آنلاین.',
+      'افزودن دکمه اکشن Bulk Configure در هدر و نوار انتخاب جهت باز شدن مودال جامع پیکربندی گروهی.',
+      'طراحی و استقرار موتور بک‌اند BulkExecutionEngine با اجرای ناهمگام در پس‌زمینه (Background Async Jobs) با قفل‌های امنیتی روی تجهیزات و جلوگیری از تداخل عملیات.',
+      'پشتیبانی کامل از قالب‌های دستورات پرکاربرد مدیریت تجهیزات: ایجاد/حذف کاربر محلی، تغییر رمز عبور، تنظیم NTP، تنظیم DNS، تنظیم سرور Syslog، بنر ورود (MOTD)، تنظیم SNMP v2c/v3، پشتیبان‌گیری از کانفیگ جاری، ذخیره دائمی کانفیگ (write memory / export)، راه‌اندازی مجدد با تاییدیه دو مرحله‌ای و اجرای امن دستورات دلخواه (Custom CLI / Script).',
+      'ایجاد پیش‌نمایش دقیق و واقعی دستورات به تفکیک سیستم‌عامل (Cisco IOS enable config mode و RouterOS CLI scripts) قبل از اجرا.',
+      'مکانیزم خودکار پشتیبان‌گیری قبل از تغییر (Pre-change Backup) و امکان دانلود فوری فایل کانفیگ پشتیبان.',
+      'مدیریت خطاهای مرحله‌ای، نمایش لاگ‌های زنده CLI هر تجهیز و ذخیره کامل در لاگ حسابرسی (Audit Trail).',
+      'تجهیز کامل مودال به قابلیت مینیمایز (Minimize) و یکپارچه‌سازی با ToolsDock بر اساس استانداردهای MODAL_GUIDELINES.md.',
+      'رعایت صددرصدی استاندارد دو زبانه و عدم وجود هیچ‌گونه متن فارسی در حالت انگلیسی.'
+    ],
+    changes_en: [
+      'Added multi-device selection checkboxes in the Inventory table along with a smart selection bar featuring one-click shortcuts for Cisco, MikroTik, and Online devices.',
+      'Integrated a prominent "Bulk Configure" button in both the header toolbar and floating selection bar to launch the bulk operation workflow.',
+      'Implemented the backend BulkExecutionEngine with asynchronous job queuing, concurrency locking per device, and robust background thread execution.',
+      'Built a comprehensive library of general-purpose configuration templates: Create/Delete Local User, Change User Password, Configure NTP Servers, Configure DNS Servers, Configure Syslog Server, Set MOTD Banner, SNMP Community/v3, Backup Running Config, Save/Write Memory, Safe Reboot with confirmation, and Custom CLI/Script execution.',
+      'Engineered realistic OS-specific syntax translation and full preview generation for both Cisco IOS (privileged config mode) and MikroTik RouterOS (safe scripting).',
+      'Implemented automatic pre-change configuration backups with instant in-browser download capability before running modifications.',
+      'Added real-time per-device execution progress tracking, terminal output viewers, cancellation control, and automatic audit trail logging.',
+      'Fully equipped the modal with universal minimization capability, registering it in ToolsDock according to MODAL_GUIDELINES.md.',
+      'Strictly enforced bilingual localization compliance with zero Persian text displayed in English mode.'
+    ]
+  },
   {
     version: '1.66.9',
     releaseDate: '2026-09-17',

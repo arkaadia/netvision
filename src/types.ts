@@ -1033,5 +1033,133 @@ export interface VPNDeleteResult {
   steps?: Array<{ command: string; success: boolean }>;
 }
 
+// -------------------------------------------------------------
+// Bulk Device Configuration Interfaces
+// -------------------------------------------------------------
+export interface BulkConfigParameter {
+  name: string;
+  labelFa: string;
+  labelEn: string;
+  type: 'string' | 'number' | 'password' | 'select' | 'textarea' | 'boolean';
+  required: boolean;
+  placeholder?: string;
+  default?: any;
+  options?: Array<{ value: string; labelFa: string; labelEn: string }>;
+}
+
+export interface BulkConfigTemplate {
+  id: string;
+  category: string;
+  title: string;
+  title_en: string;
+  description: string;
+  description_en: string;
+  icon: string;
+  parameters: BulkConfigParameter[];
+  is_dangerous: boolean;
+  confirmation_keyword: string;
+  supports_backup: boolean;
+  supports_idempotency: boolean;
+  default_timeout_sec: number;
+  requires_save_step: boolean;
+}
+
+export interface BulkDevicePreviewStep {
+  name: string;
+  command: string;
+  descriptionFa: string;
+  descriptionEn: string;
+  mode: string;
+}
+
+export interface BulkDevicePreviewItem {
+  deviceId: string;
+  deviceName: string;
+  deviceIp: string;
+  platform: string;
+  mapperName: string;
+  preCheckCommand: string | null;
+  backupCommand: string | null;
+  steps: BulkDevicePreviewStep[];
+  saveCommand: string | null;
+  isDangerous: boolean;
+  confirmationKeyword: string;
+  estimatedTimeoutSec: number;
+}
+
+export interface BulkDeviceStepDetail {
+  stepIndex: number;
+  stepName: string;
+  command: string;
+  descriptionFa: string;
+  descriptionEn: string;
+  status: 'running' | 'success' | 'failed';
+  output?: string;
+  errorType?: string;
+  errorMessageFa?: string;
+  errorMessageEn?: string;
+  durationMs?: number;
+}
+
+export interface BulkDeviceExecutionResult {
+  deviceId: string;
+  deviceName: string;
+  deviceIp: string;
+  platform: string;
+  status: 'success' | 'failed' | 'partial' | 'skipped';
+  errorType?: string;
+  errorMessageFa?: string;
+  errorMessageEn?: string;
+  stepsTotal: number;
+  stepsCompleted: number;
+  stepsDetail: BulkDeviceStepDetail[];
+  rawOutput?: string;
+  backupId?: string;
+  backupSuccess?: boolean;
+  backupPreview?: string;
+  durationMs: number;
+  retryCount: number;
+  executedAt: number;
+}
+
+export interface BulkJobLog {
+  timestamp: number;
+  timeStr: string;
+  level: 'info' | 'warning' | 'error' | 'success';
+  messageFa: string;
+  messageEn: string;
+  deviceId?: string;
+}
+
+export interface BulkJobStatus {
+  jobId: string;
+  templateId: string;
+  templateTitle: string;
+  templateTitleEn: string;
+  parameters: Record<string, any>;
+  status: 'queued' | 'running' | 'completed' | 'cancelled' | 'failed';
+  createdAt: number;
+  startedAt?: number;
+  finishedAt?: number;
+  totalDevices: number;
+  completedDevices: number;
+  percentage: number;
+  currentDeviceIndex: number;
+  currentDeviceName: string;
+  currentStepName: string;
+  successCount: number;
+  failedCount: number;
+  partialCount: number;
+  skippedCount: number;
+  options: {
+    timeoutSec: number;
+    delayMs: number;
+    autoBackup: boolean;
+    saveAfterApply: boolean;
+  };
+  results: Record<string, BulkDeviceExecutionResult>;
+  logs: BulkJobLog[];
+}
+
 
 

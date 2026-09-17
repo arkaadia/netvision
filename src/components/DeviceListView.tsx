@@ -21,7 +21,8 @@ import {
   FileCode2,
   MoreVertical,
   Edit3,
-  StickyNote
+  StickyNote,
+  Sliders,
 } from 'lucide-react';
 import { Device, DeviceType, CustomTopologyStickyNote } from '../types';
 import { useLanguage } from '../i18n';
@@ -43,6 +44,7 @@ interface DeviceListViewProps {
   onRefreshAll: () => void;
   isRefreshing: boolean;
   onEditDevice?: (device: Device) => void;
+  onOpenBulkConfig?: (devices: Device[]) => void;
 }
 
 export const DeviceListView: React.FC<DeviceListViewProps> = ({
@@ -57,12 +59,14 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
   onRefreshAll,
   isRefreshing,
   onEditDevice,
+  onOpenBulkConfig,
 }) => {
   const { t, isRtl, isEn } = useLanguage();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | DeviceType>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline' | 'unsaved'>('all');
   const [buildingFilter, setBuildingFilter] = useState<string>('all');
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
   const [pingingId, setPingingId] = useState<string | null>(null);
   const [writingId, setWritingId] = useState<string | null>(null);
   const [internalEditingDevice, setInternalEditingDevice] = useState<Device | null>(null);
@@ -303,6 +307,36 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenBulkConfig && (
+              <button
+                id="btn-bulk-configure"
+                onClick={() => {
+                  const selected = devices.filter((d) => selectedDeviceIds.has(d.id));
+                  if (selected.length > 0) {
+                    onOpenBulkConfig(selected);
+                  }
+                }}
+                disabled={selectedDeviceIds.size === 0}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium border transition active:scale-95 cursor-pointer ${
+                  selectedDeviceIds.size > 0
+                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white border-cyan-400/40 shadow-[0_0_15px_rgba(6,182,212,0.35)]'
+                    : 'bg-white/5 text-slate-500 border-white/5 cursor-not-allowed opacity-60'
+                }`}
+                title={isEn ? 'Execute common configuration across selected hardware' : 'پیکربندی همزمان دستورات روی تجهیزات انتخاب شده'}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>
+                  {isEn
+                    ? selectedDeviceIds.size > 0
+                      ? `Bulk Configure (${selectedDeviceIds.size})`
+                      : 'Bulk Configure'
+                    : selectedDeviceIds.size > 0
+                    ? `پیکربندی گروهی (${selectedDeviceIds.size})`
+                    : 'پیکربندی گروهی'}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={onRefreshAll}
               disabled={isRefreshing}
@@ -442,12 +476,107 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
         </div>
       </div>
 
+      {/* Multi-Device Selection Action Bar */}
+      {selectedDeviceIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 shadow-lg text-xs font-mono animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+              <Sliders className="w-3.5 h-3.5" />
+              <span>
+                {isEn
+                  ? `${selectedDeviceIds.size} of ${devices.length} devices selected`
+                  : `${selectedDeviceIds.size} از ${devices.length} تجهیز انتخاب شده است`}
+              </span>
+            </span>
+
+            {/* Quick Filter Selection Shortcuts */}
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => {
+                  const ciscoIds = devices.filter((d) => d.platform?.includes('cisco')).map((d) => d.id);
+                  setSelectedDeviceIds(new Set(ciscoIds));
+                }}
+                className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 cursor-pointer"
+              >
+                {isEn ? 'Only Cisco' : 'فقط سیسکو'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const mtikIds = devices.filter((d) => d.platform?.includes('mikrotik')).map((d) => d.id);
+                  setSelectedDeviceIds(new Set(mtikIds));
+                }}
+                className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 cursor-pointer"
+              >
+                {isEn ? 'Only MikroTik' : 'فقط میکروتیک'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const onlineIds = devices.filter((d) => d.is_online).map((d) => d.id);
+                  setSelectedDeviceIds(new Set(onlineIds));
+                }}
+                className="px-2 py-0.5 rounded bg-white/10 text-slate-300 hover:bg-white/20 border border-white/10 cursor-pointer"
+              >
+                {isEn ? 'Only Online' : 'فقط آنلاین'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedDeviceIds(new Set())}
+              className="px-2.5 py-1 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              {isEn ? 'Clear Selection' : 'لغو انتخاب‌ها'}
+            </button>
+
+            {onOpenBulkConfig && (
+              <button
+                type="button"
+                onClick={() => {
+                  const selected = devices.filter((d) => selectedDeviceIds.has(d.id));
+                  if (selected.length > 0) onOpenBulkConfig(selected);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold shadow-md shadow-cyan-500/20 cursor-pointer active:scale-95 transition"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>{isEn ? 'Launch Bulk Configure' : 'اجرای پیکربندی گروهی'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Devices List Table */}
       <div className="spatial-glass border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl">
         <div className="overflow-x-auto min-h-[380px]">
           <table className={`w-full ${isRtl ? 'text-right' : 'text-left'} text-xs device-table`}>
             <thead>
               <tr className="bg-slate-950/80 text-slate-300 border-b-2 border-white/15 text-[11px] font-bold uppercase tracking-wider font-mono">
+                <th className={`p-3.5 ${isRtl ? 'border-l' : 'border-r'} border-white/15 w-10 text-center`}>
+                  <input
+                    type="checkbox"
+                    checked={filteredDevices.length > 0 && selectedDeviceIds.size === filteredDevices.length}
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate =
+                          selectedDeviceIds.size > 0 && selectedDeviceIds.size < filteredDevices.length;
+                      }
+                    }}
+                    onChange={() => {
+                      if (selectedDeviceIds.size === filteredDevices.length && filteredDevices.length > 0) {
+                        setSelectedDeviceIds(new Set());
+                      } else {
+                        setSelectedDeviceIds(new Set(filteredDevices.map((d) => d.id)));
+                      }
+                    }}
+                    className="w-4 h-4 rounded text-cyan-500 bg-slate-900 border-white/20 focus:ring-cyan-500 accent-cyan-500 cursor-pointer"
+                    title={isEn ? 'Select all filtered devices' : 'انتخاب تمام تجهیزات'}
+                  />
+                </th>
                 <th className={`p-3.5 ${isRtl ? 'border-l' : 'border-r'} border-white/15`}>
                   {isEn ? 'Device Name & ID' : 'نام و شناسه تجهیز'}
                 </th>
@@ -477,7 +606,7 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
             <tbody className="divide-y divide-white/10">
               {filteredDevices.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-slate-400">
+                  <td colSpan={9} className="p-10 text-center text-slate-400">
                     {t('devicelist_no_devices')}
                   </td>
                 </tr>
@@ -487,6 +616,24 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                   const devNote = getNoteForDevice(dev.id);
                   return (
                     <tr key={dev.id} className="border-b border-white/10 hover:bg-white/5 transition-colors group">
+                      {/* Selection Checkbox */}
+                      <td className={`p-3.5 ${isRtl ? 'border-l' : 'border-r'} border-white/10 text-center`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDeviceIds.has(dev.id)}
+                          onChange={() => {
+                            setSelectedDeviceIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(dev.id)) next.delete(dev.id);
+                              else next.add(dev.id);
+                              return next;
+                            });
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 rounded text-cyan-500 bg-slate-900 border-white/20 focus:ring-cyan-500 accent-cyan-500 cursor-pointer"
+                          aria-label={`Select ${dev.name}`}
+                        />
+                      </td>
                       {/* Name & Role */}
                       <td className="p-3.5">
                         <div className="flex items-center gap-3">
