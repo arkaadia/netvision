@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.72.3';
+export const APP_VERSION = '1.73.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.73.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'معماری تطبیقی دو لایه SSH: اتصال آنی تجهیزات نوین بدون تاخیر و فال‌بک خودکار تجهیزات قدیمی سیسکو',
+    title_en: 'Two-Tier Adaptive SSH Engine: Zero-Latency Modern Fast Path & Automatic Cisco Legacy Fallback',
+    changes: [
+      'پیاده‌سازی معماری دو لایه مدرن-محور برای کلیه ارتباطات SSH: لایه ۱ (Fast Path) برای تجهیزات نوین (IOS-XE, Nexus, MikroTik v7, Linux) با الگوریتم‌های مدرن (Curve25519, ECDH, CTR/GCM) بدون کوچک‌ترین افت سرعت یا تاخیر.',
+      'فعال‌سازی خودکار و کاملاً هوشمند لایه ۲ (Legacy Fallback) صرفاً در صورت عدم سازگاری یا ریست هندشیک توسط تجهیزات قدیمی سیسکو (Cisco 2960/3560/3750 با الگوریتم‌های diffie-hellman-group1-sha1, ssh-rsa و aes128-cbc).',
+      'یکپارچه‌سازی قطعی و سراسری در تمامی ماژول‌های سامانه شامل ترمینال وب (NetworkTerminal)، تست اتصال در ثبت تجهیز جدید (Register Device SSH Test)، کشف تجهیزات (Hardware Discovery)، مدیریت نشست‌ها (SSHManager) و تنظیمات دسته‌جمعی (Bulk Config).',
+      'توقف سریع و بدون سعی مجدد در صورت ورود کلمه عبور اشتباه (AuthenticationException) یا عدم دسترسی شبکه جهت جلوگیری از ایجاد تاخیر بی‌مورد.',
+      'ثبت و گزارش دقیق الگوریتم‌های توافق‌شده (KEX, Cipher, Host Key, MAC) در زمان برقراری ارتباط با تضمین عدم بروز خطای unknown cipher.'
+    ],
+    changes_en: [
+      'Implemented a Two-Tier Modern-First Adaptive SSH Architecture: Tier 1 (Fast Path) connects modern devices (Cisco IOS-XE, Nexus, MikroTik v7, Linux OpenSSH) using modern cryptography (Curve25519, ECDH, CTR/GCM, Ed25519/RSA-SHA2) with zero latency penalty or overhead.',
+      'Automatic and seamless activation of Tier 2 (Legacy Fallback) exclusively when older Cisco equipment (Catalyst 2960/3560/3750 on IOS 12/15) rejects modern algorithms (negotiating diffie-hellman-group1-sha1, ssh-rsa, and aes128-cbc).',
+      'Universal unification across all SSH modules: Web Terminal (NetworkTerminal), Register Device SSH Test, Hardware Discovery, Session Manager (SSHManager), and Bulk Config.',
+      'Immediate fast-fail on invalid credentials (AuthenticationException) or unreachable hosts without redundant retries to eliminate unnecessary connection delays.',
+      'Precise capture and reporting of negotiated algorithms (KEX, Cipher, Host Key, MAC) with guaranteed zero "unknown cipher" crashes.'
+    ]
+  },
   {
     version: '1.72.3',
     releaseDate: '2026-09-17',

@@ -34,16 +34,17 @@ try:
     import paramiko
     HAS_PARAMIKO = True
     try:
-        from .ssh_compat import ensure_paramiko_compatibility
+        from .ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel
     except ImportError:
         try:
-            from connections.ssh_compat import ensure_paramiko_compatibility
+            from connections.ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel
         except ImportError:
-            from ssh_compat import ensure_paramiko_compatibility
+            from ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel
     ensure_paramiko_compatibility()
 except ImportError:
     HAS_PARAMIKO = False
     paramiko = None
+    open_adaptive_shell_channel = None
 
 
 class NetworkTerminalSession:
@@ -253,47 +254,37 @@ class NetworkTerminalSession:
 
     def _connect_ssh(self, start_t: float) -> bool:
         """
-        Executes real SSH connection with automatic legacy algorithm fallback for Cisco equipment.
+        Executes real SSH connection using the unified Two-Tier Adaptive Negotiation Engine:
+        - Tier 1: Modern Fast Path (no overhead for modern Cisco/MikroTik/Linux)
+        - Tier 2: Adaptive Legacy Fallback (automatic negotiation for older Cisco 2960/Catalyst)
         Never falls back to fake/simulated data.
         """
-        if not HAS_PARAMIKO:
+        if not HAS_PARAMIKO or not open_adaptive_shell_channel:
             self.error_message = "Paramiko library is not installed on the system."
             self.status = "FAILED"
             self._send_error_to_terminal(self.error_message)
             self.notify_status("failed", error=self.error_message)
             return False
 
+        term_name = "xterm-256color" if self.is_cisco else ("vt100" if self.is_mikrotik else "xterm")
+        channel, transport, client, info, err = open_adaptive_shell_channel(
+            hostname=self.host,
+            port=self.port,
+            username=self.username,
+            password=self.password,
+            cols=self.cols,
+            rows=self.rows,
+            term_name=term_name,
+            timeout=6.0,
+            on_status_msg=self.on_data_callback
+        )
+
         first_error = None
-        channel = None
-        transport = None
-
-        # Attempt 1: Standard SSHClient connection
-        try:
-            channel, transport, client = self._connect_ssh_client(timeout=6.0)
-            self.used_legacy_algorithms = False
+        if channel and transport and client:
             self._paramiko_client = client
-        except (paramiko.SSHException, socket.error, TimeoutError, Exception) as e:
-            first_error = e
-            err_msg = str(e).lower()
-            is_algo_error = any(keyword in err_msg for keyword in [
-                "no matching", "kex", "cipher", "key exchange", "incompatible", "algorithm", "disabled"
-            ])
-
-            # If standard connection failed and device is Cisco or algorithm mismatch, retry with legacy algorithms
-            if self.is_cisco or is_algo_error:
-                print(f"[NetworkTerminal] Standard SSH handshake failed for {self.host}:{self.port} ({e}). Retrying with Cisco legacy algorithms...")
-                if self.on_data_callback:
-                    self.on_data_callback(
-                        f"\r\n\x1b[33m[SSH Fallback]\x1b[0m Negotiating legacy Cisco algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa) with {self.host}...\r\n"
-                    )
-                try:
-                    channel, transport = self._connect_ssh_transport(use_legacy=True, timeout=8.0)
-                    self.used_legacy_algorithms = True
-                    first_error = None
-                except Exception as legacy_err:
-                    first_error = legacy_err
-            else:
-                first_error = e
+            self.used_legacy_algorithms = (info.get("tier") == "tier2_legacy_fallback")
+        else:
+            first_error = Exception(err or "SSH connection failed")
 
         if first_error or not channel or not transport:
             self.status = "FAILED"

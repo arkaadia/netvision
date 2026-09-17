@@ -2469,7 +2469,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                             auth_timeout=5.0
                         )
                         if not auth_ok:
-                            error_msg = f"Authentication check: {auth_err}"
+                            connected = False
+                            error_msg = f"SSH connection failed on {ip}:{port} for user '{user}': {auth_err}"
                     else:
                         p_client.connect(
                             hostname=ip,
@@ -2483,9 +2484,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
 
                     transport = p_client.get_transport()
                     if transport and transport.is_authenticated():
-                        sec_opt = transport.get_security_options()
-                        if sec_opt and sec_opt.ciphers:
-                            cipher = sec_opt.ciphers[0]
+                        info = getattr(p_client, '_negotiation_info', {})
+                        cipher = info.get("cipher") or getattr(transport, 'remote_cipher', None) or cipher
                         banner = transport.get_banner() or banner
                     p_client.close()
                 except Exception as auth_err:
