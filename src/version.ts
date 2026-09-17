@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.64.1';
+export const APP_VERSION = '1.65.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.65.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'دو برابر شدن اندازه پورت‌های فیزیکی در مودال ترمینال، نمایش ۲۴ پورت در هر سطر و افزودن دکمه اجرای مستقیم نرم‌افزار WinBox',
+    title_en: 'Double Terminal Faceplate Port Dimensions, 24 Ports Per Row Layout & Direct WinBox Native App Launcher Integration',
+    changes: [
+      'دو برابر شدن اندازه گرافیکی پورت‌های فیزیکی سخت‌افزار در نوار بالای مودال ترمینال (فیس‌پلیت) جهت خوانایی و کلیک آسان‌تر.',
+      'تغییر چیدمان پورت‌ها به ۲۴ پورت در هر سطر به جای ۱۲ عدد مطابق با معماری سوئیچ‌ها و روترهای استاندارد شبکه.',
+      'افزودن دکمه و آیکون اختصاصی WinBox در هدر فیس‌پلیت و تولبار ترمینال برای باز کردن مستقیم نرم‌افزار WinBox نصب‌شده روی سیستم کلاینت.',
+      'پشتیبانی از پروتکل سیستمی winbox:// به همراه مدال راهنما، ایجاد فایل اسکریپت راه‌انداز Bat و کپی دستور خط فرمان CLI با مشخصات اتصال دیوایس جاری.'
+    ],
+    changes_en: [
+      'Doubled the graphical dimensions of hardware physical ports rendered in the terminal modal faceplate for crystal-clear readability and easier interactions.',
+      'Updated the port row arrangement to 24 ports per row (up from 12) matching standard enterprise 24/48-port switch and router physical faceplates.',
+      'Added a dedicated WinBox launcher button in both the terminal faceplate strip and MikroTik modal toolbar to launch the installed WinBox desktop app directly on the client PC.',
+      'Implemented system protocol handling via winbox:// alongside a fallback launcher modal providing one-click CLI command copy and custom .bat batch launcher downloads.'
+    ]
+  },
   {
     version: '1.64.1',
     releaseDate: '2026-09-17',

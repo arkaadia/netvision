@@ -33,6 +33,7 @@ import { Device, SwitchPort } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 import { fetchDevicePorts, syncDevicePorts, sshConnect, sshExecute, sshDisconnect, getTerminalWebSocketUrl } from '../services/api';
 import { CompactTerminalFaceplate } from './terminal/CompactTerminalFaceplate';
+import { WinBoxLauncherModal } from './terminal/WinBoxLauncherModal';
 
 export interface MikroTikTerminalModalProps {
   device: Device | null;
@@ -103,6 +104,7 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
   const [bgChoice, setBgChoice] = useState(isLightMode ? 'winbox-silver' : 'slate');
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [ports, setPorts] = useState<SwitchPort[]>([]);
+  const [isWinBoxModalOpen, setIsWinBoxModalOpen] = useState(false);
   const [selectedPort, setSelectedPort] = useState<SwitchPort | null>(null);
   const [selectedPortIds, setSelectedPortIds] = useState<string[]>([]);
   const [sidebarTab, setSidebarTab] = useState<'guide' | 'interfaces'>('guide');
@@ -886,6 +888,52 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
               <HelpCircle className="w-4 h-4" />
             </button>
 
+            {/* Direct WinBox Application Launcher Button */}
+            <button
+              type="button"
+              id="mikrotik-modal-winbox-btn"
+              onClick={() => {
+                const targetHost = (device?.ssh_host || device?.ip || '').trim();
+                const username = (device?.ssh_username || 'admin').trim();
+                const password = device?.ssh_password || '';
+                const winboxPort = (device as any)?.winbox_port || 8291;
+                if (targetHost) {
+                  const uri = password
+                    ? `winbox://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${targetHost}:${winboxPort}`
+                    : `winbox://${encodeURIComponent(username)}@${targetHost}:${winboxPort}`;
+                  try {
+                    const a = document.createElement('a');
+                    a.href = uri;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                      if (document.body.contains(a)) document.body.removeChild(a);
+                    }, 300);
+                  } catch (e) {
+                    console.warn('WinBox launch error:', e);
+                  }
+                }
+                setIsWinBoxModalOpen(true);
+              }}
+              className={`p-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                isLightMode
+                  ? 'bg-sky-50 hover:bg-sky-600 text-sky-800 hover:text-white border-sky-300 hover:border-sky-500 shadow-xs'
+                  : 'bg-sky-950/80 hover:bg-sky-600 text-sky-200 hover:text-white border-sky-600/50 hover:border-sky-400 shadow-xs'
+              } active:scale-95`}
+              title={
+                isEn
+                  ? `Launch WinBox on your PC for ${device?.name || device?.ip || 'MikroTik'}`
+                  : `اجرای نرم‌افزار WinBox نصب شده روی سیستم شما برای ${device?.name || device?.ip || 'میکروتیک'}`
+              }
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none">
+                <rect x="2" y="2" width="20" height="20" rx="4" fill="#0284c7" />
+                <path d="M6 7h3l2 7 2-5 2 5 2-7h3l-3.5 11h-2.5l-2-5-2 5H9L6 7z" fill="white" />
+              </svg>
+              <span className="text-[11px] font-bold font-mono hidden sm:inline">WinBox</span>
+            </button>
+
             {!isEmbedded && (
               <button
                 type="button"
@@ -1373,6 +1421,16 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* WinBox Launcher Modal */}
+        {isWinBoxModalOpen && device && (
+          <WinBoxLauncherModal
+            device={device}
+            isOpen={isWinBoxModalOpen}
+            onClose={() => setIsWinBoxModalOpen(false)}
+            isLightMode={isLightMode}
+          />
+        )}
       </div>
   );
 

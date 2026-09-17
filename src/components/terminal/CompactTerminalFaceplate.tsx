@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Layers, CheckCircle2, AlertCircle, Shield, Cabl
 import { Device, SwitchPort } from '../../types';
 import { NetworkPortSvg } from '../NetworkPortSvg';
 import { MikroTikPortSvg } from '../MikroTikPortSvg';
+import { WinBoxLauncherModal } from './WinBoxLauncherModal';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 export interface CompactTerminalFaceplateProps {
@@ -32,8 +33,42 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
 }) => {
   const { isEn } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isWinBoxModalOpen, setIsWinBoxModalOpen] = useState(false);
   const [activeHoverPort, setActiveHoverPort] = useState<SwitchPort | null>(null);
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
+
+  const handleOpenWinBox = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetHost = (device.ssh_host || device.ip || '').trim();
+    const username = (device.ssh_username || 'admin').trim();
+    const password = device.ssh_password || '';
+    const winboxPort = (device as any).winbox_port || 8291;
+
+    // Immediately trigger winbox:// protocol in background
+    if (targetHost) {
+      const uri = password
+        ? `winbox://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${targetHost}:${winboxPort}`
+        : `winbox://${encodeURIComponent(username)}@${targetHost}:${winboxPort}`;
+
+      try {
+        const a = document.createElement('a');
+        a.href = uri;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          if (document.body.contains(a)) {
+            document.body.removeChild(a);
+          }
+        }, 300);
+      } catch (err) {
+        console.warn('WinBox protocol launch error:', err);
+      }
+    }
+
+    // Open helper modal for user convenience & fallback options
+    setIsWinBoxModalOpen(true);
+  };
 
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [tooltipPos, setTooltipPos] = useState<{ left: number; top: number; arrowLeft: number } | null>(null);
@@ -91,8 +126,8 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
 
   const portRows = useMemo(() => {
     const rows: SwitchPort[][] = [];
-    for (let i = 0; i < ports.length; i += 12) {
-      rows.push(ports.slice(i, i + 12));
+    for (let i = 0; i < ports.length; i += 24) {
+      rows.push(ports.slice(i, i + 24));
     }
     return rows;
   }, [ports]);
@@ -159,6 +194,29 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
             <span className="text-[9px] text-cyan-300/90 font-sans border-l border-slate-600 pl-1 group-hover/sync:text-white">
               {isSyncing ? (isEn ? 'Syncing...' : 'بررسی...') : (isEn ? 'Sync' : 'بررسی')}
             </span>
+          </button>
+
+          {/* WinBox Native App Launcher Button */}
+          <button
+            type="button"
+            id="faceplate-winbox-btn"
+            onClick={handleOpenWinBox}
+            className={`group/wb flex items-center gap-1.5 text-[10px] font-mono font-bold px-2 py-0.5 rounded transition-all shadow-xs border shrink-0 cursor-pointer ${
+              isLightMode
+                ? 'bg-sky-50 hover:bg-sky-600 text-sky-800 hover:text-white border-sky-300 hover:border-sky-500 shadow-sky-100'
+                : 'bg-sky-950/80 hover:bg-sky-600 text-sky-200 hover:text-white border-sky-600/50 hover:border-sky-400'
+            } active:scale-95`}
+            title={
+              isEn
+                ? `Launch WinBox on your PC for ${device.name || device.ip} (${device.ip || 'No IP'})`
+                : `اجرای نرم‌افزار WinBox نصب شده روی سیستم شما برای ${device.name || device.ip} (${device.ip || 'بدون IP'})`
+            }
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0 group-hover/wb:scale-110 transition-transform" fill="none">
+              <rect x="2" y="2" width="20" height="20" rx="4" fill="#0284c7" />
+              <path d="M6 7h3l2 7 2-5 2 5 2-7h3l-3.5 11h-2.5l-2-5-2 5H9L6 7z" fill="white" />
+            </svg>
+            <span className="font-bold">WinBox</span>
           </button>
 
           {/* Status Counts */}
@@ -284,7 +342,7 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
               {portRows.map((row, rowIdx) => (
                 <div key={rowIdx} className="flex items-center gap-1.5">
                   {row.map((port, pIdx) => {
-                    const globalIdx = rowIdx * 12 + pIdx;
+                    const globalIdx = rowIdx * 24 + pIdx;
                     const pId = port.port_id || (port as any).port || port.name || `port-${globalIdx + 1}`;
                     const isSelected = Boolean(
                       pId && (
@@ -324,16 +382,16 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
                             : 'hover:ring-1 hover:ring-slate-500/60'
                         }`}
                         style={{
-                          width: '28px',
-                          height: isMikroTik ? '42px' : '40px',
+                          width: isMikroTik ? '64px' : '56px',
+                          height: isMikroTik ? '84px' : '80px',
                           position: 'relative',
                         }}
                       >
                         <div
                           style={{
-                            transform: 'scale(0.5)',
+                            transform: 'scale(1)',
                             transformOrigin: 'top left',
-                            width: '56px',
+                            width: isMikroTik ? '64px' : '56px',
                             pointerEvents: 'none',
                           }}
                         >
@@ -416,6 +474,16 @@ export const CompactTerminalFaceplate: React.FC<CompactTerminalFaceplateProps> =
           </div>
         );
       })()}
+
+      {/* WinBox Launcher & Configuration Helper Modal */}
+      {isWinBoxModalOpen && (
+        <WinBoxLauncherModal
+          device={device}
+          isOpen={isWinBoxModalOpen}
+          onClose={() => setIsWinBoxModalOpen(false)}
+          isLightMode={isLightMode}
+        />
+      )}
     </div>
   );
 };
