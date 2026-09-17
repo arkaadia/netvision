@@ -89,7 +89,11 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
         const list: CustomTopologyStickyNote[] = JSON.parse(raw);
         if (Array.isArray(list)) {
           list.forEach((n) => {
-            if (n.linkedDeviceId) notesMap[n.linkedDeviceId] = n;
+            if (n.linkedDeviceId) {
+              notesMap[n.linkedDeviceId] = n;
+              notesMap[n.linkedDeviceId.replace(/^hw-/, '')] = n;
+              notesMap['hw-' + n.linkedDeviceId.replace(/^hw-/, '')] = n;
+            }
           });
         }
       }
@@ -103,6 +107,8 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
               m.stickyNotes.forEach((sn: CustomTopologyStickyNote) => {
                 if (sn.linkedDeviceId && !notesMap[sn.linkedDeviceId]) {
                   notesMap[sn.linkedDeviceId] = sn;
+                  notesMap[sn.linkedDeviceId.replace(/^hw-/, '')] = sn;
+                  notesMap['hw-' + sn.linkedDeviceId.replace(/^hw-/, '')] = sn;
                 }
               });
             }
@@ -120,13 +126,25 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
         setDeviceNotes((prev) => {
           const updated = { ...prev };
           dbNotes.forEach((n) => {
-            if (n.linkedDeviceId) updated[n.linkedDeviceId] = n;
+            if (n.linkedDeviceId) {
+              updated[n.linkedDeviceId] = n;
+              updated[n.linkedDeviceId.replace(/^hw-/, '')] = n;
+              updated['hw-' + n.linkedDeviceId.replace(/^hw-/, '')] = n;
+            }
           });
           return updated;
         });
       }
     } catch (e) {}
   }, []);
+
+  const getNoteForDevice = useCallback(
+    (id: string): CustomTopologyStickyNote | undefined => {
+      if (!id) return undefined;
+      return deviceNotes[id] || deviceNotes[id.replace(/^hw-/, '')] || deviceNotes['hw-' + id.replace(/^hw-/, '')];
+    },
+    [deviceNotes]
+  );
 
   useEffect(() => {
     loadDeviceNotes();
@@ -445,7 +463,7 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
               ) : (
                 filteredDevices.map((dev) => {
                   const isPinging = pingingId === dev.id;
-                  const devNote = deviceNotes[dev.id];
+                  const devNote = getNoteForDevice(dev.id);
                   return (
                     <tr key={dev.id} className="border-b border-white/10 hover:bg-white/5 transition-colors group">
                       {/* Name & Role */}
@@ -750,13 +768,13 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                   <StickyNote className="w-4 h-4 text-amber-400 group-hover/item:scale-110 transition shrink-0" />
                   <div className="flex flex-col">
                     <span>
-                      {deviceNotes[menuAnchor.device.id]
+                      {getNoteForDevice(menuAnchor.device.id)
                         ? (isEn ? 'View / Edit Sticky Note' : 'مشاهده و ویرایش یادداشت چسبان')
                         : (isEn ? 'Add Sticky Note' : 'افزودن یادداشت چسبان')}
                     </span>
                     <span className="text-[10px] text-amber-400/80 font-mono">
-                      {deviceNotes[menuAnchor.device.id]
-                        ? (deviceNotes[menuAnchor.device.id].title || 'Note')
+                      {getNoteForDevice(menuAnchor.device.id)
+                        ? (getNoteForDevice(menuAnchor.device.id)?.title || 'Note')
                         : (isEn ? 'Attach note to device' : 'پیوست یادداشت به تجهیز')}
                     </span>
                   </div>
@@ -904,23 +922,31 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
         <DeviceStickyNoteModal
           isOpen={isNoteModalOpen}
           device={selectedNoteDevice}
-          existingNote={deviceNotes[selectedNoteDevice.id]}
+          existingNote={getNoteForDevice(selectedNoteDevice.id)}
           onClose={() => {
             setIsNoteModalOpen(false);
             setSelectedNoteDevice(null);
           }}
           onSaved={(savedNote) => {
+            const rawId = selectedNoteDevice.id;
+            const cleanId = rawId.replace(/^hw-/, '');
             setDeviceNotes((prev) => ({
               ...prev,
-              [selectedNoteDevice.id]: savedNote,
+              [rawId]: savedNote,
+              [cleanId]: savedNote,
+              ['hw-' + cleanId]: savedNote,
             }));
             setIsNoteModalOpen(false);
             setSelectedNoteDevice(null);
           }}
           onDeleted={(deletedId) => {
+            const rawId = selectedNoteDevice.id;
+            const cleanId = rawId.replace(/^hw-/, '');
             setDeviceNotes((prev) => {
               const copy = { ...prev };
-              delete copy[selectedNoteDevice.id];
+              delete copy[rawId];
+              delete copy[cleanId];
+              delete copy['hw-' + cleanId];
               return copy;
             });
             setIsNoteModalOpen(false);

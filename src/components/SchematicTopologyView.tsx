@@ -476,6 +476,24 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
     return customMaps.find((m) => m.id === activeMapId) || null;
   }, [customMaps, activeMapId]);
 
+  const [defaultStickyNotes, setDefaultStickyNotes] = useState<CustomTopologyStickyNote[]>(() => {
+    try {
+      const saved = localStorage.getItem('nettopology_default_sticky_notes_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const activeStickyNotes = useMemo(() => {
+    if (currentCustomMap) {
+      return currentCustomMap.stickyNotes || [];
+    }
+    return defaultStickyNotes;
+  }, [currentCustomMap, defaultStickyNotes]);
+
   const [activeTool, setActiveTool] = useState<'select' | 'cable'>('select');
 
   // Interactive Cabling Workflow State
@@ -804,7 +822,6 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
 
   // Sticky Notes Handlers
   const handleAddStickyNote = useCallback(() => {
-    if (!currentCustomMap) return;
     const rect = containerRef.current?.getBoundingClientRect();
     const centerX = rect ? Math.round((-pan.x + rect.width / 2 - 115) / zoom) : 250;
     const centerY = rect ? Math.round((-pan.y + rect.height / 2 - 80) / zoom) : 200;
@@ -822,25 +839,44 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       viewMode: globalDeviceViewMode,
     };
 
-    const updatedMap: CustomTopologyMap = {
-      ...currentCustomMap,
-      stickyNotes: [...(currentCustomMap.stickyNotes || []), newNote],
-      updatedAt: new Date().toISOString(),
-    };
-    saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    if (currentCustomMap) {
+      const updatedMap: CustomTopologyMap = {
+        ...currentCustomMap,
+        stickyNotes: [...(currentCustomMap.stickyNotes || []), newNote],
+        updatedAt: new Date().toISOString(),
+      };
+      saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    } else {
+      setDefaultStickyNotes((prev) => {
+        const updated = [...prev, newNote];
+        try {
+          localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+    }
   }, [currentCustomMap, customMaps, pan.x, pan.y, zoom, saveCustomMaps, globalDeviceViewMode]);
 
   const handleUpdateStickyNote = useCallback((updatedNote: CustomTopologyStickyNote) => {
-    if (!currentCustomMap) return;
-    const updatedNotes = (currentCustomMap.stickyNotes || []).map((n) =>
-      n.id === updatedNote.id ? updatedNote : n
-    );
-    const updatedMap: CustomTopologyMap = {
-      ...currentCustomMap,
-      stickyNotes: updatedNotes,
-      updatedAt: new Date().toISOString(),
-    };
-    saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    if (currentCustomMap) {
+      const updatedNotes = (currentCustomMap.stickyNotes || []).map((n) =>
+        n.id === updatedNote.id ? updatedNote : n
+      );
+      const updatedMap: CustomTopologyMap = {
+        ...currentCustomMap,
+        stickyNotes: updatedNotes,
+        updatedAt: new Date().toISOString(),
+      };
+      saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    } else {
+      setDefaultStickyNotes((prev) => {
+        const updated = prev.map((n) => (n.id === updatedNote.id ? updatedNote : n));
+        try {
+          localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+    }
 
     // If note is linked to a device, persist to global device sticky notes storage & DB
     if (updatedNote.linkedDeviceId) {
@@ -849,15 +885,26 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   }, [currentCustomMap, customMaps, saveCustomMaps]);
 
   const handleDeleteStickyNote = useCallback((noteId: string) => {
-    if (!currentCustomMap) return;
-    const noteToDelete = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
-    const updatedNotes = (currentCustomMap.stickyNotes || []).filter((n) => n.id !== noteId);
-    const updatedMap: CustomTopologyMap = {
-      ...currentCustomMap,
-      stickyNotes: updatedNotes,
-      updatedAt: new Date().toISOString(),
-    };
-    saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    let noteToDelete: CustomTopologyStickyNote | undefined;
+    if (currentCustomMap) {
+      noteToDelete = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
+      const updatedNotes = (currentCustomMap.stickyNotes || []).filter((n) => n.id !== noteId);
+      const updatedMap: CustomTopologyMap = {
+        ...currentCustomMap,
+        stickyNotes: updatedNotes,
+        updatedAt: new Date().toISOString(),
+      };
+      saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    } else {
+      setDefaultStickyNotes((prev) => {
+        noteToDelete = prev.find((n) => n.id === noteId);
+        const updated = prev.filter((n) => n.id !== noteId);
+        try {
+          localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+    }
 
     // If note was linked to a device, remove from global device sticky notes
     if (noteToDelete?.linkedDeviceId) {
@@ -867,12 +914,13 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
 
   const handleStickyNoteStartDrag = useCallback((e: React.MouseEvent, noteId: string) => {
     e.stopPropagation();
-    if (!containerRef.current || !currentCustomMap) return;
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const worldMouseX = (e.clientX - rect.left - pan.x) / zoom;
     const worldMouseY = (e.clientY - rect.top - pan.y) / zoom;
 
-    const note = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
+    const notes = currentCustomMap ? (currentCustomMap.stickyNotes || []) : defaultStickyNotes;
+    const note = notes.find((n) => n.id === noteId);
     if (!note) return;
 
     dragNoteOffset.current = {
@@ -883,7 +931,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       moved: false,
     };
     setDraggingNoteId(noteId);
-  }, [currentCustomMap, pan.x, pan.y, zoom]);
+  }, [currentCustomMap, defaultStickyNotes, pan.x, pan.y, zoom]);
 
   // Rack Handlers
   const handleCreateCustomMapRack = useCallback((rackData: Omit<CustomTopologyRack, 'id' | 'devices' | 'x' | 'y'>) => {
@@ -1663,12 +1711,17 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   }, [topology?.nodes, localNodes, inventoryDevices, currentCustomMap?.racks, currentCustomMap?.towers, currentCustomMap?.deviceIds]);
 
   const handlePromptDeleteStickyNote = useCallback((noteId: string) => {
-    if (!currentCustomMap) return;
-    const noteToDelete = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
+    const notes = currentCustomMap ? (currentCustomMap.stickyNotes || []) : defaultStickyNotes;
+    const noteToDelete = notes.find((n) => n.id === noteId);
     if (!noteToDelete) return;
 
     const linkedDev = noteToDelete.linkedDeviceId
-      ? allAvailableDevices.find((d) => d.id === noteToDelete.linkedDeviceId)
+      ? allAvailableDevices.find(
+          (d) =>
+            d.id === noteToDelete.linkedDeviceId ||
+            d.id === noteToDelete.linkedDeviceId?.replace(/^hw-/, '') ||
+            d.id === `hw-${noteToDelete.linkedDeviceId?.replace(/^hw-/, '')}`
+        )
       : undefined;
 
     setDeleteModalTarget({
@@ -1678,7 +1731,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       content: noteToDelete.content,
       linkedDeviceName: linkedDev?.name,
     });
-  }, [currentCustomMap, allAvailableDevices]);
+  }, [currentCustomMap, defaultStickyNotes, allAvailableDevices]);
 
   const handleRemoveDeviceFromCustomMap = useCallback((deviceId: string) => {
     if (!currentCustomMap) return;
@@ -1983,8 +2036,23 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
     try {
       const rawNotes = localStorage.getItem('nettopology_device_sticky_notes_v1');
       const devNotes: CustomTopologyStickyNote[] = rawNotes ? JSON.parse(rawNotes) : [];
-      const matchingNote = devNotes.find((n) => n.linkedDeviceId === device.id);
-      if (matchingNote && !updatedStickyNotes.some((n) => n.id === matchingNote.id || n.linkedDeviceId === device.id)) {
+      const cleanDevId = device.id.replace(/^hw-/, '');
+      const matchingNote = devNotes.find(
+        (n) =>
+          n.linkedDeviceId === device.id ||
+          n.linkedDeviceId === cleanDevId ||
+          n.linkedDeviceId === `hw-${cleanDevId}`
+      );
+      if (
+        matchingNote &&
+        !updatedStickyNotes.some(
+          (n) =>
+            n.id === matchingNote.id ||
+            n.linkedDeviceId === device.id ||
+            n.linkedDeviceId === cleanDevId ||
+            n.linkedDeviceId === `hw-${cleanDevId}`
+        )
+      ) {
         updatedStickyNotes = [
           ...updatedStickyNotes,
           {
@@ -3029,7 +3097,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         .catch(() => {});
 
       // 7. Fetch latest device sticky notes from DB
-      const notesPromise = syncDeviceNotesFromDatabase().catch(() => []);
+      const notesPromise = syncStickyNotesWithDatabase().catch(() => {});
 
       await Promise.allSettled([posPromise, mapsPromise, hierarchyPromise, notesPromise]);
 
@@ -3212,6 +3280,373 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
 
     return pos;
   }, [topology, allAvailableDevices, customPositions, activeMapId, currentCustomMap, globalDeviceViewMode, draggingNodeId]);
+
+  // Helper to find device position for auto-attaching sticky notes
+  const getDevicePositionForNote = useCallback(
+    (deviceId: string): { x: number; y: number } | null => {
+      const cleanId = deviceId.replace(/^hw-/, '');
+      const hwId = 'hw-' + cleanId;
+      return (
+        nodePositions.get(deviceId) ||
+        nodePositions.get(cleanId) ||
+        nodePositions.get(hwId) ||
+        customPositions[deviceId] ||
+        customPositions[cleanId] ||
+        customPositions[hwId] ||
+        null
+      );
+    },
+    [nodePositions, customPositions]
+  );
+
+  // Synchronize device sticky notes from database & localStorage
+  const syncStickyNotesWithDatabase = useCallback(async () => {
+    try {
+      const dbNotes = await syncDeviceNotesFromDatabase();
+      if (!Array.isArray(dbNotes) || dbNotes.length === 0) return;
+
+      const notesByDev = new Map<string, CustomTopologyStickyNote>();
+      for (const n of dbNotes) {
+        if (n.linkedDeviceId) {
+          const clean = n.linkedDeviceId.replace(/^hw-/, '');
+          notesByDev.set(n.linkedDeviceId, n);
+          notesByDev.set(clean, n);
+          notesByDev.set('hw-' + clean, n);
+        }
+        if (n.id) notesByDev.set(n.id, n);
+      }
+
+      // 1. Sync custom maps
+      setCustomMaps((prevMaps) => {
+        let hasChanges = false;
+        const updatedMaps = prevMaps.map((map) => {
+          const currentNotes = Array.isArray(map.stickyNotes) ? map.stickyNotes : [];
+          const existingKeys = new Set<string>();
+
+          let mapChanged = false;
+          const mergedNotes = currentNotes.map((sn) => {
+            const match = (sn.linkedDeviceId && notesByDev.get(sn.linkedDeviceId)) || notesByDev.get(sn.id);
+            if (match) {
+              existingKeys.add(match.id);
+              if (match.linkedDeviceId) existingKeys.add(match.linkedDeviceId);
+              if (
+                sn.title !== match.title ||
+                sn.content !== match.content ||
+                sn.color !== match.color
+              ) {
+                mapChanged = true;
+                return {
+                  ...sn,
+                  id: match.id || sn.id,
+                  title: match.title,
+                  content: match.content,
+                  color: match.color || sn.color,
+                  updatedAt: match.updatedAt || sn.updatedAt,
+                };
+              }
+            }
+            return sn;
+          });
+
+          // Check if any device in this map has a note in DB not yet rendered on map
+          const devIds = Array.isArray(map.deviceIds) ? map.deviceIds : Object.keys(map.devicePositions || {});
+          for (const dId of devIds) {
+            const match = notesByDev.get(dId);
+            if (match && !existingKeys.has(match.id) && !existingKeys.has(dId)) {
+              const devPos = map.devicePositions?.[dId] || { x: 200, y: 150 };
+              mergedNotes.push({
+                ...match,
+                x: (devPos.x || 200) + 120,
+                y: (devPos.y || 150) + 40,
+                viewMode: map.deviceDisplayModes?.[dId] || 'card',
+              });
+              existingKeys.add(match.id);
+              existingKeys.add(dId);
+              mapChanged = true;
+            }
+          }
+
+          if (mapChanged) {
+            hasChanges = true;
+            return {
+              ...map,
+              stickyNotes: mergedNotes,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return map;
+        });
+
+        if (hasChanges) {
+          saveCustomMaps(updatedMaps);
+          return updatedMaps;
+        }
+        return prevMaps;
+      });
+
+      // 2. Sync default map sticky notes
+      setDefaultStickyNotes((prevNotes) => {
+        const existingKeys = new Set<string>();
+        let defaultChanged = false;
+
+        const mergedNotes = prevNotes.map((sn) => {
+          const match = (sn.linkedDeviceId && notesByDev.get(sn.linkedDeviceId)) || notesByDev.get(sn.id);
+          if (match) {
+            existingKeys.add(match.id);
+            if (match.linkedDeviceId) existingKeys.add(match.linkedDeviceId);
+            if (
+              sn.title !== match.title ||
+              sn.content !== match.content ||
+              sn.color !== match.color
+            ) {
+              defaultChanged = true;
+              return {
+                ...sn,
+                id: match.id || sn.id,
+                title: match.title,
+                content: match.content,
+                color: match.color || sn.color,
+                updatedAt: match.updatedAt || sn.updatedAt,
+              };
+            }
+          }
+          return sn;
+        });
+
+        // Auto-attach any device note that exists in DB and is in allAvailableDevices
+        for (const [devId, match] of notesByDev.entries()) {
+          if (!existingKeys.has(match.id) && !existingKeys.has(match.linkedDeviceId || devId)) {
+            const devPos = getDevicePositionForNote(match.linkedDeviceId || devId);
+            if (devPos) {
+              mergedNotes.push({
+                ...match,
+                x: devPos.x + 120,
+                y: devPos.y + 40,
+                viewMode: 'card',
+              });
+              existingKeys.add(match.id);
+              existingKeys.add(match.linkedDeviceId || devId);
+              defaultChanged = true;
+            }
+          }
+        }
+
+        if (defaultChanged) {
+          try {
+            localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(mergedNotes));
+          } catch (e) {}
+          return mergedNotes;
+        }
+        return prevNotes;
+      });
+    } catch (err) {
+      console.warn('[Sync Sticky Notes Error]', err);
+    }
+  }, [saveCustomMaps, getDevicePositionForNote]);
+
+  // Listen to nettopology_device_notes_updated and nettopology_custom_maps_updated
+  useEffect(() => {
+    syncStickyNotesWithDatabase();
+
+    const handleDeviceNotesUpdated = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      const detail = customEvt.detail;
+      if (!detail) {
+        syncStickyNotesWithDatabase();
+        return;
+      }
+
+      if (detail.deleted) {
+        const deletedId = detail.id;
+        const deletedDevId = detail.deviceId;
+        const cleanDevId = deletedDevId?.replace(/^hw-/, '');
+
+        setCustomMaps((prev) => {
+          const updated = prev.map((m) => ({
+            ...m,
+            stickyNotes: (m.stickyNotes || []).filter(
+              (n) =>
+                n.id !== deletedId &&
+                (!deletedDevId ||
+                  (n.linkedDeviceId !== deletedDevId &&
+                    n.linkedDeviceId !== cleanDevId &&
+                    n.linkedDeviceId !== 'hw-' + cleanDevId))
+            ),
+          }));
+          saveCustomMaps(updated);
+          return updated;
+        });
+
+        setDefaultStickyNotes((prev) => {
+          const updated = prev.filter(
+            (n) =>
+              n.id !== deletedId &&
+              (!deletedDevId ||
+                (n.linkedDeviceId !== deletedDevId &&
+                  n.linkedDeviceId !== cleanDevId &&
+                  n.linkedDeviceId !== 'hw-' + cleanDevId))
+          );
+          try {
+            localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+      } else {
+        // Saved / updated note from Inventory or anywhere else
+        const note: CustomTopologyStickyNote = detail;
+        const targetDevId = note.linkedDeviceId;
+        const cleanDevId = targetDevId?.replace(/^hw-/, '');
+        const hwDevId = cleanDevId ? 'hw-' + cleanDevId : undefined;
+
+        setCustomMaps((prev) => {
+          const updated = prev.map((m) => {
+            const currentNotes = m.stickyNotes || [];
+            const exists = currentNotes.some(
+              (n) =>
+                n.id === note.id ||
+                (targetDevId &&
+                  (n.linkedDeviceId === targetDevId ||
+                    n.linkedDeviceId === cleanDevId ||
+                    n.linkedDeviceId === hwDevId))
+            );
+
+            let newNotes: CustomTopologyStickyNote[];
+            if (exists) {
+              newNotes = currentNotes.map((n) =>
+                n.id === note.id ||
+                (targetDevId &&
+                  (n.linkedDeviceId === targetDevId ||
+                    n.linkedDeviceId === cleanDevId ||
+                    n.linkedDeviceId === hwDevId))
+                  ? {
+                      ...n,
+                      id: note.id,
+                      title: note.title,
+                      content: note.content,
+                      color: note.color || n.color,
+                      updatedAt: note.updatedAt || new Date().toISOString(),
+                    }
+                  : n
+              );
+            } else {
+              const hasDev =
+                (Array.isArray(m.deviceIds) &&
+                  (m.deviceIds.includes(targetDevId!) ||
+                    (cleanDevId && m.deviceIds.includes(cleanDevId)) ||
+                    (hwDevId && m.deviceIds.includes(hwDevId)))) ||
+                (m.devicePositions &&
+                  (m.devicePositions[targetDevId!] ||
+                    (cleanDevId && m.devicePositions[cleanDevId]) ||
+                    (hwDevId && m.devicePositions[hwDevId])));
+
+              if (hasDev) {
+                const devPos =
+                  (m.devicePositions &&
+                    (m.devicePositions[targetDevId!] ||
+                      (cleanDevId && m.devicePositions[cleanDevId]) ||
+                      (hwDevId && m.devicePositions[hwDevId]))) ||
+                  { x: 200, y: 150 };
+                newNotes = [
+                  ...currentNotes,
+                  {
+                    ...note,
+                    x: (devPos.x || 200) + 120,
+                    y: (devPos.y || 150) + 40,
+                    viewMode: (targetDevId && m.deviceDisplayModes?.[targetDevId]) || 'card',
+                  },
+                ];
+              } else {
+                newNotes = currentNotes;
+              }
+            }
+
+            return {
+              ...m,
+              stickyNotes: newNotes,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          saveCustomMaps(updated);
+          return updated;
+        });
+
+        setDefaultStickyNotes((prev) => {
+          const exists = prev.some(
+            (n) =>
+              n.id === note.id ||
+              (targetDevId &&
+                (n.linkedDeviceId === targetDevId ||
+                  n.linkedDeviceId === cleanDevId ||
+                  n.linkedDeviceId === hwDevId))
+          );
+
+          let updated: CustomTopologyStickyNote[];
+          if (exists) {
+            updated = prev.map((n) =>
+              n.id === note.id ||
+              (targetDevId &&
+                (n.linkedDeviceId === targetDevId ||
+                  n.linkedDeviceId === cleanDevId ||
+                  n.linkedDeviceId === hwDevId))
+                ? {
+                    ...n,
+                    id: note.id,
+                    title: note.title,
+                    content: note.content,
+                    color: note.color || n.color,
+                    updatedAt: note.updatedAt || new Date().toISOString(),
+                  }
+                : n
+            );
+          } else {
+            const devPos = (targetDevId && getDevicePositionForNote(targetDevId)) || { x: 200, y: 150 };
+            updated = [
+              ...prev,
+              {
+                ...note,
+                x: devPos.x + 120,
+                y: devPos.y + 40,
+                viewMode: 'card',
+              },
+            ];
+          }
+
+          try {
+            localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+      }
+    };
+
+    const handleCustomMapsUpdated = () => {
+      try {
+        const saved = localStorage.getItem(CUSTOM_MAPS_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setCustomMaps(parsed);
+          }
+        }
+        const rawDef = localStorage.getItem('nettopology_default_sticky_notes_v1');
+        if (rawDef) {
+          const parsedDef = JSON.parse(rawDef);
+          if (Array.isArray(parsedDef)) {
+            setDefaultStickyNotes(parsedDef);
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('nettopology_device_notes_updated', handleDeviceNotesUpdated);
+    window.addEventListener('nettopology_custom_maps_updated', handleCustomMapsUpdated);
+
+    return () => {
+      window.removeEventListener('nettopology_device_notes_updated', handleDeviceNotesUpdated);
+      window.removeEventListener('nettopology_custom_maps_updated', handleCustomMapsUpdated);
+    };
+  }, [syncStickyNotesWithDatabase, saveCustomMaps, getDevicePositionForNote]);
 
   // Switch to Card View with 3-second random neon border animation for the selected device
   const handleSwitchToCardWithHighlight = useCallback(
@@ -3685,7 +4120,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       }
 
       // 1.8 Handling Sticky Note Drag
-      if (draggingNoteId && containerRef.current && currentCustomMap) {
+      if (draggingNoteId && containerRef.current) {
         const dist = Math.hypot(
           e.clientX - dragNoteOffset.current.startClientX,
           e.clientY - dragNoteOffset.current.startClientY
@@ -3703,15 +4138,21 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
 
         dragNoteLatestCoords.current = { id: draggingNoteId, x: newX, y: newY };
 
-        const updatedNotes = (currentCustomMap.stickyNotes || []).map((n) =>
-          n.id === draggingNoteId ? { ...n, x: newX, y: newY } : n
-        );
-        const updatedMap: CustomTopologyMap = {
-          ...currentCustomMap,
-          stickyNotes: updatedNotes,
-          updatedAt: new Date().toISOString(),
-        };
-        setCustomMaps((prev) => prev.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+        if (currentCustomMap) {
+          const updatedNotes = (currentCustomMap.stickyNotes || []).map((n) =>
+            n.id === draggingNoteId ? { ...n, x: newX, y: newY } : n
+          );
+          const updatedMap: CustomTopologyMap = {
+            ...currentCustomMap,
+            stickyNotes: updatedNotes,
+            updatedAt: new Date().toISOString(),
+          };
+          setCustomMaps((prev) => prev.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+        } else {
+          setDefaultStickyNotes((prev) =>
+            prev.map((n) => (n.id === draggingNoteId ? { ...n, x: newX, y: newY } : n))
+          );
+        }
         return;
       }
 
@@ -3849,24 +4290,40 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       }
 
       if (draggingNoteId) {
-        if (dragNoteOffset.current.moved && activeMapId !== 'default') {
+        if (dragNoteOffset.current.moved) {
           const finalNoteCoords = dragNoteLatestCoords.current;
           if (finalNoteCoords) {
-            setCustomMaps((prevMaps) => {
-              const targetMap = prevMaps.find((m) => m.id === activeMapId);
-              if (!targetMap) return prevMaps;
-              const updatedNotes = (targetMap.stickyNotes || []).map((n) =>
-                n.id === finalNoteCoords.id ? { ...n, x: finalNoteCoords.x, y: finalNoteCoords.y } : n
-              );
-              const updatedMap: CustomTopologyMap = {
-                ...targetMap,
-                stickyNotes: updatedNotes,
-                updatedAt: new Date().toISOString(),
-              };
-              const newMaps = prevMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m));
-              saveCustomMaps(newMaps);
-              return newMaps;
-            });
+            if (activeMapId !== 'default') {
+              setCustomMaps((prevMaps) => {
+                const targetMap = prevMaps.find((m) => m.id === activeMapId);
+                if (!targetMap) return prevMaps;
+                const updatedNotes = (targetMap.stickyNotes || []).map((n) =>
+                  n.id === finalNoteCoords.id ? { ...n, x: finalNoteCoords.x, y: finalNoteCoords.y } : n
+                );
+                const updatedMap: CustomTopologyMap = {
+                  ...targetMap,
+                  stickyNotes: updatedNotes,
+                  updatedAt: new Date().toISOString(),
+                };
+                const newMaps = prevMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m));
+                saveCustomMaps(newMaps);
+                return newMaps;
+              });
+            } else {
+              setDefaultStickyNotes((prevNotes) => {
+                const updated = prevNotes.map((n) =>
+                  n.id === finalNoteCoords.id ? { ...n, x: finalNoteCoords.x, y: finalNoteCoords.y } : n
+                );
+                try {
+                  localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+                } catch (e) {}
+                const movedNote = updated.find((n) => n.id === finalNoteCoords.id);
+                if (movedNote?.linkedDeviceId) {
+                  persistDeviceNoteToDatabase(movedNote).catch(() => {});
+                }
+                return updated;
+              });
+            }
           }
         }
         setDraggingNoteId(null);
@@ -6142,11 +6599,18 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
             })()}
 
               {/* Sticky Notes Connector Lines to Linked Devices (rendered only if showStickyNotes and matching current viewMode) */}
-              {showStickyNotes && currentCustomMap?.stickyNotes && currentCustomMap.stickyNotes
+              {showStickyNotes && activeStickyNotes && activeStickyNotes
                 .filter((note) => (note.viewMode || 'card') === globalDeviceViewMode)
                 .map((note) => {
                 if (!note.linkedDeviceId) return null;
-                const devPos = nodePositions.get(note.linkedDeviceId) || customPositions[note.linkedDeviceId];
+                const cleanId = note.linkedDeviceId.replace(/^hw-/, '');
+                const devPos =
+                  nodePositions.get(note.linkedDeviceId) ||
+                  customPositions[note.linkedDeviceId] ||
+                  nodePositions.get(cleanId) ||
+                  customPositions[cleanId] ||
+                  nodePositions.get('hw-' + cleanId) ||
+                  customPositions['hw-' + cleanId];
                 if (!devPos) return null;
                 const noteCenterX = note.x + 115;
                 const noteCenterY = note.y + 60;
@@ -6172,7 +6636,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
               })}
 
               {/* Sticky Notes on Canvas (rendered only if showStickyNotes and matching current viewMode) */}
-              {showStickyNotes && currentCustomMap?.stickyNotes && currentCustomMap.stickyNotes
+              {showStickyNotes && activeStickyNotes && activeStickyNotes
                 .filter((note) => (note.viewMode || 'card') === globalDeviceViewMode)
                 .map((note) => (
                 <foreignObject
@@ -6192,7 +6656,14 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                     onDelete={handlePromptDeleteStickyNote}
                     onStartDrag={handleStickyNoteStartDrag}
                     onFocusDevice={(devId) => {
-                      const p = nodePositions.get(devId) || customPositions[devId];
+                      const cleanId = devId.replace(/^hw-/, '');
+                      const p =
+                        nodePositions.get(devId) ||
+                        customPositions[devId] ||
+                        nodePositions.get(cleanId) ||
+                        customPositions[cleanId] ||
+                        nodePositions.get('hw-' + cleanId) ||
+                        customPositions['hw-' + cleanId];
                       if (p) {
                         setPan({
                           x: -p.x * zoom + 300,

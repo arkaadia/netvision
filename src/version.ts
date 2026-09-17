@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.0';
+export const APP_VERSION = '1.66.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.1',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'همگام‌سازی لحظه‌ای و دوطرفه یادداشت‌های تجهیزات (Sticky Notes) بین جدول مدیریت تجهیزات و نقشه شماتیک توپولوژی',
+    title_en: 'Bi-directional Real-Time Database Synchronization of Device Sticky Notes Across Inventory and Schematic Topology',
+    changes: [
+      'یکپارچه‌سازی کامل منبع داده یادداشت‌های چسبان متصل به تجهیزات با جدول دیتابیس PostgreSQL (device_sticky_notes) و همگام‌سازی بلادرنگ با نقشه شماتیک توپولوژی.',
+      'افزودن شنونده‌های رویداد و همگام‌سازی خودکار در نقشه شماتیک توپولوژی؛ به محض افزودن یا ویرایش یادداشت تجهیز در بخش مدیریت تجهیزات، متن و مشخصات یادداشت بلافاصله روی نقشه بارگذاری و به تجهیز متصل می‌شود.',
+      'اصلاح نرمال‌سازی شناسه دیوایس‌ها (پشتیبانی یکسان از شناسه‌های دارای پیشوند hw- و بدون آن) در کلیه عملیات خواندن، نوشتن، حذف و اتصال بصری خط چین در کانواس نقشه.',
+      'پشتیبانی از جابجایی (Drag and Drop) و حفظ موقعیت مکانی یادداشت‌ها در نقشه پیش‌فرض (Default Map) علاوه بر نقشه‌های سفارشی.'
+    ],
+    changes_en: [
+      'Unified device-linked sticky notes source of truth with PostgreSQL database (device_sticky_notes) and synchronized state in real time with the schematic topology canvas.',
+      'Added automated real-time event listeners and database sync in SchematicTopologyView; edits or additions in Network Equipment Inventory immediately reflect on the schematic map and auto-attach to the target device.',
+      'Normalized device identifier matching (seamlessly handling IDs with and without the hw- prefix) across reading, writing, deleting, and visual SVG dashed connector lines.',
+      'Enabled drag-and-drop repositioning and persistence for sticky notes on the Default Map in addition to custom maps.'
+    ]
+  },
   {
     version: '1.66.0',
     releaseDate: '2026-09-17',

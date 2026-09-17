@@ -1380,6 +1380,66 @@ export async function getCustomMaps(userFilter?: MapUserFilter): Promise<any[]> 
     allMaps = loadFallbackStore().custom_maps || [];
   }
 
+  // Synchronize sticky notes from device_sticky_notes table into custom maps
+  try {
+    const dbNotes = await getDeviceStickyNotes();
+    if (Array.isArray(dbNotes) && dbNotes.length > 0) {
+      const notesByDev = new Map<string, any>();
+      for (const dn of dbNotes) {
+        if (dn.linkedDeviceId) {
+          notesByDev.set(dn.linkedDeviceId, dn);
+          notesByDev.set(dn.linkedDeviceId.replace(/^hw-/, ''), dn);
+          notesByDev.set('hw-' + dn.linkedDeviceId.replace(/^hw-/, ''), dn);
+        }
+        if (dn.id) notesByDev.set(dn.id, dn);
+      }
+
+      for (const m of allMaps) {
+        const currentNotes = Array.isArray(m.stickyNotes) ? m.stickyNotes : [];
+        const existingNoteIds = new Set<string>();
+
+        const mergedNotes = currentNotes.map((sn: any) => {
+          const match =
+            (sn.linkedDeviceId && notesByDev.get(sn.linkedDeviceId)) ||
+            notesByDev.get(sn.id);
+          if (match) {
+            existingNoteIds.add(match.id);
+            if (match.linkedDeviceId) existingNoteIds.add(match.linkedDeviceId);
+            return {
+              ...sn,
+              id: match.id || sn.id,
+              title: match.title,
+              content: match.content,
+              color: match.color || sn.color,
+              updatedAt: match.updatedAt || sn.updatedAt,
+            };
+          }
+          return sn;
+        });
+
+        // If map contains a device that has a sticky note in DB, ensure it is attached
+        const devIds: string[] = Array.isArray(m.deviceIds) ? m.deviceIds : Object.keys(m.devicePositions || {});
+        for (const dId of devIds) {
+          const match = notesByDev.get(dId);
+          if (match && !existingNoteIds.has(match.id) && !existingNoteIds.has(dId)) {
+            const devPos = m.devicePositions?.[dId] || { x: 200, y: 150 };
+            mergedNotes.push({
+              ...match,
+              x: (devPos.x || 200) + 80,
+              y: (devPos.y || 150) + 40,
+            });
+            existingNoteIds.add(match.id);
+            existingNoteIds.add(dId);
+          }
+        }
+
+        m.stickyNotes = mergedNotes;
+      }
+    }
+  } catch (syncErr) {
+    console.warn('[Custom Maps Note Sync Notice]', syncErr);
+  }
+
   // If no user filter supplied, return all maps
   if (!userFilter || !userFilter.username) {
     return allMaps;
@@ -1981,6 +2041,9 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
   const deviceId = note.linkedDeviceId || note.deviceId;
   if (!deviceId) throw new Error('Device ID is required for device sticky note');
 
+  const cleanDeviceId = deviceId.replace(/^hw-/, '');
+  const hwDeviceId = 'hw-' + cleanDeviceId;
+
   const normalizedNote = {
     id,
     linkedDeviceId: deviceId,
@@ -2000,32 +2063,51 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
     store.device_sticky_notes = [];
   }
   const existingIdx = store.device_sticky_notes.findIndex(
-    (n: any) => n.id === id || n.linkedDeviceId === deviceId
+    (n: any) =>
+      n.id === id ||
+      n.linkedDeviceId === deviceId ||
+      n.linkedDeviceId === cleanDeviceId ||
+      n.linkedDeviceId === hwDeviceId
   );
   if (existingIdx >= 0) {
+    normalizedNote.id = store.device_sticky_notes[existingIdx].id || normalizedNote.id;
     store.device_sticky_notes[existingIdx] = normalizedNote;
   } else {
     store.device_sticky_notes.push(normalizedNote);
   }
 
-  // Update or attach in custom maps containing this device
+  // Update or attach in custom maps in fallback store
   if (Array.isArray(store.custom_maps)) {
     for (const m of store.custom_maps) {
-      if (Array.isArray(m.deviceIds) && m.deviceIds.includes(deviceId)) {
-        if (!Array.isArray(m.stickyNotes)) m.stickyNotes = [];
-        const snIdx = m.stickyNotes.findIndex(
-          (sn: any) => sn.id === id || sn.linkedDeviceId === deviceId
-        );
-        if (snIdx >= 0) {
-          m.stickyNotes[snIdx] = {
-            ...m.stickyNotes[snIdx],
-            title: normalizedNote.title,
-            content: normalizedNote.content,
-            color: normalizedNote.color,
-            updatedAt: normalizedNote.updatedAt,
-          };
-        } else {
-          const devPos = m.devicePositions?.[deviceId] || { x: 200, y: 150 };
+      if (!Array.isArray(m.stickyNotes)) m.stickyNotes = [];
+      const snIdx = m.stickyNotes.findIndex(
+        (sn: any) =>
+          sn.id === normalizedNote.id ||
+          sn.linkedDeviceId === deviceId ||
+          sn.linkedDeviceId === cleanDeviceId ||
+          sn.linkedDeviceId === hwDeviceId
+      );
+      if (snIdx >= 0) {
+        m.stickyNotes[snIdx] = {
+          ...m.stickyNotes[snIdx],
+          id: normalizedNote.id,
+          title: normalizedNote.title,
+          content: normalizedNote.content,
+          color: normalizedNote.color,
+          updatedAt: normalizedNote.updatedAt,
+        };
+      } else {
+        const hasDevice =
+          (Array.isArray(m.deviceIds) &&
+            (m.deviceIds.includes(deviceId) || m.deviceIds.includes(cleanDeviceId) || m.deviceIds.includes(hwDeviceId))) ||
+          (m.devicePositions &&
+            (m.devicePositions[deviceId] || m.devicePositions[cleanDeviceId] || m.devicePositions[hwDeviceId]));
+
+        if (hasDevice) {
+          const devPos =
+            (m.devicePositions &&
+              (m.devicePositions[deviceId] || m.devicePositions[cleanDeviceId] || m.devicePositions[hwDeviceId])) ||
+            { x: 200, y: 150 };
           m.stickyNotes.push({
             ...normalizedNote,
             x: (devPos.x || 200) + 80,
@@ -2041,6 +2123,14 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
   await ensurePostgresConnection();
   if (isPostgresReady && pool) {
     try {
+      // Find if this device or id already has a record in device_sticky_notes table
+      const existingRes = await pool.query(
+        'SELECT id FROM device_sticky_notes WHERE id = $1 OR device_id = $2 OR device_id = $3 LIMIT 1',
+        [id, deviceId, cleanDeviceId]
+      );
+      const targetId = existingRes.rows.length > 0 ? existingRes.rows[0].id : normalizedNote.id;
+      normalizedNote.id = targetId;
+
       await pool.query(
         `INSERT INTO device_sticky_notes (id, device_id, title, content, color, x, y, width, view_mode, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -2055,7 +2145,7 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
            view_mode = EXCLUDED.view_mode,
            updated_at = EXCLUDED.updated_at`,
         [
-          normalizedNote.id,
+          targetId,
           normalizedNote.linkedDeviceId,
           normalizedNote.title,
           normalizedNote.content,
@@ -2068,6 +2158,64 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
           normalizedNote.updatedAt,
         ]
       );
+
+      // Also synchronize PostgreSQL custom_maps table
+      try {
+        const mapsRes = await pool.query('SELECT id, map_data FROM custom_maps');
+        for (const row of mapsRes.rows) {
+          const mapData = typeof row.map_data === 'string' ? JSON.parse(row.map_data) : (row.map_data || {});
+          let stickyNotes = Array.isArray(mapData.stickyNotes) ? mapData.stickyNotes : [];
+          const snIdx = stickyNotes.findIndex(
+            (sn: any) =>
+              sn.id === normalizedNote.id ||
+              sn.linkedDeviceId === deviceId ||
+              sn.linkedDeviceId === cleanDeviceId ||
+              sn.linkedDeviceId === hwDeviceId
+          );
+
+          let updated = false;
+          if (snIdx >= 0) {
+            stickyNotes[snIdx] = {
+              ...stickyNotes[snIdx],
+              id: normalizedNote.id,
+              title: normalizedNote.title,
+              content: normalizedNote.content,
+              color: normalizedNote.color,
+              updatedAt: normalizedNote.updatedAt,
+            };
+            updated = true;
+          } else {
+            const hasDev =
+              (Array.isArray(mapData.deviceIds) &&
+                (mapData.deviceIds.includes(deviceId) || mapData.deviceIds.includes(cleanDeviceId) || mapData.deviceIds.includes(hwDeviceId))) ||
+              (mapData.devicePositions &&
+                (mapData.devicePositions[deviceId] || mapData.devicePositions[cleanDeviceId] || mapData.devicePositions[hwDeviceId]));
+            if (hasDev) {
+              const devPos =
+                (mapData.devicePositions &&
+                  (mapData.devicePositions[deviceId] || mapData.devicePositions[cleanDeviceId] || mapData.devicePositions[hwDeviceId])) ||
+                { x: 200, y: 150 };
+              stickyNotes.push({
+                ...normalizedNote,
+                x: (devPos.x || 200) + 80,
+                y: (devPos.y || 150) + 40,
+              });
+              updated = true;
+            }
+          }
+
+          if (updated) {
+            mapData.stickyNotes = stickyNotes;
+            mapData.updatedAt = new Date().toISOString();
+            await pool.query(
+              'UPDATE custom_maps SET map_data = $1, updated_at = NOW() WHERE id = $2',
+              [JSON.stringify(mapData), row.id]
+            );
+          }
+        }
+      } catch (mapSyncErr) {
+        console.warn('[PostgreSQL custom_maps sync warning in saveDeviceStickyNote]', mapSyncErr);
+      }
     } catch (e) {
       console.error('[DB Save Error in saveDeviceStickyNote]', e);
     }
@@ -2097,7 +2245,33 @@ export async function deleteDeviceStickyNote(noteId: string): Promise<void> {
   await ensurePostgresConnection();
   if (isPostgresReady && pool) {
     try {
-      await pool.query('DELETE FROM device_sticky_notes WHERE id = $1 OR device_id = $1', [noteId]);
+      await pool.query(
+        'DELETE FROM device_sticky_notes WHERE id = $1 OR device_id = $1 OR device_id = $2',
+        [noteId, noteId.replace(/^hw-/, '')]
+      );
+
+      // Also clean up from PostgreSQL custom_maps table
+      try {
+        const mapsRes = await pool.query('SELECT id, map_data FROM custom_maps');
+        for (const row of mapsRes.rows) {
+          const mapData = typeof row.map_data === 'string' ? JSON.parse(row.map_data) : (row.map_data || {});
+          if (Array.isArray(mapData.stickyNotes)) {
+            const origLen = mapData.stickyNotes.length;
+            mapData.stickyNotes = mapData.stickyNotes.filter(
+              (sn: any) => sn.id !== noteId && sn.linkedDeviceId !== noteId && sn.linkedDeviceId !== noteId.replace(/^hw-/, '')
+            );
+            if (mapData.stickyNotes.length !== origLen) {
+              mapData.updatedAt = new Date().toISOString();
+              await pool.query(
+                'UPDATE custom_maps SET map_data = $1, updated_at = NOW() WHERE id = $2',
+                [JSON.stringify(mapData), row.id]
+              );
+            }
+          }
+        }
+      } catch (mapErr) {
+        console.warn('[PostgreSQL custom_maps cleanup warning in deleteDeviceStickyNote]', mapErr);
+      }
     } catch (e) {
       console.error('[DB Delete Error in deleteDeviceStickyNote]', e);
     }
