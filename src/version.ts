@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.64.0';
+export const APP_VERSION = '1.64.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.64.1',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'رفع خطای رندر Minified React error #310 و اصلاح ترتیب هوک‌ها در مدال ثبت دیوایس جدید',
+    title_en: 'Fix Minified React Error #310 and Restore Strict Hook Ordering in AddDeviceModal',
+    changes: [
+      'رفع کامل خطای نقض قوانین هوک‌های ری‌اکت (Rules of Hooks) در کامپوننت AddDeviceModal ناشی از فراخوانی پس از شرط خروج زودهنگام.',
+      'انتقال کلیه هوک‌های وضعیت منوی ثبت دیوایس (isSubmitMenuOpen و successNotice) به بالاترین سطح کامپوننت قبل از هرگونه بازگشت شرطی.',
+      'تضمین باز شدن بی‌نقص مدال ثبت تجهیزات شبکه از هر دو بخش مدیریت انبار و نقشه توپولوژی.'
+    ],
+    changes_en: [
+      'Resolved React Hook ordering violation (Minified React error #310) in AddDeviceModal caused by calling state hooks below an early return.',
+      'Moved all submit menu state hooks (isSubmitMenuOpen, successNotice) to the top level of AddDeviceModal before any conditional guard checks.',
+      'Guaranteed smooth and error-free opening of the Register New Device modal across both inventory management and schematic topology views.'
+    ]
+  },
   {
     version: '1.64.0',
     releaseDate: '2026-09-17',

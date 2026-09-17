@@ -146,6 +146,11 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   // Direct SSH Terminal state for "Introduce New Device"
   const [directTerminalDev, setDirectTerminalDev] = useState<Device | null>(null);
 
+  // Submit action dropdown state & quick notice (placed before any conditional return)
+  type SubmitAction = 'save_close' | 'save_new' | 'save_terminal';
+  const [isSubmitMenuOpen, setIsSubmitMenuOpen] = useState(false);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
   const handleOpenDirectTerminal = () => {
     const targetHost = (sshHost || ip || '').trim();
     const constructedDevice: Device = {
@@ -219,6 +224,8 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     setError(null);
     setSelectedTemplateId('');
     setPreventBackdropClose(true);
+    setIsSubmitMenuOpen(false);
+    setSuccessNotice(null);
 
     // Fetch templates
     fetchTemplates()
@@ -512,10 +519,6 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       setIsTestingPing(false);
     }
   };
-
-  type SubmitAction = 'save_close' | 'save_new' | 'save_terminal';
-  const [isSubmitMenuOpen, setIsSubmitMenuOpen] = useState(false);
-  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   const handlePerformSubmit = async (action: SubmitAction = 'save_close') => {
     if (!name.trim()) {
