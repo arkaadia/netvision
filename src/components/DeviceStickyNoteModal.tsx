@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Device, CustomTopologyStickyNote, StickyNoteColor } from '../types';
 import { useLanguage } from '../i18n';
-import { persistDeviceNoteToDatabase, deleteDeviceNoteFromDatabase } from '../services/settingsStorage';
+import { persistDeviceNoteToDatabase, deleteDeviceNoteFromDatabase, STORAGE_KEYS } from '../services/settingsStorage';
 
 interface DeviceStickyNoteModalProps {
   isOpen: boolean;
@@ -150,6 +150,37 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
     if (!content.trim() && !title.trim()) {
       setError(isEn ? 'Note content or title cannot be empty' : 'عنوان یا متن یادداشت نمی‌تواند خالی باشد');
       return;
+    }
+
+    // If creating a new note, verify device does not already have an existing note
+    if (!existingNote) {
+      let alreadyHasNote = false;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
+        if (raw) {
+          const notes = JSON.parse(raw);
+          if (Array.isArray(notes)) {
+            const cleanId = device.id.replace(/^hw-/, '');
+            alreadyHasNote = notes.some(
+              (n: any) =>
+                n &&
+                n.linkedDeviceId &&
+                (n.linkedDeviceId === device.id ||
+                  n.linkedDeviceId === cleanId ||
+                  n.linkedDeviceId === 'hw-' + cleanId)
+            );
+          }
+        }
+      } catch (e) {}
+
+      if (alreadyHasNote) {
+        setError(
+          isEn
+            ? `Device "${device.name || device.ip}" already has a note and you cannot add another note to it.`
+            : `این دیوایس دارای یادداشت است و نمی‌توانید روی آن یادداشت اضافه کنید.`
+        );
+        return;
+      }
     }
 
     try {

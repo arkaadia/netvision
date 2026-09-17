@@ -6,6 +6,7 @@ interface TopologyStickyNoteProps {
   note: CustomTopologyStickyNote;
   isEn: boolean;
   availableDevices: Device[];
+  allNotes?: CustomTopologyStickyNote[];
   onUpdate: (note: CustomTopologyStickyNote) => void;
   onDelete: (noteId: string) => void;
   onStartDrag: (e: React.MouseEvent, noteId: string) => void;
@@ -82,12 +83,18 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
   note,
   isEn,
   availableDevices,
+  allNotes,
   onUpdate,
   onDelete,
   onStartDrag,
   onFocusDevice,
 }) => {
   const [isLinkingOpen, setIsLinkingOpen] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    targetDeviceId?: string;
+    targetDeviceName: string;
+    existingNoteTitle: string;
+  } | null>(null);
   const [pendingReassign, setPendingReassign] = useState<{
     targetDeviceId?: string;
     targetDeviceName: string;
@@ -177,6 +184,52 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
     const cleanCurrent = note.linkedDeviceId?.replace(/^hw-/, '');
     const cleanTarget = deviceId?.replace(/^hw-/, '');
 
+    // Check if target device already has ANOTHER note linked to it
+    if (cleanTarget && cleanTarget !== cleanCurrent) {
+      let conflictingNote: CustomTopologyStickyNote | undefined;
+
+      // 1. Check in allNotes prop
+      if (Array.isArray(allNotes)) {
+        conflictingNote = allNotes.find((n) => {
+          if (!n || n.id === note.id || !n.linkedDeviceId) return false;
+          const nClean = n.linkedDeviceId.replace(/^hw-/, '');
+          return nClean === cleanTarget || n.linkedDeviceId === deviceId || n.linkedDeviceId === `hw-${cleanTarget}`;
+        });
+      }
+
+      // 2. Check in localStorage device notes
+      if (!conflictingNote) {
+        try {
+          const raw = localStorage.getItem('nettopology_device_sticky_notes_v1');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              conflictingNote = parsed.find((n: any) => {
+                if (!n || n.id === note.id || !n.linkedDeviceId) return false;
+                const nClean = n.linkedDeviceId.replace(/^hw-/, '');
+                return nClean === cleanTarget || n.linkedDeviceId === deviceId || n.linkedDeviceId === `hw-${cleanTarget}`;
+              });
+            }
+          }
+        } catch (e) {}
+      }
+
+      // If conflicting note exists on target device, show error and do not allow adding/linking
+      if (conflictingNote) {
+        const targetDev = availableDevices.find(
+          (d) => d.id === deviceId || d.id === cleanTarget || d.id === `hw-${cleanTarget}`
+        );
+        const targetName = targetDev?.name || targetDev?.ip || deviceId;
+        setDuplicateWarning({
+          targetDeviceId: deviceId,
+          targetDeviceName: targetName,
+          existingNoteTitle: conflictingNote.title || (isEn ? 'Existing Note' : 'یادداشت موجود'),
+        });
+        setPendingReassign(null);
+        return;
+      }
+    }
+
     // If note is already linked to a device and user is reassigning it to another device, ask for confirmation
     if (!force && cleanCurrent && cleanTarget && cleanCurrent !== cleanTarget) {
       const currentDev = availableDevices.find(
@@ -201,6 +254,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
       updatedAt: new Date().toISOString(),
     });
     setPendingReassign(null);
+    setDuplicateWarning(null);
     setIsLinkingOpen(false);
   };
 
@@ -284,7 +338,29 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
           className="p-2 bg-slate-900 border border-white/20 rounded-lg shadow-2xl text-white text-[11px] m-1 z-30 space-y-1.5 animate-scale-up"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          {pendingReassign ? (
+          {duplicateWarning ? (
+            <div className="p-2.5 bg-red-950/95 border border-red-500/70 rounded-lg space-y-2 text-white">
+              <div className="flex items-center gap-1.5 text-red-400 font-bold text-[11px]">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{isEn ? 'Device Already Has a Note' : 'این دیوایس یادداشت دارد'}</span>
+              </div>
+              <p className="text-[10px] leading-relaxed text-red-100 font-sans">
+                {isEn
+                  ? `Device "${duplicateWarning.targetDeviceName}" already has a note and you cannot add or link another note to it.`
+                  : `این دیوایس («${duplicateWarning.targetDeviceName}») دارای یادداشت است و نمی‌توانید روی آن یادداشت اضافه کنید.`}
+              </p>
+              <div className="flex items-center justify-end pt-1 border-t border-red-500/30">
+                <button
+                  type="button"
+                  id={`ack-duplicate-btn-${note.id}`}
+                  onClick={() => setDuplicateWarning(null)}
+                  className="py-1 px-3 rounded-md bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] cursor-pointer transition shadow-xs active:scale-95"
+                >
+                  <span>{isEn ? 'Understood' : 'متوجه شدم'}</span>
+                </button>
+              </div>
+            </div>
+          ) : pendingReassign ? (
             <div className="p-2.5 bg-amber-950/90 border border-amber-500/50 rounded-lg space-y-2 text-white">
               <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[11px]">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
@@ -346,24 +422,50 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
                     <Check className="w-3 h-3" />
                   </button>
                 )}
-                {availableDevices.map((dev) => (
-                  <button
-                    key={dev.id}
-                    type="button"
-                    onClick={() => handleLinkDevice(dev.id)}
-                    className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between ${
-                      note.linkedDeviceId === dev.id
-                        ? 'bg-blue-600 text-white font-bold'
-                        : 'hover:bg-white/10 text-slate-300'
-                    }`}
-                  >
-                    <div className="truncate pr-1">
-                      <span className="font-semibold">{dev.name}</span>{' '}
-                      <span className="text-[9px] opacity-70">({dev.ip})</span>
-                    </div>
-                    {note.linkedDeviceId === dev.id && <Check className="w-3 h-3 flex-shrink-0" />}
-                  </button>
-                ))}
+                {availableDevices.map((dev) => {
+                  const cleanDevId = dev.id.replace(/^hw-/, '');
+                  const isLinkedToThis =
+                    note.linkedDeviceId === dev.id ||
+                    (note.linkedDeviceId && note.linkedDeviceId.replace(/^hw-/, '') === cleanDevId);
+
+                  const otherNote = allNotes?.find(
+                    (n) =>
+                      n.id !== note.id &&
+                      n.linkedDeviceId &&
+                      (n.linkedDeviceId === dev.id ||
+                        n.linkedDeviceId === cleanDevId ||
+                        n.linkedDeviceId === 'hw-' + cleanDevId ||
+                        n.linkedDeviceId.replace(/^hw-/, '') === cleanDevId)
+                  );
+
+                  return (
+                    <button
+                      key={dev.id}
+                      type="button"
+                      onClick={() => handleLinkDevice(dev.id)}
+                      className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between transition ${
+                        isLinkedToThis
+                          ? 'bg-blue-600 text-white font-bold'
+                          : otherNote
+                          ? 'hover:bg-amber-500/20 text-slate-300'
+                          : 'hover:bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      <div className="truncate pr-1 flex items-center gap-1">
+                        <span className="font-semibold truncate">{dev.name}</span>{' '}
+                        <span className="text-[9px] opacity-70 flex-shrink-0">({dev.ip})</span>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {otherNote && !isLinkedToThis && (
+                          <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/25 text-amber-300 border border-amber-500/40 font-medium">
+                            {isEn ? 'Has Note' : 'دارای یادداشت'}
+                          </span>
+                        )}
+                        {isLinkedToThis && <Check className="w-3 h-3 flex-shrink-0" />}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}

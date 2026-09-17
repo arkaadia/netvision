@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.6';
+export const APP_VERSION = '1.66.7';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.7',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'همگام‌سازی فوری یادداشت تجهیزات با نقشه شماتیک و جلوگیری از ثبت یادداشت تکراری',
+    title_en: 'Sync Device Notes Instantly with Schematic Topology and Prevent Duplicate Device Notes',
+    changes: [
+      'حل مشکل عدم نمایش یادداشت اضافه شده در لیست دیوایس‌ها هنگام ورود به بخش نقشه شماتیک؛ پاک‌سازی خودکار نشانه‌گذاری‌های حذفی پیشین (Tombstones) و فعال‌سازی نمایش نوت‌ها در نقشه.',
+      'افزودن موقعیت‌دهی هوشمند به یادداشت‌های ایجاد شده از لیست تجهیزات تا بلافاصله در کنار کارت تجهیز مربوطه در نقشه قرار گیرند.',
+      'افزودن اعتبارسنجی و ممانعت از ایجاد یا لینک چند یادداشت به یک تجهیز در هر دو بخش مودال و نقشه با نمایش هشدار مشخص مبنی بر داشتن نوت قبلی.',
+      'افزودن نشانگر «دارای یادداشت» (Has Note) در منوی کشویی انتخاب تجهیزات جهت بهبود تجربه کاربری.',
+      'رعایت کامل قانون عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization).'
+    ],
+    changes_en: [
+      'Resolved issue where notes added in the Device List were not showing when navigating to the Schematic Map; automatically clears any stale tombstones upon saving and enables sticky note visibility on the map.',
+      'Implemented smart position attachment for notes created via inventory, placing them neatly beside the linked device card.',
+      'Added strict duplicate note validation preventing multiple notes from being linked or added to the same device across both the modal and schematic map views, displaying a clear alert when attempted.',
+      'Added "Has Note" badge in device selector dropdowns to visually identify devices that already possess a linked note.',
+      'Strictly maintained bilingual localization standards ensuring no Persian text appears in English mode.'
+    ]
+  },
   {
     version: '1.66.6',
     releaseDate: '2026-09-17',

@@ -10,7 +10,7 @@ import {
   CustomTopologyStickyNote
 } from '../types';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   DEVICE_GROUPS: 'nettopology_device_groups_v1',
   AD_CONFIG: 'nettopology_ad_config_v1',
   ACCESS_POLICIES: 'nettopology_access_policies_v1',
@@ -910,6 +910,36 @@ function removeNoteFromLocalMaps(noteId: string, deviceId?: string): void {
 }
 
 export async function persistDeviceNoteToDatabase(note: CustomTopologyStickyNote): Promise<CustomTopologyStickyNote> {
+  // Clear any tombstone for this device or note in sessionStorage so it is never suppressed
+  try {
+    const targetDevId = note.linkedDeviceId;
+    const cleanTargetDevId = targetDevId?.replace(/^hw-/, '');
+    const hwTargetDevId = cleanTargetDevId ? 'hw-' + cleanTargetDevId : undefined;
+
+    const rawDevs = sessionStorage.getItem('nettopology_deleted_devices_tombstone');
+    if (rawDevs) {
+      const devs: string[] = JSON.parse(rawDevs);
+      if (Array.isArray(devs)) {
+        const filteredDevs = devs.filter(
+          (d) => d !== targetDevId && d !== cleanTargetDevId && d !== hwTargetDevId
+        );
+        sessionStorage.setItem('nettopology_deleted_devices_tombstone', JSON.stringify(filteredDevs));
+      }
+    }
+
+    const rawNotes = sessionStorage.getItem('nettopology_deleted_notes_tombstone');
+    if (rawNotes) {
+      const notes: string[] = JSON.parse(rawNotes);
+      if (Array.isArray(notes)) {
+        const filteredNotes = notes.filter((id) => id !== note.id);
+        sessionStorage.setItem('nettopology_deleted_notes_tombstone', JSON.stringify(filteredNotes));
+      }
+    }
+
+    // Ensure notes display toggle is enabled so added note is immediately visible
+    localStorage.setItem('nettopology_show_sticky_notes', 'true');
+  } catch (e) {}
+
   // Update local cache immediately
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
