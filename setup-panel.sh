@@ -30,7 +30,7 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-PANEL_VERSION="1.61.11"
+PANEL_VERSION="1.61.12"
 
 # ==============================================================================
 # Enterprise Package Manager & DPKG Lock Guard
@@ -630,8 +630,8 @@ elif [ "$SYS_MEM_MB" -le 1500 ]; then
   NODE_HEAP_MB=1536
 fi
 
-export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB} --stack-size=4096"
-log_info "Node.js execution environment: Heap ${NODE_HEAP_MB}MB | Stack 4MB | System RAM: ${SYS_MEM_MB}MB"
+export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB}"
+log_info "Node.js execution environment: Heap ${NODE_HEAP_MB}MB | OS Stack Limit: 64MB | System RAM: ${SYS_MEM_MB}MB"
 
 if ! npm install; then
   log_warning "Standard npm install failed. Retrying with mirror registry (registry.npmmirror.com)..."

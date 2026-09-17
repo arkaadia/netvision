@@ -163,7 +163,7 @@ echo -e "${CYAN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║                                                                  ║"
 echo "║     🌐  NetTopology - Enterprise Network Management Panel        ║"
-echo "║     🚀  Version: 1.61.11 (Production Stable)                     ║"
+echo "║     🚀  Version: 1.61.12 (Production Stable)                     ║"
 echo "║     🛡️  Cisco Port Security & CDP/LLDP Topology Visualizer       ║"
 echo "║     🎨  Spatial Cyber Neon & Multi-Theme Network Studio          ║"
 echo "║                                                                  ║"
@@ -422,7 +422,7 @@ fi
 mkdir -p "$APP_DIR/.tmp"
 chmod 777 "$APP_DIR/.tmp" 2>/dev/null || true
 export TMPDIR="$APP_DIR/.tmp"
-export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB} --stack-size=4096"
+export NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB}"
 rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* "$APP_DIR/.tmp"/* 2>/dev/null || true
 
 # Run npm install
@@ -437,7 +437,7 @@ BUILD_OK=false
 
 # Tier 1: Standard npm run build
 if [ -n "$SUDO_USER" ]; then
-  if su - "$SUDO_USER" -c "cd '$APP_DIR' && export TMPDIR='$APP_DIR/.tmp' && export NODE_OPTIONS='--max-old-space-size=${NODE_HEAP_MB} --stack-size=4096' && npm run build"; then
+  if su - "$SUDO_USER" -c "cd '$APP_DIR' && export TMPDIR='$APP_DIR/.tmp' && export NODE_OPTIONS='--max-old-space-size=${NODE_HEAP_MB}' && npm run build"; then
     BUILD_OK=true
   fi
 else

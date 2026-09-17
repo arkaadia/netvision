@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.11';
+export const APP_VERSION = '1.61.12';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.61.12',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'رفع خطای node: --stack-size= is not allowed in NODE_OPTIONS در محیط سرور',
+    title_en: 'Fix node: --stack-size= is not allowed in NODE_OPTIONS on Server Environments',
+    changes: [
+      'حذف فلگ نامعتبر --stack-size از متغیر محیطی NODE_OPTIONS در اسکریپت‌های setup-panel.sh و install.sh.',
+      'واگذاری مدیریت اندازه پشته مستقیماً به کرنل لینوکس از طریق دستور ulimit -s 65536 جهت ممانعت از ایجاد خطای عدم مجاز بودن در Node.js.',
+      'تثبیت متغیر NODE_OPTIONS صرفاً بر روی تنظیم حافظه هیپ استاندارد (--max-old-space-size) بر اساس میزان حافظه رم در دسترس سیستم.'
+    ],
+    changes_en: [
+      'Removed unsupported --stack-size option from NODE_OPTIONS environment variable in setup-panel.sh and install.sh.',
+      'Delegated thread stack allocation directly to the Linux OS kernel level via ulimit -s 65536, eliminating Node.js startup failure.',
+      'Standardized NODE_OPTIONS strictly to heap sizing (--max-old-space-size) calculated dynamically based on total detected system RAM.'
+    ]
+  },
   {
     version: '1.61.11',
     releaseDate: '2026-09-17',
