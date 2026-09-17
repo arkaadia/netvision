@@ -1634,7 +1634,7 @@ export const AuditLogsView: React.FC = () => {
 
       {/* DEDICATED WATCH LOG INSPECTOR MODAL (Requested feature) */}
       {activeWatchSession && (
-        <div className="fixed inset-0 z-50 modal-glass-backdrop flex items-center justify-center p-3 sm:p-5">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 modal-glass-backdrop flex items-center justify-center p-3 sm:p-5">
           <div className="audit-glass-panel border border-white/15 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-white/10 bg-black/30 flex items-start justify-between gap-4">
@@ -1847,7 +1847,7 @@ export const AuditLogsView: React.FC = () => {
 
       {/* PORTAL LOG DETAIL INSPECTION MODAL */}
       {selectedPortalLog && (
-        <div className="fixed inset-0 z-50 modal-glass-backdrop flex items-center justify-center p-4">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 modal-glass-backdrop flex items-center justify-center p-4">
           <div className="audit-glass-panel border border-white/15 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/30">
               <div className="flex items-center gap-2.5">
@@ -1978,7 +1978,7 @@ export const AuditLogsView: React.FC = () => {
 
       {/* SINGLE COMMAND DETAIL INSPECTION MODAL */}
       {selectedCommandLog && (
-        <div className="fixed inset-0 z-50 modal-glass-backdrop flex items-center justify-center p-4">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 modal-glass-backdrop flex items-center justify-center p-4">
           <div className="audit-glass-panel border border-white/15 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/30">
               <div className="flex items-center gap-2.5">
@@ -2067,7 +2067,7 @@ export const AuditLogsView: React.FC = () => {
 
       {/* CONFIRM PURGE MODAL */}
       {isConfirmPurgeOpen && (
-        <div className="fixed inset-0 z-50 modal-glass-backdrop flex items-center justify-center p-4">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 modal-glass-backdrop flex items-center justify-center p-4">
           <div className="audit-glass-panel border border-rose-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-rose-400">
               <div className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30">

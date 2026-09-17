@@ -831,7 +831,7 @@ export const LocalUsersTab: React.FC<LocalUsersTabProps> = ({
 
       {/* MODAL: CREATE / EDIT LOCAL USER */}
       {userModalOpen && editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-white/15 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
@@ -1069,7 +1069,7 @@ export const LocalUsersTab: React.FC<LocalUsersTabProps> = ({
 
       {/* MODAL: CREATE / EDIT LOCAL GROUP */}
       {groupModalOpen && editingGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-white/15 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
@@ -1223,7 +1223,7 @@ export const LocalUsersTab: React.FC<LocalUsersTabProps> = ({
 
       {/* MODAL: DELETE CONFIRMATION */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+        <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-rose-500/30 p-5 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-rose-400">
               <div className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30">

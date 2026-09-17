@@ -251,7 +251,7 @@ export const CaptureConfigModal: React.FC<CaptureConfigModalProps> = ({
   return (
     <div
       data-modal-backdrop="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md modal-backdrop-blur overflow-y-auto animate-fadeIn"
+      className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md modal-backdrop-blur overflow-y-auto animate-fadeIn"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

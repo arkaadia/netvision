@@ -274,7 +274,7 @@ export const CiscoPortConfigConfirmModal: React.FC<CiscoPortConfigConfirmModalPr
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 modal-backdrop-blur"
+      className="fixed top-0 left-0 right-0 bottom-8 z-[10000] flex items-center justify-center p-3 sm:p-4 modal-backdrop-blur"
       data-modal-backdrop="true"
       onClick={onClose}
     >

@@ -345,7 +345,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center ${
         isFullscreen ? 'p-0' : 'p-2 sm:p-4'
       } bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200`}
       dir={isRtl ? 'rtl' : 'ltr'}
@@ -353,7 +353,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
       <div
         className={`relative w-full ${
           isFullscreen
-            ? 'h-full max-h-screen rounded-none border-none'
+            ? 'h-full max-h-full rounded-none border-none'
             : 'max-w-6xl max-h-[92vh] rounded-2xl border'
         } flex flex-col shadow-2xl ${
           isLightMode
@@ -1623,7 +1623,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
 
         {/* SUB-MODAL: Individual Device Raw CLI Output & Logs Viewer */}
         {viewingResult && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="fixed top-0 left-0 right-0 bottom-8 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
             <div className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-slate-950 border border-white/20 shadow-2xl overflow-hidden font-mono">
               <div className="flex items-center justify-between px-5 py-3.5 bg-slate-900 border-b border-white/10 text-xs">
                 <div className="flex items-center gap-2">
@@ -1729,7 +1729,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
 
         {/* SUB-MODAL: Backup Viewer */}
         {viewingBackup && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="fixed top-0 left-0 right-0 bottom-8 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
             <div className="w-full max-w-4xl max-h-[85vh] flex flex-col rounded-2xl bg-slate-950 border border-white/20 shadow-2xl overflow-hidden font-mono">
               <div className="flex items-center justify-between px-5 py-3.5 bg-slate-900 border-b border-white/10 text-xs">
                 <div className="flex items-center gap-2">

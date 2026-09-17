@@ -151,7 +151,7 @@ start "" winbox.exe ${targetHost} ${username} ${password ? `"${password}"` : ''}
   return (
     <div
       id="winbox-launcher-backdrop"
-      className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+      className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div

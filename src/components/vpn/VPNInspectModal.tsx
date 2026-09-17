@@ -26,7 +26,7 @@ export const VPNInspectModal: React.FC<VPNInspectModalProps> = ({
   if (!isOpen || !vpn) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+    <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
       <div
         className={`w-full max-w-xl rounded-xl p-6 shadow-2xl space-y-4 border ${
           isLightMode ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white'

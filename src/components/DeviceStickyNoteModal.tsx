@@ -234,7 +234,7 @@ export const DeviceStickyNoteModal: React.FC<DeviceStickyNoteModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-5 modal-backdrop-blur overflow-y-auto"
+      className="fixed top-0 left-0 right-0 bottom-8 z-[1200] flex items-center justify-center p-3 sm:p-5 modal-backdrop-blur overflow-y-auto"
       data-modal-backdrop="true"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleRequestClose();

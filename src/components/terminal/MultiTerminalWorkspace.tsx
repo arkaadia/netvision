@@ -172,7 +172,9 @@ export const MultiTerminalWorkspace: React.FC<MultiTerminalWorkspaceProps> = ({
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 bottom-8 z-50 flex flex-col p-1 sm:p-2.5 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden"
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex flex-col ${
+        isFullscreen ? 'p-0' : 'p-1 sm:p-2.5'
+      } bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden`}
       dir={isEn ? 'ltr' : 'rtl'}
       onClick={(e) => {
         if (e.target === e.currentTarget && !preventBackdropClose) {
@@ -181,7 +183,9 @@ export const MultiTerminalWorkspace: React.FC<MultiTerminalWorkspaceProps> = ({
       }}
     >
       {/* Global Multi-Terminal Top Navigation Bar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl mb-2 text-xs select-none shrink-0 shadow-lg">
+      <div className={`flex items-center justify-between px-3 py-2 bg-slate-900 border border-slate-800 ${
+        isFullscreen ? 'rounded-none border-x-0 border-t-0 mb-0' : 'rounded-xl mb-2'
+      } text-xs select-none shrink-0 shadow-lg`}>
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
             <Columns className="w-4 h-4" />

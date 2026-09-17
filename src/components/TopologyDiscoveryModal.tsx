@@ -25,6 +25,8 @@ import {
   Info,
   ShieldAlert,
   Cpu,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { Device, CustomTopologyMap, CustomTopologyLink } from '../types';
@@ -129,6 +131,7 @@ export const TopologyDiscoveryModal: React.FC<TopologyDiscoveryModalProps> = ({
   // Job Execution State
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [currentStepEn, setCurrentStepEn] = useState<string>('');
@@ -367,9 +370,15 @@ export const TopologyDiscoveryModal: React.FC<TopologyDiscoveryModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center ${
+      isFullscreen ? 'p-0' : 'p-3 sm:p-4'
+    } bg-slate-950/80 backdrop-blur-md animate-fadeIn`}>
       <div
-        className={`relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl border transition-all overflow-hidden ${
+        className={`relative w-full ${
+          isFullscreen
+            ? 'h-full max-h-full max-w-none rounded-none border-none'
+            : 'max-w-5xl max-h-[92vh] rounded-2xl border'
+        } flex flex-col shadow-2xl transition-all overflow-hidden ${
           isLightMode ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900 border-white/10 text-white'
         }`}
         dir={isRtl ? 'rtl' : 'ltr'}
@@ -420,6 +429,19 @@ export const TopologyDiscoveryModal: React.FC<TopologyDiscoveryModalProps> = ({
                 <Minus className="w-4 h-4" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className={`p-2 rounded-xl transition cursor-pointer ${
+                isLightMode
+                  ? 'text-slate-500 hover:text-cyan-600 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-cyan-400 hover:bg-white/5'
+              }`}
+              title={isFullscreen ? (isEn ? 'Exit Fullscreen' : 'خروج از حالت تمام‌صفحه') : (isEn ? 'Fullscreen' : 'تمام‌صفحه')}
+              aria-label={isFullscreen ? (isEn ? 'Exit Fullscreen' : 'خروج از حالت تمام‌صفحه') : (isEn ? 'Fullscreen' : 'تمام‌صفحه')}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
             <button
               type="button"
               onClick={onClose}

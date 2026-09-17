@@ -143,7 +143,7 @@ export const AddTowerModal: React.FC<AddTowerModalProps> = ({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop-blur animate-in fade-in duration-200 ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 modal-backdrop-blur animate-in fade-in duration-200 ${
         isLightMode ? 'bg-slate-900/40 theme-light' : 'bg-slate-950/80'
       }`}
     >

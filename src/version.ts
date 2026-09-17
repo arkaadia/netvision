@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.71.0';
+export const APP_VERSION = '1.72.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.72.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'بهبود پاسخ‌دهی فوری بررسی آپدیت در هدر، ارتقای کامل پکیج‌ها و بک‌اند، و رفع تداخل مودال‌ها با فوتر در حالت تمام‌صفحه',
+    title_en: 'Instant Header Update Check, Complete Backend & Package Rebuild Suite, and Fullscreen Modal Footer Alignment',
+    changes: [
+      'بررسی آنی و بی‌درنگ مخزن گیت‌هاب با کلیک بر روی دکمه Check for Updates در هدر، با ادغام مستقیم GitHub API و توکن احراز هویت، رفع کامل تاخیر و باز شدن خودکار مودال تغییرات پس از یافتن آپدیت.',
+      'افزودن دکمه همگام‌سازی و نصب مجدد کامل (Force Full Rebuild & Sync) در مودال انتشار جهت بازسازی صددرصد پکیج‌های NPM (شامل devDependencies)، درایورهای پایتون و کدهای بک‌اند بدون نیاز به حذف دستی پنل از سرور.',
+      'پاکسازی و بستن پروسه قدیمی پایتون در پورت ۸۰۰۰ قبل از راه‌اندازی مجدد تا تمام کدهای جدید بک‌اند بلافاصله بارگذاری گردند.',
+      'افزودن لاگ‌های پیش‌رونده و زنده در رابط کاربری در حین اجرای فرآیند ارتقای سرور جهت نمایش دقیق هر یک از فازهای ۶گانه.',
+      'تنظیم دقیق موقعیت تمام مودال‌های سراسر سامانه (Bulk Device Config, Audit Logs, Schematic Topology, VPN Manager, Release Notes) در حالت معمولی و تمام‌صفحه تا لبه بالایی فوتر (bottom-8) جهت جلوگیری از هرگونه هم‌پوشانی با فوتر.'
+    ],
+    changes_en: [
+      'Instant real-time GitHub repository release checking from the header profile button with GitHub API integration and auth token support, immediately opening release notes on update detection.',
+      'Added Force Full Rebuild & Sync capability in the Release Notes modal to comprehensively reinstall all NPM packages (including devDependencies), Python drivers, and backend code without manual server wipes.',
+      'Graceful termination of stale Python backend processes on port 8000 during updates ensuring all new backend features load instantly upon restart.',
+      'Live progressive UI phase tracking during server updates, providing clear feedback across all 6 upgrade phases.',
+      'System-wide modal positioning overhaul across all modals (Bulk Device Config, Audit Logs, Schematic Topology, VPN Manager, Release Notes), strictly stopping at the top edge of the footer (bottom-8) in both normal and fullscreen modes.'
+    ]
+  },
   {
     version: '1.71.0',
     releaseDate: '2026-09-17',

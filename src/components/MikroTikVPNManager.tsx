@@ -26,7 +26,7 @@ export const MikroTikVPNManager: React.FC<MikroTikVPNManagerProps> = ({
   if (!isOpen || !device) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+    <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
       <div
         className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 border shadow-2xl transition-colors ${
           isLightMode ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 text-white'

@@ -544,7 +544,7 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[1100] flex items-center justify-center p-3 sm:p-5 md:py-8 backdrop-blur-md animate-fade-in ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-3 sm:p-5 md:py-8 backdrop-blur-md animate-fade-in ${
         isLightMode ? 'bg-slate-900/40 theme-light' : 'bg-black/85'
       }`}
       dir={isRtl ? 'rtl' : 'ltr'}

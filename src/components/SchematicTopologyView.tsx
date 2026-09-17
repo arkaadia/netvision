@@ -5226,7 +5226,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`${isRtl ? 'text-right' : 'text-left'} overflow-hidden text-slate-100 transition-all duration-300 ${
         isFullMode
-          ? 'fixed inset-0 z-[99999] w-screen h-screen bg-slate-950 flex flex-col m-0 p-0 shadow-2xl'
+          ? 'fixed top-0 left-0 right-0 bottom-8 z-[99999] bg-slate-950 flex flex-col m-0 p-0 shadow-2xl'
           : 'flex flex-col h-full min-h-[500px] bg-transparent'
       }`}
     >
@@ -7884,7 +7884,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {addFloorBuilding && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setAddFloorBuilding(null)}
         >
           <div
@@ -7961,7 +7961,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {showAddBuildingModal && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setShowAddBuildingModal(false)}
         >
           <div
@@ -8040,7 +8040,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {relocateDevice && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setRelocateDevice(null)}
         >
           <div
@@ -8285,7 +8285,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {addUnitModal && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setAddUnitModal(null)}
         >
           <div
@@ -8361,7 +8361,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {addRackModal && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setAddRackModal(null)}
         >
           <div
@@ -8467,7 +8467,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {renameModal && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setRenameModal(null)}
         >
           <div
@@ -8544,7 +8544,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {deleteModal && (
         <div
           data-modal-backdrop="true"
-          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100000] flex items-center justify-center p-4 modal-backdrop-blur"
           onClick={() => setDeleteModal(null)}
         >
           <div
@@ -8639,7 +8639,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       {/* Confirmation Modal for Disconnecting Cable Link */}
       {linkToDelete && (
         <div
-          className="fixed inset-0 z-[100005] flex items-center justify-center p-4 modal-backdrop-blur"
+          className="fixed top-0 left-0 right-0 bottom-8 z-[100005] flex items-center justify-center p-4 modal-backdrop-blur"
           data-modal-backdrop="true"
           dir={isRtl ? 'rtl' : 'ltr'}
           onClick={() => setLinkToDelete(null)}

@@ -139,7 +139,7 @@ export const MikroTikPortConfigConfirmModal: React.FC<MikroTikPortConfigConfirmM
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200 ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200 ${
         isLightMode ? 'bg-slate-900/50' : 'bg-black/80'
       }`}
     >

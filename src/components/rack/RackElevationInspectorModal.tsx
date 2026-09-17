@@ -116,7 +116,7 @@ export const RackElevationInspectorModal: React.FC<RackElevationInspectorModalPr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5 pt-16 sm:pt-16 pb-4 bg-black/90 backdrop-blur-xl animate-fade-in"
+      className="fixed top-0 left-0 right-0 bottom-8 z-[1000] flex items-center justify-center p-3 sm:p-5 pt-16 sm:pt-16 pb-4 bg-black/90 backdrop-blur-xl animate-fade-in"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div

@@ -690,7 +690,7 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
         isEmbedded
           ? 'h-full rounded-xl border-cyan-500/30'
           : isFullScreen
-          ? 'h-full max-w-none rounded-none'
+          ? 'h-full max-h-full max-w-none rounded-none border-none'
           : 'max-w-5xl h-[85vh] rounded-2xl'
       } border flex flex-col overflow-hidden transition-all ${
         isLightMode
@@ -1445,7 +1445,9 @@ export const MikroTikTerminalModal: React.FC<MikroTikTerminalModalProps> = ({
           onClose();
         }
       }}
-      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200 ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center ${
+        isFullScreen ? 'p-0' : 'p-2 sm:p-4'
+      } backdrop-blur-xs animate-in fade-in duration-200 ${
         isLightMode ? 'bg-slate-900/50' : 'bg-black/85'
       }`}
     >

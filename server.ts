@@ -141,10 +141,10 @@ function compareSemver(v1: string, v2: string): number {
   return 0;
 }
 
-// Helper: Run shell commands safely
-function executeShell(command: string, cwd: string): Promise<string> {
+// Helper: Run shell commands safely with timeout
+function executeShell(command: string, cwd: string, timeoutMs: number = 60000): Promise<string> {
   return new Promise((resolve, reject) => {
-    exec(command, { cwd, maxBuffer: 25 * 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(command, { cwd, maxBuffer: 25 * 1024 * 1024, timeout: timeoutMs }, (err, stdout, stderr) => {
       if (err) {
         reject(new Error(`${err.message}\n${stderr}`));
       } else {
@@ -153,6 +153,9 @@ function executeShell(command: string, cwd: string): Promise<string> {
     });
   });
 }
+
+// GitHub access token for rate-limit bypass and authenticated git operations (from environment)
+const GITHUB_AUTH_TOKEN = process.env.GITHUB_TOKEN || process.env.GITHUB_PAT || '';
 
 // Bridge status endpoint to verify frontend-backend intercommunication
 app.get('/api/status/bridge', (req: Request, res: Response) => {
@@ -173,7 +176,7 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
 
   try {
     const pkgPath = path.join(projectRoot, 'package.json');
-    let currentVersion = '1.70.0';
+    let currentVersion = '1.72.0';
     if (fs.existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
@@ -184,74 +187,130 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
     }
 
     const timestamp = Date.now();
-    const repoPkgUrl = `https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/package.json?_t=${timestamp}`;
-    const repoVersionTsUrl = `https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/src/version.ts?_t=${timestamp}`;
-
     let latestVersion = currentVersion;
     let remoteReleaseNote: any = null;
     let remoteCommitSha: string | null = null;
     let localCommitSha: string | null = null;
+    let commitMessage: string | null = null;
 
-    // Check git commits directly if local .git exists
+    // 1. Fast local git checks with tight timeout
     const gitDir = path.join(projectRoot, '.git');
     if (fs.existsSync(gitDir)) {
       try {
-        localCommitSha = (await executeShell('git rev-parse HEAD', projectRoot)).trim();
-        const lsRemoteOut = await executeShell('git ls-remote origin refs/heads/master', projectRoot);
+        localCommitSha = (await executeShell('git rev-parse HEAD', projectRoot, 3000)).trim();
+      } catch (e: any) {
+        // ignore
+      }
+
+      try {
+        // Configure authenticated remote if needed
+        const lsRemoteOut = await executeShell('git ls-remote origin refs/heads/master', projectRoot, 5000);
         const match = lsRemoteOut.match(/^([0-9a-f]{40})/i);
         if (match) {
           remoteCommitSha = match[1];
         }
       } catch (gitCheckErr: any) {
-        console.warn('[Check Update] Git check warning:', gitCheckErr.message);
+        console.warn('[Check Update] Local git ls-remote warning:', gitCheckErr.message);
       }
+    }
+
+    // 2. High-speed multi-source fetch: GitHub API + jsDelivr CDN + raw.githubusercontent
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const headersWithAuth: Record<string, string> = {
+      'User-Agent': 'Net-Management-Panel',
+      'Accept': 'application/vnd.github.v3+json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
+    };
+    if (GITHUB_AUTH_TOKEN) {
+      headersWithAuth['Authorization'] = `token ${GITHUB_AUTH_TOKEN}`;
     }
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const [pkgRes, versionTsRes] = await Promise.allSettled([
-        fetch(repoPkgUrl, { signal: controller.signal, headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } }),
-        fetch(repoVersionTsUrl, { signal: controller.signal, headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } })
-      ]);
-      clearTimeout(timeoutId);
-
-      if (pkgRes.status === 'fulfilled' && pkgRes.value.ok) {
-        const remotePkg = await pkgRes.value.json() as any;
-        if (remotePkg && remotePkg.version) {
-          latestVersion = remotePkg.version;
+      // Query GitHub API directly for master commit info
+      const commitApiPromise = fetch('https://api.github.com/repos/shahbazimasoud/Net-Management/commits/master', {
+        signal: controller.signal,
+        headers: headersWithAuth
+      }).then(async (res) => {
+        if (res.ok) {
+          const json = await res.json() as any;
+          if (json && json.sha) {
+            remoteCommitSha = json.sha;
+            commitMessage = json.commit?.message?.split('\n')[0] || null;
+          }
         }
-      }
+      }).catch(() => {});
 
-      if (versionTsRes.status === 'fulfilled' && versionTsRes.value.ok) {
-        const tsText = await versionTsRes.value.text();
-        const vMatch = tsText.match(/version:\s*['"]([^'"]+)['"]/);
-        const dMatch = tsText.match(/releaseDate:\s*['"]([^'"]+)['"]/);
-        const tMatch = tsText.match(/type:\s*['"]([^'"]+)['"]/);
-        const titleMatch = tsText.match(/title:\s*['"]([^'"]+)['"]/);
-        const titleEnMatch = tsText.match(/title_en:\s*['"]([^'"]+)['"]/);
-        const changesBlock = tsText.match(/changes:\s*\[([\s\S]*?)\]/);
-        const changesEnBlock = tsText.match(/changes_en:\s*\[([\s\S]*?)\]/);
+      // Query raw package.json and version.ts with fallback CDN
+      const packageSources = [
+        `https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/package.json?_t=${timestamp}`,
+        `https://cdn.jsdelivr.net/gh/shahbazimasoud/Net-Management@master/package.json?_t=${timestamp}`
+      ];
+      const versionSources = [
+        `https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/src/version.ts?_t=${timestamp}`,
+        `https://cdn.jsdelivr.net/gh/shahbazimasoud/Net-Management@master/src/version.ts?_t=${timestamp}`
+      ];
 
-        const changes = changesBlock ? [...changesBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]) : [];
-        const changes_en = changesEnBlock ? [...changesEnBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]) : [];
+      const fetchPackage = async () => {
+        for (const src of packageSources) {
+          try {
+            const r = await fetch(src, { signal: controller.signal, headers: { 'Cache-Control': 'no-cache' } });
+            if (r.ok) {
+              const data = await r.json() as any;
+              if (data && data.version) {
+                latestVersion = data.version;
+                break;
+              }
+            }
+          } catch {
+            // try next
+          }
+        }
+      };
 
-        remoteReleaseNote = {
-          version: vMatch?.[1] || latestVersion,
-          releaseDate: dMatch?.[1] || new Date().toISOString().split('T')[0],
-          type: tMatch?.[1] || 'patch',
-          title: titleMatch?.[1] || `نگارش ${latestVersion}`,
-          title_en: titleEnMatch?.[1] || `Release v${latestVersion}`,
-          changes: changes.length > 0 ? changes : ['به‌روزرسانی و ارتقای کلی عملکرد سامانه'],
-          changes_en: changes_en.length > 0 ? changes_en : ['System optimizations and feature enhancements']
-        };
-      }
+      const fetchVersionTs = async () => {
+        for (const src of versionSources) {
+          try {
+            const r = await fetch(src, { signal: controller.signal, headers: { 'Cache-Control': 'no-cache' } });
+            if (r.ok) {
+              const tsText = await r.text();
+              const vMatch = tsText.match(/version:\s*['"]([^'"]+)['"]/);
+              const dMatch = tsText.match(/releaseDate:\s*['"]([^'"]+)['"]/);
+              const tMatch = tsText.match(/type:\s*['"]([^'"]+)['"]/);
+              const titleMatch = tsText.match(/title:\s*['"]([^'"]+)['"]/);
+              const titleEnMatch = tsText.match(/title_en:\s*['"]([^'"]+)['"]/);
+              const changesBlock = tsText.match(/changes:\s*\[([\s\S]*?)\]/);
+              const changesEnBlock = tsText.match(/changes_en:\s*\[([\s\S]*?)\]/);
+
+              const changes = changesBlock ? [...changesBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]) : [];
+              const changes_en = changesEnBlock ? [...changesEnBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]) : [];
+
+              remoteReleaseNote = {
+                version: vMatch?.[1] || latestVersion,
+                releaseDate: dMatch?.[1] || new Date().toISOString().split('T')[0],
+                type: tMatch?.[1] || 'patch',
+                title: titleMatch?.[1] || `نگارش ${latestVersion}`,
+                title_en: titleEnMatch?.[1] || `Release v${latestVersion}`,
+                changes: changes.length > 0 ? changes : ['به‌روزرسانی و ارتقای کلی عملکرد سامانه'],
+                changes_en: changes_en.length > 0 ? changes_en : ['System optimizations and feature enhancements']
+              };
+              break;
+            }
+          } catch {
+            // try next
+          }
+        }
+      };
+
+      await Promise.allSettled([commitApiPromise, fetchPackage(), fetchVersionTs()]);
+      clearTimeout(timeoutId);
     } catch (fetchErr: any) {
-      console.warn('[Check Update] Warning fetching remote repository:', fetchErr.message);
+      console.warn('[Check Update] Warning fetching remote updates:', fetchErr.message);
     }
 
-    // Check if simulation was requested in query string (e.g. for preview testing)
+    // Check if simulation was requested in query string
     const simulateParam = req.query.simulate === 'true';
     if (simulateParam) {
       const parts = currentVersion.split('.').map(Number);
@@ -262,8 +321,8 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
           version: simVersion,
           releaseDate: new Date().toISOString().split('T')[0],
           type: 'minor',
-          title: 'نسخه آزمایشی ارتقای سیستم مانیتورینگ شبکه و بهینه‌سازی‌های امنیتی',
-          title_en: 'Enhanced Network Monitoring System & Security Suite',
+          title: 'نسخه ارتقای سیستم و رفع مشکلات پکیج‌ها و همگام‌سازی بک‌اند',
+          title_en: 'System Upgrade Suite, Package Reconciliation & Backend Synchronization',
           changes: [
             'قابلیت بررسی خودکار نگارش‌های جدید و ارتقای مستقیم پنل با یک کلیک',
             'افزودن نشانگر چشمک‌زن قرمز روی پروفایل هنگام انتشار نسخه جدید',
@@ -288,6 +347,7 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
       hasUpdate,
       remoteCommitSha,
       localCommitSha,
+      commitMessage,
       releaseNote: remoteReleaseNote,
       repoUrl: 'https://github.com/shahbazimasoud/Net-Management',
       checkedAt: new Date().toISOString()
@@ -324,7 +384,7 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
       if (fs.existsSync(envPath)) fs.copyFileSync(envPath, path.join(backupDir, '.env'));
       if (fs.existsSync(dbStore)) fs.copyFileSync(dbStore, path.join(backupDir, 'database_store.json'));
       if (fs.existsSync(netData)) fs.copyFileSync(netData, path.join(backupDir, 'network_data.json'));
-      log('Safeguarded configuration and local database state.');
+      log('Safeguarded configuration (.env) and local database store.');
     } catch (bErr: any) {
       log(`State backup notice: ${bErr.message}`);
     }
@@ -332,25 +392,28 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
     // Step 2: Codebase Synchronization
     log('--- [Phase 2/6] Synchronizing Codebase with GitHub Repository ---');
     if (fs.existsSync(gitDir)) {
-      log('Local Git repository verified. Fetching latest master branch...');
+      log('Local Git repository detected. Setting origin and pulling latest master branch...');
       try {
-        await executeShell('git fetch origin master', projectRoot);
-        await executeShell('git reset --hard origin/master', projectRoot);
-        await executeShell('git clean -fd -e .env -e backend/database_store.json -e backend/network_data.json', projectRoot);
+        const authedRemote = `https://shahbazimasoud:${GITHUB_AUTH_TOKEN}@github.com/shahbazimasoud/Net-Management.git`;
+        await executeShell(`git remote set-url origin "${authedRemote}" 2>/dev/null || true`, projectRoot, 5000);
+        await executeShell('git fetch origin master', projectRoot, 30000);
+        await executeShell('git checkout master 2>/dev/null || git checkout -B master origin/master', projectRoot, 10000);
+        await executeShell('git reset --hard origin/master', projectRoot, 10000);
+        await executeShell('git clean -fd -e .env -e backend/database_store.json -e backend/network_data.json', projectRoot, 10000);
         log('Repository codebase successfully aligned with origin/master.');
       } catch (gitErr: any) {
         log(`Git fetch warning: ${gitErr.message}. Falling back to pull...`);
         try {
-          await executeShell('git pull origin master || true', projectRoot);
+          await executeShell('git pull origin master || true', projectRoot, 20000);
         } catch {
           // continue
         }
       }
     } else {
       log('Standalone archive mode: Downloading complete repository tarball...');
-      const downloadScript = `curl -sSL -f -o /tmp/netman-update.tar.gz https://codeload.github.com/shahbazimasoud/Net-Management/tar.gz/refs/heads/master && tar -xzf /tmp/netman-update.tar.gz -C /tmp && cp -a /tmp/Net-Management-master/. . && rm -rf /tmp/netman-update.tar.gz /tmp/Net-Management-master`;
+      const downloadScript = `curl -sSL -H "Authorization: token ${GITHUB_AUTH_TOKEN}" -f -o /tmp/netman-update.tar.gz https://api.github.com/repos/shahbazimasoud/Net-Management/tarball/master 2>/dev/null || curl -sSL -f -o /tmp/netman-update.tar.gz https://codeload.github.com/shahbazimasoud/Net-Management/tar.gz/refs/heads/master && tar -xzf /tmp/netman-update.tar.gz -C /tmp && cp -a /tmp/*Net-Management*/. . && rm -rf /tmp/netman-update.tar.gz /tmp/*Net-Management*`;
       try {
-        await executeShell(downloadScript, projectRoot);
+        await executeShell(downloadScript, projectRoot, 45000);
         log('Repository archive extracted and merged successfully.');
       } catch (dlErr: any) {
         log(`Archive extraction warning: ${dlErr.message}`);
@@ -359,17 +422,17 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
 
     // Restore executable permissions for shell scripts
     try {
-      await executeShell('chmod +x *.sh 2>/dev/null || true', projectRoot);
+      await executeShell('chmod +x *.sh backend/*.py 2>/dev/null || true', projectRoot, 5000);
     } catch {
       // ignore
     }
 
-    // Step 3: Full NPM Dependency Reconciliation
-    log('--- [Phase 3/6] Installing & Reconciling NPM Dependencies ---');
+    // Step 3: Full NPM Dependency Reconciliation (Crucial: --include=dev so Vite and TypeScript build tools are installed!)
+    log('--- [Phase 3/6] Installing & Reconciling NPM Dependencies (including build tools) ---');
     if (isCleanMode) {
-      log('Clean installation mode requested: Purging node_modules cache...');
+      log('Clean installation mode requested: Purging node_modules cache and package-lock...');
       try {
-        await executeShell('rm -rf node_modules package-lock.json', projectRoot);
+        await executeShell('rm -rf node_modules package-lock.json', projectRoot, 15000);
       } catch (rmErr: any) {
         log(`Notice removing node_modules: ${rmErr.message}`);
       }
@@ -377,38 +440,51 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
 
     try {
       // Configure network timeout and retry resilience for npm
-      await executeShell('npm config set fetch-retry-maxtimeout 180000 2>/dev/null || true', projectRoot);
-      await executeShell('npm config set fetch-retry-mintimeout 30000 2>/dev/null || true', projectRoot);
-      await executeShell('npm config set fetch-retries 5 2>/dev/null || true', projectRoot);
+      await executeShell('npm config set fetch-retry-maxtimeout 180000 2>/dev/null || true', projectRoot, 5000);
+      await executeShell('npm config set fetch-retry-mintimeout 30000 2>/dev/null || true', projectRoot, 5000);
+      await executeShell('npm config set fetch-retries 5 2>/dev/null || true', projectRoot, 5000);
 
-      log('Running npm install...');
+      log('Running full npm install with all dependencies and devDependencies...');
       try {
-        await executeShell('npm install --no-audit', projectRoot);
+        await executeShell('NODE_ENV=development npm install --include=dev --legacy-peer-deps --no-audit', projectRoot, 180000);
         log('NPM dependencies installed successfully.');
       } catch (firstNpmErr: any) {
         log(`Standard NPM install encountered issue: ${firstNpmErr.message}. Retrying with mirror registry...`);
-        await executeShell('npm install --no-audit --registry=https://registry.npmmirror.com', projectRoot);
+        await executeShell('NODE_ENV=development npm install --include=dev --legacy-peer-deps --no-audit --registry=https://registry.npmmirror.com', projectRoot, 180000);
         log('NPM dependencies successfully installed via fallback mirror.');
       }
 
       // Ensure platform-specific native binaries for Rollup / esbuild on Linux
-      await executeShell('npm install --no-save @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 2>/dev/null || true', projectRoot);
-      await executeShell('npm install --no-save @rollup/rollup-linux-arm64-gnu @esbuild/linux-arm64 2>/dev/null || true', projectRoot);
-      await executeShell('npm rebuild 2>/dev/null || true', projectRoot);
+      await executeShell('npm install --no-save @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 2>/dev/null || true', projectRoot, 30000);
+      await executeShell('npm install --no-save @rollup/rollup-linux-arm64-gnu @esbuild/linux-arm64 2>/dev/null || true', projectRoot, 30000);
+      await executeShell('npm rebuild 2>/dev/null || true', projectRoot, 30000);
     } catch (npmErr: any) {
       log(`NPM installation notice: ${npmErr.message}`);
     }
 
-    // Step 4: Python Backend Dependencies
-    log('--- [Phase 4/6] Verifying Python Backend Dependencies ---');
+    // Step 4: Terminate old Python backend and update Python dependencies
+    log('--- [Phase 4/6] Terminating Stale Python Backend & Reconciling Python Dependencies ---');
     try {
-      const pipInstallCmd = 'python3 -m pip install --upgrade --break-system-packages paramiko cryptography websockets 2>/dev/null || pip3 install paramiko cryptography websockets 2>/dev/null || pip install paramiko cryptography websockets 2>/dev/null || true';
-      await executeShell(pipInstallCmd, projectRoot);
+      // Kill old python backend process so port 8000 is released and new backend files will be loaded!
+      await executeShell('pkill -9 -f "backend/server.py" 2>/dev/null || true', projectRoot, 5000);
+      await executeShell('fuser -k 8000/tcp 2>/dev/null || true', projectRoot, 5000);
+      if (pythonProcess) {
+        try {
+          pythonProcess.kill('SIGKILL');
+          pythonProcess = null;
+        } catch {
+          // ignore
+        }
+      }
+      log('Released port 8000 from old Python backend instance.');
+
+      const pipInstallCmd = 'python3 -m pip install --upgrade --break-system-packages paramiko cryptography websockets requests flask python-dotenv 2>/dev/null || pip3 install paramiko cryptography websockets requests flask 2>/dev/null || pip install paramiko cryptography websockets requests 2>/dev/null || true';
+      await executeShell(pipInstallCmd, projectRoot, 60000);
       const reqPath = path.join(projectRoot, 'requirements.txt');
       if (fs.existsSync(reqPath)) {
-        await executeShell('python3 -m pip install -r requirements.txt --break-system-packages 2>/dev/null || true', projectRoot);
+        await executeShell('python3 -m pip install -r requirements.txt --break-system-packages 2>/dev/null || true', projectRoot, 60000);
       }
-      log('Python environment & drivers (paramiko, cryptography, websockets) verified.');
+      log('Python environment & drivers (paramiko, cryptography, websockets, requests) verified.');
     } catch (pyErr: any) {
       log(`Python dependency notice: ${pyErr.message}`);
     }
@@ -416,14 +492,14 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
     // Step 5: Production Assets & Server Bundle
     log('--- [Phase 5/6] Compiling Production Frontend & Backend Bundles ---');
     try {
-      await executeShell('NODE_OPTIONS="--max-old-space-size=2048" npm run build', projectRoot);
+      await executeShell('NODE_OPTIONS="--max-old-space-size=2048" npm run build', projectRoot, 120000);
       log('Production bundle compiled successfully (dist/ and dist/server.cjs ready).');
     } catch (bErr: any) {
       log(`Build warning: ${bErr.message}`);
     }
 
     // Read updated version from package.json
-    let newVersion = '1.71.0';
+    let newVersion = '1.72.0';
     const pkgPath = path.join(projectRoot, 'package.json');
     if (fs.existsSync(pkgPath)) {
       try {
@@ -435,7 +511,7 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
     }
 
     log(`--- [Phase 6/6] Update Complete! System updated to v${newVersion} ---`);
-    log('Scheduling graceful service restart to reload updated backend into memory...');
+    log('Scheduling graceful service restart to reload updated backend and frontend into memory...');
 
     // Respond immediately with full logs so the frontend can display them and countdown
     res.json({
@@ -445,11 +521,11 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
       logs
     });
 
-    // Schedule background service restart after 1.5 seconds so response reaches client
+    // Schedule background service restart after 1.5 seconds so response reaches client cleanly
     setTimeout(() => {
-      console.log('[Update Engine] Triggering background service restart...');
+      console.log('[Update Engine] Triggering background service and process restart...');
       // 1. Try systemd service restart
-      exec('sudo systemctl restart nettopology || systemctl restart nettopology || bash ./restart.sh', { cwd: projectRoot }, (rErr) => {
+      exec('sudo systemctl restart nettopology || systemctl restart nettopology || sudo systemctl restart net-management || systemctl restart net-management || pm2 restart all || pm2 restart nettopology || bash ./restart.sh', { cwd: projectRoot }, (rErr) => {
         if (rErr) {
           console.log('[Update Engine] Service restart command notice:', rErr.message);
         }

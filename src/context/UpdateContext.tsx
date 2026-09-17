@@ -162,6 +162,8 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         : `[Phase 1/6] Starting ${isCleanMode ? 'clean deep rebuild' : 'standard update'} pipeline...`
     ]);
 
+    let progressInterval: any = null;
+
     try {
       // If in simulated test mode, simulate real steps for demonstration
       if (isSimulated) {
@@ -206,11 +208,40 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return true;
       }
 
+      // Provide live progressive UI logs during server operations
+      const simulatedSteps = isPersian ? [
+        '[گام ۲/۶] همگام‌سازی کامل کدها و فایل‌های مخزن با برنچ اصلی GitHub...',
+        '[گام ۳/۶] نصب و بازسازی پکیج‌های NPM و ابزارهای ساخت (Vite/TypeScript)...',
+        '[گام ۴/۶] پاکسازی پروسه پایتون و بررسی ماژول‌های backend (paramiko, requests)...',
+        '[گام ۵/۶] ساخت و کامپایل مجدد کدهای اجرایی پنل (Production Build)...',
+        '[گام ۶/۶] نهایی‌سازی تنظیمات، آماده‌سازی سرویس و ری‌استارت نهایی...'
+      ] : [
+        '[Phase 2/6] Synchronizing repository codebase with GitHub master branch...',
+        '[Phase 3/6] Installing & reconciling NPM packages and build tools (Vite/TypeScript)...',
+        '[Phase 4/6] Clearing stale Python process & verifying backend packages (paramiko, requests)...',
+        '[Phase 5/6] Compiling production frontend and backend bundles...',
+        '[Phase 6/6] Finalizing configuration, preparing service restart...'
+      ];
+
+      let stepIdx = 0;
+      progressInterval = setInterval(() => {
+        if (stepIdx < simulatedSteps.length) {
+          const nextText = simulatedSteps[stepIdx];
+          setUpdateLogs((prev) => [...prev, nextText]);
+          stepIdx++;
+        }
+      }, 5000);
+
       const res = await fetch('/api/system/perform-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clean: isCleanMode })
       });
+
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
 
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -222,10 +253,16 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCountdown(3);
       return true;
     } catch (err: any) {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       console.error('[UpdateContext] Update error:', err);
       setError(err.message || (isPersian ? 'خطا در ارتقای نرم‌افزار' : 'Software update failed'));
       return false;
     } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       setUpdating(false);
     }
   }, [isSimulated]);

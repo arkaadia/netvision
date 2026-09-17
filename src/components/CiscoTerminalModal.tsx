@@ -2135,7 +2135,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         isEmbedded
           ? 'w-full h-full rounded-xl border-slate-800 shadow-none'
           : isFullscreen
-          ? 'w-full h-full max-h-screen rounded-none'
+          ? 'w-full h-full max-h-full rounded-none border-none'
           : 'w-full max-w-6xl my-auto max-h-[94vh] sm:max-h-[90vh]'
       }`}
     >
@@ -2962,7 +2962,9 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
 
     return (
       <div
-        className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-2 sm:p-4 modal-backdrop-blur overflow-y-auto"
+        className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center ${
+          isFullscreen ? 'p-0' : 'p-2 sm:p-4'
+        } modal-backdrop-blur overflow-y-auto`}
         data-modal-backdrop="true"
         dir={isEn ? 'ltr' : 'rtl'}
         onClick={(e) => {

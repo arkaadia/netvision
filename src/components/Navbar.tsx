@@ -366,8 +366,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Prominent Direct GitHub Check Button */}
                   <button
-                    onClick={async () => {
-                      await checkUpdate(false, true);
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const result = await checkUpdate(false, true);
+                      if (result.hasUpdate && onOpenReleaseNotes) {
+                        setProfileOpen(false);
+                        onOpenReleaseNotes();
+                      }
                     }}
                     disabled={checking}
                     className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 border border-cyan-500/25 hover:border-cyan-500/40 text-xs font-semibold transition cursor-pointer active:scale-98 disabled:opacity-50"
