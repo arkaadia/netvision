@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Info, X, HelpCircle, CheckCircle2 } from 'lucide-react';
 
@@ -14,6 +14,13 @@ interface InfoTooltipPopoverProps {
   className?: string;
 }
 
+interface Coords {
+  top: number;
+  left: number;
+  width: number;
+  isFlipped: boolean;
+}
+
 export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
   title,
   what,
@@ -26,56 +33,83 @@ export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({
-    top: 0,
-    left: 0,
-    width: 320,
-  });
+  const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
+  const [coords, setCoords] = useState<Coords | null>(null);
 
-  // Calculate coordinates to ensure popover NEVER overflows viewport or parent modal
-  const updatePosition = () => {
-    if (!triggerRef.current) return;
-    const triggerRect = triggerRef.current.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+  // Synchronously calculate position directly under mouse click or trigger button
+  const computePosition = useCallback(
+    (mousePoint?: { x: number; y: number } | null): Coords => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const targetWidth = Math.min(320, viewportWidth - 24);
 
-    // Responsive popover width constrained safely within viewport margins
-    const targetWidth = Math.min(330, viewportWidth - 24);
+      let anchorX: number;
+      let anchorY: number;
 
-    // Desired horizontal position
-    let left = isEn
-      ? triggerRect.left
-      : triggerRect.right - targetWidth;
+      if (mousePoint && mousePoint.x > 0 && mousePoint.y > 0) {
+        anchorX = mousePoint.x;
+        anchorY = mousePoint.y;
+      } else if (triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect();
+        anchorX = rect.left + rect.width / 2;
+        anchorY = rect.bottom;
+      } else {
+        anchorX = viewportWidth / 2;
+        anchorY = viewportHeight / 2;
+      }
 
-    // Check boundary overflow
-    if (left + targetWidth > viewportWidth - 12) {
-      left = viewportWidth - targetWidth - 12;
-    }
-    if (left < 12) {
-      left = 12;
-    }
+      // Center horizontally directly under the cursor / trigger
+      let left = Math.round(anchorX - targetWidth / 2);
 
-    // Determine vertical placement: prefer bottom, flip to top if insufficient space below
-    const estimatedHeight = 280;
-    const spaceBelow = viewportHeight - triggerRect.bottom;
-    const spaceAbove = triggerRect.top;
+      // Clamp within viewport margins
+      if (left + targetWidth > viewportWidth - 12) {
+        left = viewportWidth - targetWidth - 12;
+      }
+      if (left < 12) {
+        left = 12;
+      }
 
-    let top: number;
-    if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
-      // Place above trigger
-      top = Math.max(12, triggerRect.top - estimatedHeight - 8);
+      // Vertical placement directly under click
+      const estimatedHeight = 260;
+      const spaceBelow = viewportHeight - anchorY;
+      const spaceAbove = anchorY;
+
+      let top: number;
+      let isFlipped = false;
+
+      if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+        // Position directly above cursor
+        top = Math.max(12, Math.round(anchorY - estimatedHeight - 10));
+        isFlipped = true;
+      } else {
+        // Position directly below cursor
+        top = Math.min(viewportHeight - estimatedHeight - 12, Math.round(anchorY + 10));
+        if (top < 12) top = 12;
+      }
+
+      return { top, left, width: targetWidth, isFlipped };
+    },
+    []
+  );
+
+  const toggleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (isOpen) {
+      setIsOpen(false);
+      lastMouseRef.current = null;
     } else {
-      // Place below trigger
-      top = triggerRect.bottom + 6;
+      const mouse = { x: e.clientX, y: e.clientY };
+      lastMouseRef.current = mouse;
+      const calculated = computePosition(mouse);
+      setCoords(calculated);
+      setIsOpen(true);
     }
-
-    setCoords({ top, left, width: targetWidth });
   };
 
   useEffect(() => {
     if (!isOpen) return;
-
-    updatePosition();
 
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -96,7 +130,7 @@ export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
     };
 
     const handleScrollOrResize = () => {
-      updatePosition();
+      setCoords(computePosition(lastMouseRef.current));
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -110,13 +144,7 @@ export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
       window.removeEventListener('resize', handleScrollOrResize);
       window.removeEventListener('scroll', handleScrollOrResize, true);
     };
-  }, [isOpen, isEn]);
-
-  const toggleOpen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setIsOpen((prev) => !prev);
-  };
+  }, [isOpen, computePosition]);
 
   return (
     <div className={`inline-flex items-center shrink-0 ${className}`}>
@@ -136,6 +164,7 @@ export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
       </button>
 
       {isOpen &&
+        coords &&
         createPortal(
           <div
             ref={popoverRef}
@@ -149,7 +178,7 @@ export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
               maxHeight: 'calc(100vh - 32px)',
               zIndex: 99999,
             }}
-            className="p-3 rounded-xl bg-slate-900/95 border border-cyan-500/40 shadow-2xl backdrop-blur-xl text-xs font-sans text-slate-200 transition-all animate-in fade-in zoom-in-95 flex flex-col overflow-hidden"
+            className="p-3 rounded-xl bg-slate-900/95 border border-cyan-500/40 shadow-2xl backdrop-blur-xl text-xs font-sans text-slate-200 animate-in fade-in zoom-in-95 duration-150 flex flex-col overflow-hidden"
             dir={isEn ? 'ltr' : 'rtl'}
           >
             {/* Header */}
@@ -167,7 +196,7 @@ export const InfoTooltipPopover: React.FC<InfoTooltipPopoverProps> = ({
               </button>
             </div>
 
-            {/* Scrollable Body if needed on very small screens */}
+            {/* Scrollable Body if needed on small screens */}
             <div className="space-y-2 overflow-y-auto max-h-[60vh] pr-1 pl-1 scrollbar-thin scrollbar-thumb-white/10">
               {/* 1. What it is */}
               {what && (

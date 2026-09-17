@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.69.1';
+export const APP_VERSION = '1.69.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.69.2',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'اصلاح باز شدن کادر راهنما دقیقا در محل کلیک موس (Exact Click-Anchor Popover Positioning)',
+    title_en: 'Anchor Info Popover Directly to Mouse Click Location with Zero Position Delay',
+    changes: [
+      'محاسبه بلادرنگ و همگام مختصات افقی و عمودی کادر راهنما دقیقا زیر محل کلیک موس کاربر.',
+      'حذف انیمیشن transition-all برای رفع پرش ناگهانی کادر از گوشه سمت راست به زیر موس.',
+      'مرکزیت‌بخشی افقی کادر متناسب با نشانگر موس همراه با مهار هوشمند در لبه‌های مانیتور.',
+      'پشتیبانی هماهنگ از کلیک کیبورد با فالبک هوشمند به موقعیت هندسی دکمه راهنما.'
+    ],
+    changes_en: [
+      'Engineered instantaneous, synchronous coordinate calculation directly anchoring the info popover under the mouse click position.',
+      'Eliminated generic transition-all animation, removing the unwanted jump/glide from the top-right corner to the cursor.',
+      'Horizontally centered the popover beneath the cursor with safety viewport edge clamping.',
+      'Maintained seamless keyboard accessibility with automatic fallback to trigger element bounding rect.'
+    ]
+  },
   {
     version: '1.69.1',
     releaseDate: '2026-09-17',
