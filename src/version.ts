@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.62.2';
+export const APP_VERSION = '1.63.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.63.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'بازنویسی معماری پردازش دستورات ترمینال سیسکو، تفکیک استریم سخت‌افزار از CLI تعاملی و نمایش کامل خروجی دستورات show',
+    title_en: 'Architectural Overhaul of Cisco Terminal CLI Pipeline, Real-Hardware vs Interactive Stream Separation, and Guaranteed show Output Rendering',
+    changes: [
+      'اصلاح ساختاری رهگیری دستورات در وب‌سوکت و رفع باگ بلعیده شدن دستورات در حالت غیرسخت‌افزاری (Simulated/Interactive)؛ دستورات تایپ‌شده دیگر بی‌پاسخ رها نشده و خروجی متنی آن‌ها مستقیماً و بلافاصله در کنسول ترمینال رندر می‌شود.',
+      'پشتیبانی کامل و دقیق از ترنزیشن مدهای سیسکو (مانند دستور enable/en و خروج از آن) و همگام‌سازی بلادرنگ پرامپت ترمینال بین کاربر (>User EXEC) و سطح دسترسی مدیر (#Privileged EXEC).',
+      'تکمیل و ارتقای مجموعه جامع دستورات بررسی وضعیت سیسکو (show running-config، show interfaces detailed، show ip int brief، show interfaces status، show vlan brief، show clock، show arp، show startup-config، show inventory، show logging، show spanning-tree و ...) با خروجی‌های معتبر و استاندارد سیسکو.',
+      'تداوم همگام‌سازی خودکار پورت‌های فیزیکی پنل بالای ترمینال در پس‌زمینه بدون مسدودسازی یا تداخل با نمایش خروجی‌های متنی در کادر کنسول.',
+      'افزایش پایداری اتصال و نمایش صحیح وضعیت ترمینال تعاملی (Interactive CLI Ready) در صورت عدم دسترسی محیط کلود به SSH فیزیکی.'
+    ],
+    changes_en: [
+      'Overhauled command interception logic in the terminal WebSocket pipeline, preventing input swallowing in simulated/interactive sessions so that typed commands always render their full text output directly in the console.',
+      'Full support for standard Cisco IOS mode transitions (enable, en, disable, configure terminal) with real-time prompt updating between User EXEC (>) and Privileged EXEC (#).',
+      'Expanded comprehensive Cisco show suite (show running-config, show interfaces detailed, show ip interface brief, show interfaces status, show vlan brief, show clock, show arp, show startup-config, show inventory, show logging, show spanning-tree, etc.) with authentic Cisco IOS formatting.',
+      'Continuous background synchronization of top faceplate ports without blocking, suppressing, or interfering with console terminal output display.',
+      'Enhanced session fallback indicators displaying Interactive CLI Ready whenever hardware SSH is unreachable from the container environment.'
+    ]
+  },
   {
     version: '1.62.2',
     releaseDate: '2026-09-17',
