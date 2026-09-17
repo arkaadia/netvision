@@ -30,7 +30,7 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-PANEL_VERSION="1.61.12"
+PANEL_VERSION="1.62.1"
 
 # ==============================================================================
 # Enterprise Package Manager & DPKG Lock Guard
@@ -690,6 +690,13 @@ if [ "$BUILD_SUCCESS" = false ]; then
 
   log_info "Installing @rollup/wasm-node (zero-native WebAssembly bundler)..."
   npm install --no-save @rollup/wasm-node 2>/dev/null || true
+
+  # Inject WASM engine directly into Rollup native resolution path
+  if [ -d "node_modules/@rollup/wasm-node/dist" ] && [ -d "node_modules/rollup/dist" ]; then
+    cp -rf node_modules/@rollup/wasm-node/dist/wasm-node node_modules/rollup/dist/ 2>/dev/null || true
+    cp -f node_modules/@rollup/wasm-node/dist/native.js node_modules/rollup/dist/native.js 2>/dev/null || true
+    log_info "WebAssembly bundler engine linked into Rollup pipeline."
+  fi
 
   if npx vite build --emptyOutDir && npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs; then
     log_success "NetTopology build successfully produced via WebAssembly engine!"

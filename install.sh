@@ -163,7 +163,7 @@ echo -e "${CYAN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║                                                                  ║"
 echo "║     🌐  NetTopology - Enterprise Network Management Panel        ║"
-echo "║     🚀  Version: 1.61.12 (Production Stable)                     ║"
+echo "║     🚀  Version: 1.62.1 (Production Stable)                      ║"
 echo "║     🛡️  Cisco Port Security & CDP/LLDP Topology Visualizer       ║"
 echo "║     🎨  Spatial Cyber Neon & Multi-Theme Network Studio          ║"
 echo "║                                                                  ║"
@@ -468,6 +468,12 @@ if [ "$BUILD_OK" = false ]; then
   echo -e "${YELLOW}در حال اجرای کامپایلر ایزوله WebAssembly (@rollup/wasm-node)...${NC}"
   rm -rf "$APP_DIR/dist" "$APP_DIR/node_modules/.vite" /tmp/esbuild* "$APP_DIR/.tmp"/* 2>/dev/null || true
   npm install --no-save @rollup/wasm-node 2>/dev/null || true
+
+  # Inject WASM engine directly into Rollup native resolution path
+  if [ -d "$APP_DIR/node_modules/@rollup/wasm-node/dist" ] && [ -d "$APP_DIR/node_modules/rollup/dist" ]; then
+    cp -rf "$APP_DIR/node_modules/@rollup/wasm-node/dist/wasm-node" "$APP_DIR/node_modules/rollup/dist/" 2>/dev/null || true
+    cp -f "$APP_DIR/node_modules/@rollup/wasm-node/dist/native.js" "$APP_DIR/node_modules/rollup/dist/native.js" 2>/dev/null || true
+  fi
 
   if npx vite build --emptyOutDir && npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs; then
     BUILD_OK=true

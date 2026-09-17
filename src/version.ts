@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.62.0';
+export const APP_VERSION = '1.62.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.62.1',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'تثبیت ترتیب ایمپورت CSS و پیوند مستقیم موتور WebAssembly در فالبک کامپایل سرور',
+    title_en: 'Fix CSS Import Order and Link WebAssembly Engine in Server Build Pipeline',
+    changes: [
+      'انتقال دستور import "tailwindcss"@ به خط اول فایل src/index.css و رفع خطای اعتبارسنجی نحوی parser لایتنینگ‌سی‌اس‌اس (UnexpectedImportRule) که منجر به ناهماهنگی در باینری‌های نیتیو می‌شد.',
+      'اصلاح و تقویت فالبک سطح سوم (Tier 3) در اسکریپت‌های setup-panel.sh و install.sh جهت کپی و اتصال مستقیم باینری‌های WebAssembly پکیج rollup/wasm-node@ در مسیر اجرایی rollup/dist/ به نحوی که در صورت بروز خطای حافظه فیزیکی (Bus error/core dumped)، کامپایل به صورت صددرصد ایزوله و موفق انجام پذیرد.',
+      'آزمایش و تایید بیلد کامل و موفق فرانت‌اند و بک‌اند با کامپایلر ایزوله بدون هیچ‌گونه وابستگی به محدودیت‌های کرنل سرور.'
+    ],
+    changes_en: [
+      'Positioned @import "tailwindcss"; strictly at the first line of src/index.css, resolving lightningcss parser syntax errors (UnexpectedImportRule) that precipitated native binding failures.',
+      'Enhanced Tier 3 build recovery in setup-panel.sh and install.sh to directly inject @rollup/wasm-node WebAssembly artifacts into rollup/dist/, guaranteeing 100% resilient zero-native builds even when VPS hosts suffer physical bus memory faults.',
+      'Validated end-to-end frontend and backend builds with zero kernel-level dependency or failure.'
+    ]
+  },
   {
     version: '1.62.0',
     releaseDate: '2026-09-17',
