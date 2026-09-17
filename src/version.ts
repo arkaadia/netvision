@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.69.0';
+export const APP_VERSION = '1.69.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.69.1',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'اصلاح موقعیت و جلوگیری از سرریز کادرهای راهنما (Info Popovers Viewport Clamping)',
+    title_en: 'Fix Info Popover Positioning & Prevent Modal Scrollbar Overflow via React Portals',
+    changes: [
+      'انتقال رندرینگ پاپ‌اورهای راهنما به React Portal روی بدنه صفحه جهت جلوگیری از دستکاری ابعاد والد و حذف اسکرول ناخواسته.',
+      'محاسبه هوشمند مختصات افقی و عمودی پاپ‌اور بر اساس فضای باقی‌مانده دید (Viewport Boundary Clamping).',
+      'وارونه‌سازی خودکار موقعیت باز شدن به سمت بالا در صورت کمبود فضا در پایین دکمه.',
+      'تعیین سقف عرضی و طولی متناسب با صفحه نمایش و فراهم کردن اسکرول نرم داخلی تنها برای متون طولانی.'
+    ],
+    changes_en: [
+      'Migrated info popover rendering to React Portals on document body, completely eliminating unwanted parent container scrollbars.',
+      'Engineered smart viewport boundary clamping preventing popovers from escaping the screen edges in both RTL and LTR.',
+      'Implemented automatic upward flip detection when vertical space below the trigger is constrained.',
+      'Restricted maximum widths and heights responsively, confining any long textual overflow strictly inside the popover.'
+    ]
+  },
   {
     version: '1.69.0',
     releaseDate: '2026-09-17',
