@@ -297,7 +297,16 @@ export function getTerminalWebSocketUrl(
   deviceId: string,
   protocol?: 'ssh' | 'telnet',
   role?: string,
-  deviceInfo?: { ip?: string; ssh_host?: string; ssh_port?: number; ssh_username?: string }
+  deviceInfo?: {
+    ip?: string;
+    ssh_host?: string;
+    ssh_port?: number;
+    ssh_username?: string;
+    ssh_password?: string;
+    password?: string;
+    enable_password?: string;
+    platform?: string;
+  }
 ): string {
   const loc = window.location;
   const wsProto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -310,6 +319,10 @@ export function getTerminalWebSocketUrl(
     if (h) query.set('host', h);
     if (deviceInfo.ssh_port) query.set('port', String(deviceInfo.ssh_port));
     if (deviceInfo.ssh_username) query.set('username', deviceInfo.ssh_username);
+    const pass = deviceInfo.ssh_password || deviceInfo.password;
+    if (pass) query.set('password', pass);
+    if (deviceInfo.enable_password) query.set('enable_password', deviceInfo.enable_password);
+    if (deviceInfo.platform) query.set('platform', deviceInfo.platform);
   }
   return `${wsProto}//${loc.host}/ws/ssh/${encodeURIComponent(deviceId)}?${query.toString()}`;
 }

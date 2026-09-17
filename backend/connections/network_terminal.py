@@ -210,6 +210,39 @@ class NetworkTerminalSession:
 
         return channel, transport
 
+    def _connect_ssh_client(self, timeout: float = 6.0) -> Tuple[Any, Any, Any]:
+        """
+        Connects using standard paramiko.SSHClient with auto-add host key policy.
+        Supports standard Linux servers, modern Cisco IOS-XE, and MikroTik RouterOS.
+        Returns (channel, transport, client).
+        """
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        client.connect(
+            hostname=self.host,
+            port=self.port,
+            username=self.username,
+            password=self.password,
+            timeout=timeout,
+            banner_timeout=timeout,
+            auth_timeout=timeout,
+            look_for_keys=False,
+            allow_agent=False
+        )
+
+        transport = client.get_transport()
+        if not transport or not transport.is_authenticated():
+            raise paramiko.AuthenticationException(f"Authentication failed for user '{self.username}' on {self.host}:{self.port}")
+
+        term_name = "xterm-256color" if self.is_cisco else ("vt100" if self.is_mikrotik else "xterm")
+        channel = transport.open_session(timeout=timeout)
+        channel.get_pty(term=term_name, width=self.cols, height=self.rows)
+        channel.invoke_shell()
+        channel.settimeout(0.05)
+
+        return channel, transport, client
+
     def _connect_ssh(self, start_t: float) -> bool:
         """
         Executes real SSH connection with automatic legacy algorithm fallback for Cisco equipment.
@@ -222,24 +255,25 @@ class NetworkTerminalSession:
             self.notify_status("failed", error=self.error_message)
             return False
 
-        # Attempt 1: Modern standard algorithms
         first_error = None
         channel = None
         transport = None
 
+        # Attempt 1: Standard SSHClient connection
         try:
-            channel, transport = self._connect_ssh_transport(use_legacy=False, timeout=6.0)
+            channel, transport, client = self._connect_ssh_client(timeout=6.0)
             self.used_legacy_algorithms = False
-        except (paramiko.SSHException, socket.error, TimeoutError) as e:
+            self._paramiko_client = client
+        except (paramiko.SSHException, socket.error, TimeoutError, Exception) as e:
             first_error = e
-            # If negotiation failed or device is Cisco, retry with legacy algorithms enabled
             err_msg = str(e).lower()
             is_algo_error = any(keyword in err_msg for keyword in [
                 "no matching", "kex", "cipher", "key exchange", "incompatible", "algorithm", "disabled"
             ])
 
+            # If standard connection failed and device is Cisco or algorithm mismatch, retry with legacy algorithms
             if self.is_cisco or is_algo_error:
-                print(f"[NetworkTerminal] Modern SSH handshake failed for {self.host}:{self.port} ({e}). Retrying with Cisco legacy algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa)...")
+                print(f"[NetworkTerminal] Standard SSH handshake failed for {self.host}:{self.port} ({e}). Retrying with Cisco legacy algorithms...")
                 if self.on_data_callback:
                     self.on_data_callback(
                         f"\r\n\x1b[33m[SSH Fallback]\x1b[0m Negotiating legacy Cisco algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa) with {self.host}...\r\n"
@@ -252,10 +286,6 @@ class NetworkTerminalSession:
                     first_error = legacy_err
             else:
                 first_error = e
-        except paramiko.AuthenticationException as e:
-            first_error = e
-        except Exception as e:
-            first_error = e
 
         if first_error or not channel or not transport:
             self.status = "FAILED"
@@ -286,7 +316,7 @@ class NetworkTerminalSession:
                     f"Verify that SSH server daemon is enabled on this device.\r\n"
                 )
                 self.error_message = f"Connection refused by {self.host}:{self.port}"
-            elif "unreachable" in err_lower:
+            elif "unreachable" in err_lower or "no route" in err_lower:
                 user_msg = (
                     f"\r\n\x1b[1;31m[Network Unreachable]\x1b[0m\r\n"
                     f"No route to host {self.host} from the management server container.\r\n"
@@ -329,14 +359,13 @@ class NetworkTerminalSession:
         )
         self._send_error_to_terminal(success_banner)
 
-        # Send initial terminal configuration commands to disable pagination
-        # so show commands (e.g. show running-config, show interfaces status) output fully without hanging on --More--
+        # Send initial terminal configuration commands to disable pagination on Cisco
         try:
             if self.is_cisco and self._ssh_channel:
-                time.sleep(0.1)
+                time.sleep(0.08)
                 self._ssh_channel.send("terminal length 0\r\n".encode("utf-8"))
             elif self.is_mikrotik and self._ssh_channel:
-                time.sleep(0.1)
+                time.sleep(0.08)
                 self._ssh_channel.send("/console/set terminal=vt100\r\n".encode("utf-8"))
         except Exception as e:
             print(f"[NetworkTerminal] Initial paging config send warning: {e}")
@@ -352,27 +381,46 @@ class NetworkTerminalSession:
     def _ssh_reader_loop(self):
         """Reads incoming bytes from the real SSH channel and triggers on_data_callback."""
         chan = self._ssh_channel
+        if not chan:
+            return
+
+        chan.settimeout(0.05)
+
         while not self._stop_event.is_set() and chan and not chan.closed:
             try:
-                r, _, _ = select.select([chan], [], [], 0.05)
-                if r:
-                    if chan.recv_ready():
+                data = None
+                if chan.recv_ready():
+                    data = chan.recv(4096)
+                else:
+                    try:
                         data = chan.recv(4096)
-                        if not data:
-                            # EOF received from device
+                    except (socket.timeout, TimeoutError):
+                        pass
+
+                if data:
+                    while chan.recv_ready():
+                        extra = chan.recv(4096)
+                        if not extra:
                             break
-                        # Read all immediately available bytes to avoid slicing text across multiple frames
-                        while chan.recv_ready():
-                            extra = chan.recv(4096)
-                            if not extra:
-                                break
-                            data += extra
-                        self.last_activity = time.time()
-                        text = data.decode("utf-8", errors="replace")
+                        data += extra
+                    self.last_activity = time.time()
+                    text = data.decode("utf-8", errors="replace")
+                    if self.on_data_callback:
+                        self.on_data_callback(text)
+                elif data == b'':
+                    # Device closed the channel (EOF)
+                    break
+
+                if chan.recv_stderr_ready():
+                    err_data = chan.recv_stderr(4096)
+                    if err_data:
+                        text = err_data.decode("utf-8", errors="replace")
                         if self.on_data_callback:
                             self.on_data_callback(text)
+
+            except (socket.timeout, TimeoutError):
+                continue
             except Exception as e:
-                # Only exit if the session is stopping or channel is closed
                 if self._stop_event.is_set() or not chan or chan.closed:
                     break
                 time.sleep(0.01)

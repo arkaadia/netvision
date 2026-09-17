@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.61.12';
+export const APP_VERSION = '1.62.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.62.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'تجهیز مسیر معرفی تجهیز به کنسول مستقیم SSH و استریم بلادرنگ نشست‌های واقعی سخت‌افزار',
+    title_en: 'Direct Interactive SSH Console in Introduce New Device & Real Hardware CLI Streaming',
+    changes: [
+      'افزودن دکمه «کنسول مستقیم SSH (ترمینال CLI)» در فرم معرفی تجهیز جدید (Introduce New Device) جهت اتصال تعاملی بلادرنگ به تجهیز تحت بررسی.',
+      'پایدارسازی کانال نشست ترمینال در سرور پایتون (NetworkTerminalSession) با استفاده از paramiko.SSHClient و پشتیبانی کامل از الگوریتم‌های رمزنگاری استاندارد و لگاسی سیسکو.',
+      'استریم بلادرنگ stdout و stderr از طریق وب‌سوکت دوطرفه، استخراج و هماهنگ‌سازی پویا پرامپت سخت‌افزار و حذف اکوی تکراری دستورات.',
+      'حذف کامل رفتارهای شبیه‌سازی‌شده یا ساختگی و هدایت مستقیم تمامی دستورات تایپ‌شده در CLI به شل واقعی تجهیز شبکه.'
+    ],
+    changes_en: [
+      'Added "SSH Console Direct (CLI Terminal)" action in the Introduce New Device modal for instant, interactive SSH sessions.',
+      'Stabilized persistent SSH sessions in the Python backend (NetworkTerminalSession) using paramiko.SSHClient with legacy Cisco cipher fallbacks.',
+      'Streamed live stdout and stderr through interactive WebSockets with dynamic hardware prompt detection and duplicate echo suppression.',
+      'Eliminated simulated or hardcoded mock responses, guaranteeing all CLI keystrokes route directly to the real target network hardware.'
+    ]
+  },
   {
     version: '1.61.12',
     releaseDate: '2026-09-17',

@@ -31,12 +31,14 @@ import { Device, DeviceType, DevicePlatform, ConnectionMode, SwitchPort, ConfigT
 import { fetchTemplates, testDeviceConnection, pingHost, fetchDevices } from '../services/api';
 import { useLanguage } from '../i18n';
 import { getDevicePortComment } from '../data/portSpecs';
+import { CiscoTerminalModal } from './CiscoTerminalModal';
 
 export interface AddDeviceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMinimize?: () => void;
   onAdd: (device: Partial<Device>) => Promise<Device | void>;
+  onOpenTerminal?: (device: Device) => void;
   onDeviceCreatedWithTemplate?: (device: Device, templateId: string) => void;
   isLightMode?: boolean;
 }
@@ -46,6 +48,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   onClose,
   onMinimize,
   onAdd,
+  onOpenTerminal,
   onDeviceCreatedWithTemplate,
   isLightMode: propIsLightMode,
 }) => {
@@ -139,6 +142,43 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       return false;
     }) || null;
   }, [existingDevices, ip, sshHost]);
+
+  // Direct SSH Terminal state for "Introduce New Device"
+  const [directTerminalDev, setDirectTerminalDev] = useState<Device | null>(null);
+
+  const handleOpenDirectTerminal = () => {
+    const targetHost = (sshHost || ip || '').trim();
+    const constructedDevice: Device = {
+      id: `dev-preview-${Date.now()}`,
+      name: name.trim() || targetHost || 'New Device',
+      ip: ip.trim() || targetHost,
+      type: type,
+      role: role || 'Access Switch',
+      model: model.trim() || (platform === 'mikrotik_routeros' ? 'MikroTik RouterBoard' : 'Cisco Switch'),
+      total_ports: totalPorts,
+      mac: mac || '00:00:00:00:00:00',
+      building: building || '',
+      floor: floor || '',
+      unit: unit || '',
+      rack: rack || '',
+      is_online: true,
+      cdp_enabled: true,
+      lldp_enabled: true,
+      connection_protocol: connectionProtocol,
+      ssh_host: targetHost,
+      ssh_port: Number(sshPort) || (connectionProtocol === 'telnet' ? 23 : 22),
+      ssh_username: sshUsername.trim() || 'admin',
+      ssh_password: sshPassword,
+      enable_password: enablePassword,
+      platform: platform,
+    };
+
+    if (onOpenTerminal) {
+      onOpenTerminal(constructedDevice);
+    } else {
+      setDirectTerminalDev(constructedDevice);
+    }
+  };
 
   // Reset and populate defaults on modal open
   useEffect(() => {
@@ -260,7 +300,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen && !directTerminalDev) return null;
 
   const handleProtocolChange = (proto: 'ssh' | 'telnet') => {
     setConnectionProtocol(proto);
@@ -585,9 +625,12 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     }
   };
 
-  return createPortal(
-    <div
-      className="fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-2 sm:p-4 modal-backdrop-blur overflow-y-auto"
+  return (
+    <>
+      {isOpen &&
+        createPortal(
+          <div
+            className="fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-2 sm:p-4 modal-backdrop-blur overflow-y-auto"
       data-modal-backdrop="true"
       onClick={(e) => {
         if (e.target === e.currentTarget && !preventBackdropClose) onClose();
@@ -1279,6 +1322,16 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                         <span>{isEn ? `Test ${connectionProtocol.toUpperCase()}` : `تست اتصال ${connectionProtocol.toUpperCase()}`}</span>
                       </>
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-ssh-console-direct"
+                    onClick={handleOpenDirectTerminal}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition shadow-xs cursor-pointer"
+                    title={isEn ? 'Open direct interactive SSH CLI Console' : 'باز کردن کنسول تعاملی مستقیم SSH'}
+                  >
+                    <Terminal className="w-3 h-3" />
+                    <span>{isEn ? 'SSH Console Direct (CLI Terminal)' : 'کنسول مستقیم SSH (ترمینال CLI)'}</span>
                   </button>
                 </div>
               </div>
@@ -2147,5 +2200,15 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       </div>
     </div>,
     document.body
+  )}
+      {directTerminalDev && (
+        <CiscoTerminalModal
+          isOpen={!!directTerminalDev}
+          device={directTerminalDev}
+          onClose={() => setDirectTerminalDev(null)}
+          isLightMode={isLightMode}
+        />
+      )}
+    </>
   );
 };

@@ -239,6 +239,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
   const activeSessionIdRef = useRef<string | null>(null);
   const draftInputRef = useRef<string>('');
   const wsRef = useRef<WebSocket | null>(null);
+  const [livePrompt, setLivePrompt] = useState<string>('');
+  const lastExecutedCommandRef = useRef<string>('');
 
   const filteredInterfaces = useMemo(() => {
     if (!interfaceSearch.trim()) return ports;
@@ -439,8 +441,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     const textWithoutAnsi = cleanText.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
     if (!textWithoutAnsi) return;
 
-    // Detect remote prompt transitions to sync local cliMode
-    if (textWithoutAnsi.includes('(config-if)#')) {
+    // Detect remote prompt transitions to sync local cliMode and prompt
+    if (textWithoutAnsi.includes('(config-if)#') || textWithoutAnsi.includes('(config-if-range)#')) {
       setCliMode('INTERFACE_CONFIG');
     } else if (textWithoutAnsi.includes('(config)#')) {
       setCliMode('GLOBAL_CONFIG');
@@ -450,6 +452,19 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       setCliMode('USER_EXEC');
     }
 
+    // Dynamic prompt detection from terminal stream
+    const trimmedChunk = textWithoutAnsi.trim();
+    const promptRegex = /(?:^|\n)([A-Za-z0-9_.-]+(?:(?:\([A-Za-z0-9_.-]+\))?[#>$]|\[[^\]]+\]\s*>[#]?))\s*$/;
+    const promptMatch = trimmedChunk.match(promptRegex);
+    if (promptMatch && promptMatch[1]) {
+      const extractedPrompt = promptMatch[1].trim();
+      setLivePrompt(extractedPrompt);
+      const hostMatch = extractedPrompt.match(/^([A-Za-z0-9_.-]+)[#(>]/);
+      if (hostMatch && hostMatch[1]) {
+        setHostname(hostMatch[1]);
+      }
+    }
+
     const segments = textWithoutAnsi.split('\n');
     const endsWithNewline = textWithoutAnsi.endsWith('\n');
 
@@ -457,17 +472,27 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       const updated = [...prev];
       let startIdx = 0;
 
+      // Avoid duplicating the command echo from remote PTY if it matches what the user just executed
+      const lastCmd = lastExecutedCommandRef.current.trim();
+      if (lastCmd && segments.length > 0) {
+        const firstClean = segments[0].trim();
+        if (firstClean === lastCmd || firstClean.endsWith(' ' + lastCmd) || firstClean.endsWith('#' + lastCmd) || firstClean.endsWith('>' + lastCmd)) {
+          lastExecutedCommandRef.current = '';
+          startIdx = 1;
+        }
+      }
+
       // If the previous chunk did not finish with a newline and there is an existing output line,
       // append the first segment to that line instead of splitting onto a new line
-      if (!lastLineEndedWithNewlineRef.current && updated.length > 0) {
+      if (!lastLineEndedWithNewlineRef.current && updated.length > 0 && startIdx < segments.length) {
         const lastIndex = updated.length - 1;
         const lastLine = updated[lastIndex];
         if (lastLine && lastLine.type === 'output') {
           updated[lastIndex] = {
             ...lastLine,
-            text: lastLine.text + segments[0],
+            text: lastLine.text + segments[startIdx],
           };
-          startIdx = 1;
+          startIdx++;
         }
       }
 
@@ -476,8 +501,13 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         if (i === segments.length - 1 && segments[i] === '' && endsWithNewline) {
           continue;
         }
+        // If the line is an orphan prompt at the very end of stream, skip it because input bar displays the live prompt
+        const segTrim = segments[i].trim();
+        if (i === segments.length - 1 && !endsWithNewline && promptMatch && segTrim === promptMatch[1].trim()) {
+          continue;
+        }
         updated.push({
-          id: 'ws-out-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          id: 'ws-out-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '-' + i,
           type: 'output',
           text: segments[i],
         });
@@ -619,11 +649,18 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
 
       // Connect interactive WebSocket tunnel with device parameters
       try {
+        const pass = fullDev?.ssh_password || (fullDev?.connection as any)?.password || curDev?.ssh_password || (curDev?.connection as any)?.password || '';
+        const enablePass = fullDev?.enable_password || curDev?.enable_password || '';
+        const devPlatform = fullDev?.platform || curDev?.platform || fullDev?.type || curDev?.type || '';
+
         const wsUrl = getTerminalWebSocketUrl(curDev.id, connProtocol, 'Super Admin', {
           ip: targetHost || curDev.ip,
           ssh_host: targetHost || curDev.ssh_host,
           ssh_port: sshPort,
           ssh_username: sshUser,
+          ssh_password: pass,
+          enable_password: enablePass,
+          platform: devPlatform,
         });
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;

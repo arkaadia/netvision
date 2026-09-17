@@ -824,6 +824,7 @@ export default function App() {
           })
         }
         onAdd={handleAddDevice}
+        onOpenTerminal={(dev) => openTerminal(dev as any)}
         onDeviceCreatedWithTemplate={(createdDevice, templateId) => {
           setApplyTemplateDevice(createdDevice);
           setApplyPreselectedTemplateId(templateId);
