@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.7';
+export const APP_VERSION = '1.66.8';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.8',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'همگام‌سازی کامل آنلینک و جابجایی یادداشت میان تجهیزات در نقشه و لیست تجهیزات',
+    title_en: 'Full Note Unlink and Device Reassignment Synchronization Between Map and Device List',
+    changes: [
+      'اصلاح و یکپارچه‌سازی فرآیند آنلینک (Unlink) یادداشت از دیوایس در نقشه شماتیک: با قطع اتصال یادداشت در نقشه، یادداشت فوراً از دیوایس مربوطه در بخش لیست تجهیزات و پایگاه داده حذف شده در حالی که یادداشت به صورت شناور روی نقشه باقی می‌ماند.',
+      'افزودن دکمه اختصاصی «قطع اتصال از دیوایس (آنلینک)» با آیکون Unlink در منوی تجهیزات هر یادداشت چسبان.',
+      'اصلاح فرآیند جابجایی یادداشت (Reassignment) میان دو تجهیز: هنگام تغییر دیوایس متصل به یادداشت، انتساب یادداشت از دیوایس قبلی پاک شده و به صورت لحظه‌ای به دیوایس جدید در لیست تجهیزات و دیتابیس اختصاص می‌یابد.',
+      'ارتقای متد loadDeviceNotes و افزودن پشتیبانی از پارامتر keepInMap در روت‌های بک‌اند و پایگاه داده جهت تفکیک حذف کامل یادداشت از آنلینک کردن آن.',
+      'رعایت کامل قانون عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization).'
+    ],
+    changes_en: [
+      'Thoroughly streamlined note unlinking from devices in schematic topology: unlinking a note immediately removes the note association from that device in the Device List and database, while keeping the sticky note intact as a free-floating note on the map.',
+      'Added a dedicated "Unlink from Device" button with an Unlink icon in the note device assignment dropdown.',
+      'Enhanced device reassignment flow: reassigning a note to another device immediately removes it from the previous device and binds it cleanly to the new device in both inventory and database.',
+      'Updated loadDeviceNotes and backend DELETE routes with keepInMap support to cleanly distinguish between permanent note deletion and note unlinking.',
+      'Strictly maintained bilingual localization standards ensuring no Persian text appears in English mode.'
+    ]
+  },
   {
     version: '1.66.7',
     releaseDate: '2026-09-17',

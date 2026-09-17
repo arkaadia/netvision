@@ -98,23 +98,25 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
         }
       }
       // 2. Scan custom maps for notes linked to devices
-      const rawMaps = localStorage.getItem('net_topology_custom_maps_v2');
-      if (rawMaps) {
-        const maps = JSON.parse(rawMaps);
-        if (Array.isArray(maps)) {
-          maps.forEach((m) => {
-            if (Array.isArray(m.stickyNotes)) {
-              m.stickyNotes.forEach((sn: CustomTopologyStickyNote) => {
-                if (sn.linkedDeviceId && !notesMap[sn.linkedDeviceId]) {
-                  notesMap[sn.linkedDeviceId] = sn;
-                  notesMap[sn.linkedDeviceId.replace(/^hw-/, '')] = sn;
-                  notesMap['hw-' + sn.linkedDeviceId.replace(/^hw-/, '')] = sn;
-                }
-              });
-            }
-          });
+      ['nettopology_custom_maps_v2', 'net_topology_custom_maps_v2'].forEach((key) => {
+        const rawMaps = localStorage.getItem(key);
+        if (rawMaps) {
+          const maps = JSON.parse(rawMaps);
+          if (Array.isArray(maps)) {
+            maps.forEach((m) => {
+              if (Array.isArray(m.stickyNotes)) {
+                m.stickyNotes.forEach((sn: CustomTopologyStickyNote) => {
+                  if (sn.linkedDeviceId && !notesMap[sn.linkedDeviceId]) {
+                    notesMap[sn.linkedDeviceId] = sn;
+                    notesMap[sn.linkedDeviceId.replace(/^hw-/, '')] = sn;
+                    notesMap['hw-' + sn.linkedDeviceId.replace(/^hw-/, '')] = sn;
+                  }
+                });
+              }
+            });
+          }
         }
-      }
+      });
     } catch (e) {}
 
     setDeviceNotes(notesMap);
@@ -123,17 +125,15 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
     try {
       const dbNotes = await syncDeviceNotesFromDatabase();
       if (Array.isArray(dbNotes)) {
-        setDeviceNotes((prev) => {
-          const updated = { ...prev };
-          dbNotes.forEach((n) => {
-            if (n.linkedDeviceId) {
-              updated[n.linkedDeviceId] = n;
-              updated[n.linkedDeviceId.replace(/^hw-/, '')] = n;
-              updated['hw-' + n.linkedDeviceId.replace(/^hw-/, '')] = n;
-            }
-          });
-          return updated;
+        const freshDbMap: Record<string, CustomTopologyStickyNote> = {};
+        dbNotes.forEach((n) => {
+          if (n && n.linkedDeviceId) {
+            freshDbMap[n.linkedDeviceId] = n;
+            freshDbMap[n.linkedDeviceId.replace(/^hw-/, '')] = n;
+            freshDbMap['hw-' + n.linkedDeviceId.replace(/^hw-/, '')] = n;
+          }
         });
+        setDeviceNotes(freshDbMap);
       }
     } catch (e) {}
   }, []);
@@ -148,7 +148,26 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
 
   useEffect(() => {
     loadDeviceNotes();
-    const handleUpdate = () => {
+    const handleUpdate = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.previousDeviceId) {
+        const prevId = detail.previousDeviceId;
+        const cleanPrev = prevId.replace(/^hw-/, '');
+        setDeviceNotes((current) => {
+          const next = { ...current };
+          delete next[prevId];
+          delete next[cleanPrev];
+          delete next['hw-' + cleanPrev];
+          if (detail.newDeviceId && detail.note) {
+            const newId = detail.newDeviceId;
+            const cleanNew = newId.replace(/^hw-/, '');
+            next[newId] = detail.note;
+            next[cleanNew] = detail.note;
+            next['hw-' + cleanNew] = detail.note;
+          }
+          return next;
+        });
+      }
       loadDeviceNotes();
     };
     window.addEventListener('nettopology_device_notes_updated', handleUpdate);

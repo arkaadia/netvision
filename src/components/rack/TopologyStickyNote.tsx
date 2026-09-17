@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CustomTopologyStickyNote, StickyNoteColor, Device } from '../../types';
-import { Trash2, GripHorizontal, Link2, Pin, Check, X, AlertTriangle } from 'lucide-react';
+import { Trash2, GripHorizontal, Link2, Pin, Check, X, AlertTriangle, Unlink } from 'lucide-react';
 
 interface TopologyStickyNoteProps {
   note: CustomTopologyStickyNote;
@@ -412,7 +412,22 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
                 </button>
               </div>
               <div className="max-h-36 overflow-y-auto space-y-1">
-                {!note.linkedDeviceId && (
+                {note.linkedDeviceId ? (
+                  <button
+                    type="button"
+                    id={`unlink-device-btn-${note.id}`}
+                    onClick={() => handleLinkDevice(undefined)}
+                    className="w-full text-left px-2 py-1.5 rounded text-[10px] flex items-center justify-between bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white font-medium border border-rose-500/30 transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Unlink className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>{isEn ? 'Unlink from Device' : 'قطع اتصال از دیوایس (آنلینک)'}</span>
+                    </span>
+                    <span className="text-[9px] text-rose-300/80 bg-rose-500/20 px-1 py-0.5 rounded shrink-0">
+                      {isEn ? 'Float' : 'شناور'}
+                    </span>
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => handleLinkDevice(undefined)}

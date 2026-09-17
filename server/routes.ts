@@ -588,8 +588,9 @@ apiRouter.delete('/settings/device-notes/:id', async (req: Request, res: Respons
   try {
     const noteId = req.params.id;
     const deviceId = (req.query.deviceId as string) || (req.body?.deviceId as string);
-    await deleteDeviceStickyNote(noteId, deviceId);
-    res.json({ success: true, id: noteId, deviceId });
+    const keepInMap = req.query.keepInMap === 'true' || req.body?.keepInMap === true;
+    await deleteDeviceStickyNote(noteId, deviceId, keepInMap);
+    res.json({ success: true, id: noteId, deviceId, keepInMap });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

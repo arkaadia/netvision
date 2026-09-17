@@ -79,6 +79,7 @@ import {
   persistDeviceNoteToDatabase,
   deleteDeviceNoteFromDatabase,
   syncDeviceNotesFromDatabase,
+  handleDeviceNoteLinkChange,
 } from '../services/settingsStorage';
 import { CustomMapPortSelectorModal } from './CustomMapPortSelectorModal';
 import { CustomMapLinkConfigModal } from './CustomMapLinkConfigModal';
@@ -956,6 +957,16 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       return;
     }
 
+    // Determine previous note to detect any changes in device linkage (unlink or reassign)
+    const allExistingNotes = [
+      ...defaultStickyNotes,
+      ...(currentCustomMap ? (currentCustomMap.stickyNotes || []) : []),
+      ...customMaps.flatMap((m) => m.stickyNotes || []),
+    ];
+    const prevNote = allExistingNotes.find((n) => n && n.id === updatedNote.id);
+    const oldDeviceId = prevNote?.linkedDeviceId;
+    const newDeviceId = updatedNote.linkedDeviceId;
+
     if (currentCustomMap) {
       const updatedNotes = (currentCustomMap.stickyNotes || [])
         .filter((sn) => !isTombstoned(sn.id, sn.linkedDeviceId))
@@ -978,11 +989,14 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       });
     }
 
-    // If note is linked to a device, persist to global device sticky notes storage & DB
-    if (updatedNote.linkedDeviceId) {
+    // If device link has changed (unlinked or moved to another device)
+    if (oldDeviceId !== newDeviceId) {
+      handleDeviceNoteLinkChange(updatedNote.id, oldDeviceId, newDeviceId, updatedNote).catch(() => {});
+    } else if (newDeviceId) {
+      // If still linked to the same device, update title/content/color
       persistDeviceNoteToDatabase(updatedNote).catch(() => {});
     }
-  }, [currentCustomMap, customMaps, saveCustomMaps, isTombstoned]);
+  }, [currentCustomMap, customMaps, defaultStickyNotes, saveCustomMaps, isTombstoned]);
 
   const handleDeleteStickyNote = useCallback((noteId: string) => {
     // 1. Locate the note across currentCustomMap or defaultStickyNotes
