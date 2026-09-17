@@ -869,6 +869,7 @@ function syncNoteIntoLocalMaps(note: CustomTopologyStickyNote): void {
 function removeNoteFromLocalMaps(noteId: string, deviceId?: string): void {
   const mapKeys = ['nettopology_custom_maps_v2', 'net_topology_custom_maps_v2'];
   const cleanTargetDevId = deviceId?.replace(/^hw-/, '');
+  const hwTargetDevId = cleanTargetDevId ? 'hw-' + cleanTargetDevId : undefined;
 
   mapKeys.forEach((key) => {
     try {
@@ -883,7 +884,7 @@ function removeNoteFromLocalMaps(noteId: string, deviceId?: string): void {
           ...m,
           stickyNotes: m.stickyNotes.filter((sn: any) => {
             if (noteId && sn.id === noteId) return false;
-            if (!noteId && deviceId && (sn.linkedDeviceId === deviceId || sn.linkedDeviceId === cleanTargetDevId || sn.linkedDeviceId === 'hw-' + cleanTargetDevId)) return false;
+            if (deviceId && (sn.linkedDeviceId === deviceId || sn.linkedDeviceId === cleanTargetDevId || sn.linkedDeviceId === hwTargetDevId)) return false;
             return true;
           }),
         };
@@ -899,7 +900,7 @@ function removeNoteFromLocalMaps(noteId: string, deviceId?: string): void {
       if (Array.isArray(defaultNotes)) {
         const updatedDefault = defaultNotes.filter((sn) => {
           if (noteId && sn.id === noteId) return false;
-          if (!noteId && deviceId && (sn.linkedDeviceId === deviceId || sn.linkedDeviceId === cleanTargetDevId || sn.linkedDeviceId === 'hw-' + cleanTargetDevId)) return false;
+          if (deviceId && (sn.linkedDeviceId === deviceId || sn.linkedDeviceId === cleanTargetDevId || sn.linkedDeviceId === hwTargetDevId)) return false;
           return true;
         });
         localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updatedDefault));
@@ -965,13 +966,15 @@ export async function persistDeviceNoteToDatabase(note: CustomTopologyStickyNote
 }
 
 export async function deleteDeviceNoteFromDatabase(noteId: string, deviceId?: string): Promise<void> {
+  const cleanDevId = deviceId?.replace(/^hw-/, '');
+  const hwDevId = cleanDevId ? 'hw-' + cleanDevId : undefined;
+
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
     const existing: CustomTopologyStickyNote[] = raw ? JSON.parse(raw) : [];
-    const cleanDevId = deviceId?.replace(/^hw-/, '');
     const updated = existing.filter((n) => {
       if (noteId && n.id === noteId) return false;
-      if (!noteId && deviceId && (n.linkedDeviceId === deviceId || n.linkedDeviceId === cleanDevId || n.linkedDeviceId === 'hw-' + cleanDevId)) return false;
+      if (deviceId && (n.linkedDeviceId === deviceId || n.linkedDeviceId === cleanDevId || n.linkedDeviceId === hwDevId)) return false;
       return true;
     });
     localStorage.setItem(STORAGE_KEYS.DEVICE_STICKY_NOTES, JSON.stringify(updated));
@@ -985,7 +988,11 @@ export async function deleteDeviceNoteFromDatabase(noteId: string, deviceId?: st
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    await fetch(`/api/settings/device-notes/${encodeURIComponent(noteId)}`, {
+    const queryParams = new URLSearchParams();
+    if (deviceId) queryParams.set('deviceId', deviceId);
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+    await fetch(`/api/settings/device-notes/${encodeURIComponent(noteId)}${queryString}`, {
       method: 'DELETE',
       headers,
     });

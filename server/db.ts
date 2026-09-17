@@ -2224,19 +2224,36 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
   return normalizedNote;
 }
 
-export async function deleteDeviceStickyNote(noteId: string): Promise<void> {
+export async function deleteDeviceStickyNote(noteId: string, deviceId?: string): Promise<void> {
   const store = loadFallbackStore();
+  let effectiveDeviceId = deviceId;
+
+  // If effectiveDeviceId not provided, check fallbackStore and DB for matching note
+  if (!effectiveDeviceId && Array.isArray(store.device_sticky_notes)) {
+    const found = store.device_sticky_notes.find((n: any) => n.id === noteId);
+    if (found?.linkedDeviceId) {
+      effectiveDeviceId = found.linkedDeviceId;
+    }
+  }
+
+  const cleanDeviceId = effectiveDeviceId ? effectiveDeviceId.replace(/^hw-/, '') : undefined;
+  const hwDeviceId = cleanDeviceId ? 'hw-' + cleanDeviceId : undefined;
+
+  const matchesTarget = (sn: any) => {
+    if (!sn) return false;
+    if (noteId && sn.id === noteId) return true;
+    if (effectiveDeviceId && (sn.linkedDeviceId === effectiveDeviceId || sn.linkedDeviceId === cleanDeviceId || sn.linkedDeviceId === hwDeviceId)) return true;
+    if (noteId && sn.linkedDeviceId === noteId) return true;
+    return false;
+  };
+
   if (Array.isArray(store.device_sticky_notes)) {
-    store.device_sticky_notes = store.device_sticky_notes.filter(
-      (n: any) => n.id !== noteId && n.linkedDeviceId !== noteId
-    );
+    store.device_sticky_notes = store.device_sticky_notes.filter((n: any) => !matchesTarget(n));
   }
   if (Array.isArray(store.custom_maps)) {
     for (const m of store.custom_maps) {
       if (Array.isArray(m.stickyNotes)) {
-        m.stickyNotes = m.stickyNotes.filter(
-          (sn: any) => sn.id !== noteId && sn.linkedDeviceId !== noteId
-        );
+        m.stickyNotes = m.stickyNotes.filter((sn: any) => !matchesTarget(sn));
       }
     }
   }
@@ -2245,9 +2262,24 @@ export async function deleteDeviceStickyNote(noteId: string): Promise<void> {
   await ensurePostgresConnection();
   if (isPostgresReady && pool) {
     try {
+      if (!effectiveDeviceId) {
+        try {
+          const lookup = await pool.query('SELECT device_id FROM device_sticky_notes WHERE id = $1 LIMIT 1', [noteId]);
+          if (lookup.rows.length > 0 && lookup.rows[0].device_id) {
+            effectiveDeviceId = lookup.rows[0].device_id;
+          }
+        } catch {}
+      }
+
+      const cleanDev = effectiveDeviceId ? effectiveDeviceId.replace(/^hw-/, '') : null;
+      const hwDev = cleanDev ? 'hw-' + cleanDev : null;
+
       await pool.query(
-        'DELETE FROM device_sticky_notes WHERE id = $1 OR device_id = $1 OR device_id = $2',
-        [noteId, noteId.replace(/^hw-/, '')]
+        `DELETE FROM device_sticky_notes 
+         WHERE id = $1 
+            OR device_id = $1 
+            OR ($2::text IS NOT NULL AND (device_id = $2 OR device_id = $3 OR device_id = $4))`,
+        [noteId, effectiveDeviceId || null, cleanDev || null, hwDev || null]
       );
 
       // Also clean up from PostgreSQL custom_maps table
@@ -2257,9 +2289,7 @@ export async function deleteDeviceStickyNote(noteId: string): Promise<void> {
           const mapData = typeof row.map_data === 'string' ? JSON.parse(row.map_data) : (row.map_data || {});
           if (Array.isArray(mapData.stickyNotes)) {
             const origLen = mapData.stickyNotes.length;
-            mapData.stickyNotes = mapData.stickyNotes.filter(
-              (sn: any) => sn.id !== noteId && sn.linkedDeviceId !== noteId && sn.linkedDeviceId !== noteId.replace(/^hw-/, '')
-            );
+            mapData.stickyNotes = mapData.stickyNotes.filter((sn: any) => !matchesTarget(sn));
             if (mapData.stickyNotes.length !== origLen) {
               mapData.updatedAt = new Date().toISOString();
               await pool.query(

@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.5';
+export const APP_VERSION = '1.66.6';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.6',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'رفع قطعی مشکل بازگشت یادداشت‌های چسبان پس از حذف در نقشه شماتیک',
+    title_en: 'Permanently Fix Sticky Notes Reappearing After Deletion in Schematic Topology',
+    changes: [
+      'رفع کامل مشکل بازگشت مجدد یادداشت چسبان (Sticky Note) در نقشه شماتیک پس از حذف؛ پیاده‌سازی سیستم نشانه‌گذاری حذفی (Tombstone Tracking) در حافظه و SessionStorage برای جلوگیری از بازگشت یادداشت در حین واکشی و همگام‌سازی‌های پس‌زمینه.',
+      'افزودن قابلیت مسدودسازی چرخه ذخیره‌سازی خودکار و رویدادهای blur/click-outside در زمان حذف یادداشت.',
+      'اصلاح منطق حذف در بک‌اند و پایگاه داده به‌همراه دریافت و پاک‌سازی کامل بر اساس شناسه تجهیز متصل (linkedDeviceId).',
+      'رعایت کامل قانون عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization).'
+    ],
+    changes_en: [
+      'Permanently resolved the issue where deleting a sticky note on the schematic map caused it to disappear momentarily and then reappear; introduced tombstone tracking in memory and SessionStorage to block re-fetching during background sync cycles.',
+      'Prevented race conditions from auto-commit, blur, and click-outside listeners during deletion execution.',
+      'Updated backend database endpoints to thoroughly clean up notes by both note ID and linked device ID.',
+      'Strictly maintained bilingual localization standards ensuring no Persian text appears in English mode.'
+    ]
+  },
   {
     version: '1.66.5',
     releaseDate: '2026-09-17',

@@ -99,6 +99,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
   const [localTitle, setLocalTitle] = useState(note.title || '');
   const [localContent, setLocalContent] = useState(note.content || '');
   const isFocusedRef = useRef(false);
+  const isDeletingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const latestValuesRef = useRef({ title: localTitle, content: localContent });
@@ -108,7 +109,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
 
   // Sync from props only when note ID changes or when not actively editing
   useEffect(() => {
-    if (!isFocusedRef.current) {
+    if (!isFocusedRef.current && !isDeletingRef.current) {
       setLocalTitle(note.title || '');
       setLocalContent(note.content || '');
     }
@@ -116,6 +117,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
 
   // Commit changes to parent only when user finishes typing or clicks outside
   const commitChanges = useCallback(() => {
+    if (isDeletingRef.current) return;
     const currentTitle = latestValuesRef.current.title;
     const currentContent = latestValuesRef.current.content;
     const prevTitle = note.title || '';
@@ -134,6 +136,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
   // Click outside listener: commit changes whenever user clicks anywhere outside this sticky note
   useEffect(() => {
     const handleDocumentMouseDown = (e: MouseEvent) => {
+      if (isDeletingRef.current) return;
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         if (isFocusedRef.current) {
           isFocusedRef.current = false;
@@ -258,10 +261,15 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
+              isDeletingRef.current = true;
               isFocusedRef.current = false;
               onDelete(note.id);
             }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              isDeletingRef.current = true;
+              isFocusedRef.current = false;
+            }}
             className="p-1 rounded hover:bg-rose-500/20 text-rose-800 hover:text-rose-950 transition opacity-70 hover:opacity-100 cursor-pointer"
             title={isEn ? 'Delete Note' : 'حذف یادداشت'}
           >
