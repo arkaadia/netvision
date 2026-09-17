@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.2';
+export const APP_VERSION = '1.66.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.3',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'رفع مشکل حذف یادداشت‌های شماتیک و هشدار انتساب مجدد یادداشت به دیوایس دیگر',
+    title_en: 'Fix Sticky Note Deletion and Add Reassignment Confirmation Prompt Across Devices',
+    changes: [
+      'رفع باگ عدم حذف یادداشت‌های چسبان (Sticky Notes) در نقشه شماتیک و هماهنگ‌سازی پایدار فرایند حذف در حافظه محلی و دیتابیس بدون بازگشت مجدد یادداشت.',
+      'افزودن هشدار و پنجره تایید هنگام انتساب مجدد یادداشت چسبانی که قبلاً به یک دیوایس متصل بوده و کاربر قصد دارد آن را به دیوایس دیگری متصل کند.',
+      'اصلاح منطق فیلتر و رویدادهای به‌روزرسانی نوت‌ها جهت جلوگیری از پاک شدن ناخواسته سایر یادداشت‌های متصل به همان دیوایس.',
+      'رعایت کامل قانون عدم نمایش متن فارسی در حالت انگلیسی (Strict Localization).'
+    ],
+    changes_en: [
+      'Fixed sticky note deletion in schematic topology view, ensuring persistent and reliable removal from both local state and database without resurrection.',
+      'Added a confirmation warning prompt when reassigning a sticky note that is already linked to a device to a different device.',
+      'Refined device note update and deletion event filtering to prevent accidental cascade removal of other notes attached to the same device.',
+      'Fully adhered to strict localization rules ensuring zero Persian text when English mode is active.'
+    ]
+  },
   {
     version: '1.66.2',
     releaseDate: '2026-09-17',

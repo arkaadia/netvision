@@ -881,14 +881,11 @@ function removeNoteFromLocalMaps(noteId: string, deviceId?: string): void {
         if (!m || !Array.isArray(m.stickyNotes)) return m;
         return {
           ...m,
-          stickyNotes: m.stickyNotes.filter(
-            (sn: any) =>
-              sn.id !== noteId &&
-              (!deviceId ||
-                (sn.linkedDeviceId !== deviceId &&
-                  sn.linkedDeviceId !== cleanTargetDevId &&
-                  sn.linkedDeviceId !== 'hw-' + cleanTargetDevId))
-          ),
+          stickyNotes: m.stickyNotes.filter((sn: any) => {
+            if (noteId && sn.id === noteId) return false;
+            if (!noteId && deviceId && (sn.linkedDeviceId === deviceId || sn.linkedDeviceId === cleanTargetDevId || sn.linkedDeviceId === 'hw-' + cleanTargetDevId)) return false;
+            return true;
+          }),
         };
       });
       localStorage.setItem(key, JSON.stringify(updatedMaps));
@@ -900,14 +897,11 @@ function removeNoteFromLocalMaps(noteId: string, deviceId?: string): void {
     if (rawDefault) {
       const defaultNotes: CustomTopologyStickyNote[] = JSON.parse(rawDefault);
       if (Array.isArray(defaultNotes)) {
-        const updatedDefault = defaultNotes.filter(
-          (sn) =>
-            sn.id !== noteId &&
-            (!deviceId ||
-              (sn.linkedDeviceId !== deviceId &&
-                sn.linkedDeviceId !== cleanTargetDevId &&
-                sn.linkedDeviceId !== 'hw-' + cleanTargetDevId))
-        );
+        const updatedDefault = defaultNotes.filter((sn) => {
+          if (noteId && sn.id === noteId) return false;
+          if (!noteId && deviceId && (sn.linkedDeviceId === deviceId || sn.linkedDeviceId === cleanTargetDevId || sn.linkedDeviceId === 'hw-' + cleanTargetDevId)) return false;
+          return true;
+        });
         localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updatedDefault));
       }
     }
@@ -975,14 +969,11 @@ export async function deleteDeviceNoteFromDatabase(noteId: string, deviceId?: st
     const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
     const existing: CustomTopologyStickyNote[] = raw ? JSON.parse(raw) : [];
     const cleanDevId = deviceId?.replace(/^hw-/, '');
-    const updated = existing.filter(
-      (n) =>
-        n.id !== noteId &&
-        (!deviceId ||
-          (n.linkedDeviceId !== deviceId &&
-            n.linkedDeviceId !== cleanDevId &&
-            n.linkedDeviceId !== 'hw-' + cleanDevId))
-    );
+    const updated = existing.filter((n) => {
+      if (noteId && n.id === noteId) return false;
+      if (!noteId && deviceId && (n.linkedDeviceId === deviceId || n.linkedDeviceId === cleanDevId || n.linkedDeviceId === 'hw-' + cleanDevId)) return false;
+      return true;
+    });
     localStorage.setItem(STORAGE_KEYS.DEVICE_STICKY_NOTES, JSON.stringify(updated));
   } catch (e) {}
 

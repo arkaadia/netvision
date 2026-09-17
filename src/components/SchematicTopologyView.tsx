@@ -885,9 +885,42 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   }, [currentCustomMap, customMaps, saveCustomMaps]);
 
   const handleDeleteStickyNote = useCallback((noteId: string) => {
-    let noteToDelete: CustomTopologyStickyNote | undefined;
-    if (currentCustomMap) {
-      noteToDelete = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
+    // 1. Locate the note across currentCustomMap or defaultStickyNotes
+    const allNotes = currentCustomMap ? (currentCustomMap.stickyNotes || []) : defaultStickyNotes;
+    const noteToDelete = allNotes.find((n) => n.id === noteId);
+    const linkedDevId = noteToDelete?.linkedDeviceId;
+
+    // 2. Remove immediately from defaultStickyNotes
+    setDefaultStickyNotes((prev) => {
+      const updated = prev.filter((n) => n.id !== noteId);
+      try {
+        localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 3. Remove immediately from all custom maps
+    setCustomMaps((prev) => {
+      let changed = false;
+      const updated = prev.map((m) => {
+        if ((m.stickyNotes || []).some((n) => n.id === noteId)) {
+          changed = true;
+          return {
+            ...m,
+            stickyNotes: (m.stickyNotes || []).filter((n) => n.id !== noteId),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return m;
+      });
+      if (changed) {
+        saveCustomMaps(updated);
+      }
+      return updated;
+    });
+
+    // 4. If currentCustomMap is active, explicitly persist it
+    if (currentCustomMap && (currentCustomMap.stickyNotes || []).some((n) => n.id === noteId)) {
       const updatedNotes = (currentCustomMap.stickyNotes || []).filter((n) => n.id !== noteId);
       const updatedMap: CustomTopologyMap = {
         ...currentCustomMap,
@@ -895,22 +928,22 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
-    } else {
-      setDefaultStickyNotes((prev) => {
-        noteToDelete = prev.find((n) => n.id === noteId);
-        const updated = prev.filter((n) => n.id !== noteId);
-        try {
-          localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
-        } catch (e) {}
-        return updated;
-      });
     }
 
-    // If note was linked to a device, remove from global device sticky notes
-    if (noteToDelete?.linkedDeviceId) {
-      deleteDeviceNoteFromDatabase(noteId, noteToDelete.linkedDeviceId).catch(() => {});
-    }
-  }, [currentCustomMap, customMaps, saveCustomMaps]);
+    // 5. Always delete from database and local storage via deleteDeviceNoteFromDatabase
+    deleteDeviceNoteFromDatabase(noteId, linkedDevId).catch((err) => {
+      console.warn('[Delete Device Note Error]', err);
+    });
+
+    // 6. Close delete modal if open
+    setDeleteModalTarget(null);
+
+    // 7. Visual toast feedback
+    setFeedbackToast({
+      type: 'success',
+      message: isEn ? 'Sticky note deleted successfully' : 'یادداشت با موفقیت حذف شد',
+    });
+  }, [currentCustomMap, customMaps, defaultStickyNotes, saveCustomMaps, isEn]);
 
   const handleStickyNoteStartDrag = useCallback((e: React.MouseEvent, noteId: string) => {
     e.stopPropagation();
@@ -3464,28 +3497,22 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         setCustomMaps((prev) => {
           const updated = prev.map((m) => ({
             ...m,
-            stickyNotes: (m.stickyNotes || []).filter(
-              (n) =>
-                n.id !== deletedId &&
-                (!deletedDevId ||
-                  (n.linkedDeviceId !== deletedDevId &&
-                    n.linkedDeviceId !== cleanDevId &&
-                    n.linkedDeviceId !== 'hw-' + cleanDevId))
-            ),
+            stickyNotes: (m.stickyNotes || []).filter((n) => {
+              if (deletedId && n.id === deletedId) return false;
+              if (!deletedId && deletedDevId && (n.linkedDeviceId === deletedDevId || n.linkedDeviceId === cleanDevId || n.linkedDeviceId === 'hw-' + cleanDevId)) return false;
+              return true;
+            }),
           }));
           saveCustomMaps(updated);
           return updated;
         });
 
         setDefaultStickyNotes((prev) => {
-          const updated = prev.filter(
-            (n) =>
-              n.id !== deletedId &&
-              (!deletedDevId ||
-                (n.linkedDeviceId !== deletedDevId &&
-                  n.linkedDeviceId !== cleanDevId &&
-                  n.linkedDeviceId !== 'hw-' + cleanDevId))
-          );
+          const updated = prev.filter((n) => {
+            if (deletedId && n.id === deletedId) return false;
+            if (!deletedId && deletedDevId && (n.linkedDeviceId === deletedDevId || n.linkedDeviceId === cleanDevId || n.linkedDeviceId === 'hw-' + cleanDevId)) return false;
+            return true;
+          });
           try {
             localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
           } catch (e) {}

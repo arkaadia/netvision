@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CustomTopologyStickyNote, StickyNoteColor, Device } from '../../types';
-import { Trash2, GripHorizontal, Link2, Pin, Check, X } from 'lucide-react';
+import { Trash2, GripHorizontal, Link2, Pin, Check, X, AlertTriangle } from 'lucide-react';
 
 interface TopologyStickyNoteProps {
   note: CustomTopologyStickyNote;
@@ -88,6 +88,11 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
   onFocusDevice,
 }) => {
   const [isLinkingOpen, setIsLinkingOpen] = useState(false);
+  const [pendingReassign, setPendingReassign] = useState<{
+    targetDeviceId?: string;
+    targetDeviceName: string;
+    currentDeviceName: string;
+  } | null>(null);
   const palette = COLOR_PALETTES[note.color] || COLOR_PALETTES.yellow;
 
   // Local state for title and content to prevent premature server sync and overwrites during typing
@@ -165,7 +170,26 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
     });
   };
 
-  const handleLinkDevice = (deviceId?: string) => {
+  const handleLinkDevice = (deviceId?: string, force = false) => {
+    const cleanCurrent = note.linkedDeviceId?.replace(/^hw-/, '');
+    const cleanTarget = deviceId?.replace(/^hw-/, '');
+
+    // If note is already linked to a device and user is reassigning it to another device, ask for confirmation
+    if (!force && cleanCurrent && cleanTarget && cleanCurrent !== cleanTarget) {
+      const currentDev = availableDevices.find(
+        (d) => d.id === note.linkedDeviceId || d.id === cleanCurrent || d.id === `hw-${cleanCurrent}`
+      );
+      const targetDev = availableDevices.find(
+        (d) => d.id === deviceId || d.id === cleanTarget || d.id === `hw-${cleanTarget}`
+      );
+      setPendingReassign({
+        targetDeviceId: deviceId,
+        targetDeviceName: targetDev?.name || targetDev?.ip || deviceId,
+        currentDeviceName: currentDev?.name || currentDev?.ip || note.linkedDeviceId || '',
+      });
+      return;
+    }
+
     onUpdate({
       ...note,
       title: latestValuesRef.current.title,
@@ -173,6 +197,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
       linkedDeviceId: deviceId,
       updatedAt: new Date().toISOString(),
     });
+    setPendingReassign(null);
     setIsLinkingOpen(false);
   };
 
@@ -206,7 +231,10 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
           {/* Link to Device button */}
           <button
             type="button"
-            onClick={() => setIsLinkingOpen(!isLinkingOpen)}
+            onClick={() => {
+              setIsLinkingOpen(!isLinkingOpen);
+              setPendingReassign(null);
+            }}
             className={`p-1 rounded hover:bg-black/10 transition ${
               note.linkedDeviceId ? 'text-blue-700 font-bold' : 'opacity-70 hover:opacity-100'
             }`}
@@ -230,6 +258,7 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
+              isFocusedRef.current = false;
               onDelete(note.id);
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -244,50 +273,94 @@ export const TopologyStickyNote: React.FC<TopologyStickyNoteProps> = ({
       {/* Device Linking Selector Dropdown */}
       {isLinkingOpen && (
         <div
-          className="p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl text-white text-[11px] m-1 z-30 space-y-1.5"
+          className="p-2 bg-slate-900 border border-white/20 rounded-lg shadow-2xl text-white text-[11px] m-1 z-30 space-y-1.5 animate-scale-up"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between pb-1 border-b border-white/10 font-bold">
-            <span>{isEn ? 'Attach Note to Device:' : 'اتصال یادداشت به دیوایس:'}</span>
-            <button
-              onClick={() => setIsLinkingOpen(false)}
-              className="text-slate-400 hover:text-white"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="max-h-36 overflow-y-auto space-y-1">
-            <button
-              type="button"
-              onClick={() => handleLinkDevice(undefined)}
-              className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between ${
-                !note.linkedDeviceId
-                  ? 'bg-blue-600 text-white font-bold'
-                  : 'hover:bg-white/10 text-slate-300'
-              }`}
-            >
-              <span>{isEn ? '— None (Float Freely) —' : '— بدون اتصال (شناور آزاد) —'}</span>
-              {!note.linkedDeviceId && <Check className="w-3 h-3" />}
-            </button>
-            {availableDevices.map((dev) => (
-              <button
-                key={dev.id}
-                type="button"
-                onClick={() => handleLinkDevice(dev.id)}
-                className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between ${
-                  note.linkedDeviceId === dev.id
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'hover:bg-white/10 text-slate-300'
-                }`}
-              >
-                <div className="truncate pr-1">
-                  <span className="font-semibold">{dev.name}</span>{' '}
-                  <span className="text-[9px] opacity-70">({dev.ip})</span>
-                </div>
-                {note.linkedDeviceId === dev.id && <Check className="w-3 h-3 flex-shrink-0" />}
-              </button>
-            ))}
-          </div>
+          {pendingReassign ? (
+            <div className="p-2.5 bg-amber-950/90 border border-amber-500/50 rounded-lg space-y-2 text-white">
+              <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[11px]">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>{isEn ? 'Reassign Linked Device' : 'هشدار تغییر دیوایس متصل'}</span>
+              </div>
+              <p className="text-[10px] leading-relaxed text-amber-100/95 font-sans">
+                {isEn ? (
+                  <>
+                    This note is already linked to <strong className="text-white underline">{pendingReassign.currentDeviceName}</strong>. Are you sure you want to reassign this note to <strong className="text-white underline">{pendingReassign.targetDeviceName}</strong>?
+                  </>
+                ) : (
+                  <>
+                    این یادداشت هم‌اکنون به دیوایس «<strong className="text-white underline">{pendingReassign.currentDeviceName}</strong>» متصل است. آیا مطمئن هستید که می‌خواهید آن را به دیوایس «<strong className="text-white underline">{pendingReassign.targetDeviceName}</strong>» نسبت دهید؟
+                  </>
+                )}
+              </p>
+              <div className="flex items-center gap-2 pt-1 border-t border-amber-500/30">
+                <button
+                  type="button"
+                  id={`confirm-reassign-btn-${note.id}`}
+                  onClick={() => handleLinkDevice(pendingReassign.targetDeviceId, true)}
+                  className="flex-1 py-1 px-2 rounded-md bg-amber-600 hover:bg-amber-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 shadow cursor-pointer transition active:scale-95"
+                >
+                  <Check className="w-3 h-3" />
+                  <span>{isEn ? 'Yes, Reassign' : 'تایید و تغییر انتساب'}</span>
+                </button>
+                <button
+                  type="button"
+                  id={`cancel-reassign-btn-${note.id}`}
+                  onClick={() => setPendingReassign(null)}
+                  className="py-1 px-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium cursor-pointer transition"
+                >
+                  <span>{isEn ? 'Cancel' : 'انصراف'}</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between pb-1 border-b border-white/10 font-bold">
+                <span>{isEn ? 'Attach Note to Device:' : 'اتصال یادداشت به دیوایس:'}</span>
+                <button
+                  onClick={() => {
+                    setIsLinkingOpen(false);
+                    setPendingReassign(null);
+                  }}
+                  className="text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-1">
+                <button
+                  type="button"
+                  onClick={() => handleLinkDevice(undefined)}
+                  className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between ${
+                    !note.linkedDeviceId
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'hover:bg-white/10 text-slate-300'
+                  }`}
+                >
+                  <span>{isEn ? '— None (Float Freely) —' : '— بدون اتصال (شناور آزاد) —'}</span>
+                  {!note.linkedDeviceId && <Check className="w-3 h-3" />}
+                </button>
+                {availableDevices.map((dev) => (
+                  <button
+                    key={dev.id}
+                    type="button"
+                    onClick={() => handleLinkDevice(dev.id)}
+                    className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between ${
+                      note.linkedDeviceId === dev.id
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'hover:bg-white/10 text-slate-300'
+                    }`}
+                  >
+                    <div className="truncate pr-1">
+                      <span className="font-semibold">{dev.name}</span>{' '}
+                      <span className="text-[9px] opacity-70">({dev.ip})</span>
+                    </div>
+                    {note.linkedDeviceId === dev.id && <Check className="w-3 h-3 flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
