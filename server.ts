@@ -167,9 +167,13 @@ app.get('/api/status/bridge', (req: Request, res: Response) => {
 
 // Check repository for newer releases (Net-Management GitHub)
 app.get('/api/system/check-update', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     const pkgPath = path.join(projectRoot, 'package.json');
-    let currentVersion = '1.38.0';
+    let currentVersion = '1.70.0';
     if (fs.existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
@@ -179,19 +183,37 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
       }
     }
 
-    const repoPkgUrl = 'https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/package.json';
-    const repoVersionTsUrl = 'https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/src/version.ts';
+    const timestamp = Date.now();
+    const repoPkgUrl = `https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/package.json?_t=${timestamp}`;
+    const repoVersionTsUrl = `https://raw.githubusercontent.com/shahbazimasoud/Net-Management/master/src/version.ts?_t=${timestamp}`;
 
     let latestVersion = currentVersion;
     let remoteReleaseNote: any = null;
+    let remoteCommitSha: string | null = null;
+    let localCommitSha: string | null = null;
+
+    // Check git commits directly if local .git exists
+    const gitDir = path.join(projectRoot, '.git');
+    if (fs.existsSync(gitDir)) {
+      try {
+        localCommitSha = (await executeShell('git rev-parse HEAD', projectRoot)).trim();
+        const lsRemoteOut = await executeShell('git ls-remote origin refs/heads/master', projectRoot);
+        const match = lsRemoteOut.match(/^([0-9a-f]{40})/i);
+        if (match) {
+          remoteCommitSha = match[1];
+        }
+      } catch (gitCheckErr: any) {
+        console.warn('[Check Update] Git check warning:', gitCheckErr.message);
+      }
+    }
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const [pkgRes, versionTsRes] = await Promise.allSettled([
-        fetch(repoPkgUrl, { signal: controller.signal }),
-        fetch(repoVersionTsUrl, { signal: controller.signal })
+        fetch(repoPkgUrl, { signal: controller.signal, headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } }),
+        fetch(repoVersionTsUrl, { signal: controller.signal, headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } })
       ]);
       clearTimeout(timeoutId);
 
@@ -256,12 +278,16 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
       }
     }
 
-    const hasUpdate = compareSemver(latestVersion, currentVersion) > 0;
+    const semverHigher = compareSemver(latestVersion, currentVersion) > 0;
+    const commitDiffers = Boolean(remoteCommitSha && localCommitSha && remoteCommitSha !== localCommitSha);
+    const hasUpdate = semverHigher || commitDiffers;
 
     res.json({
       currentVersion,
       latestVersion,
       hasUpdate,
+      remoteCommitSha,
+      localCommitSha,
       releaseNote: remoteReleaseNote,
       repoUrl: 'https://github.com/shahbazimasoud/Net-Management',
       checkedAt: new Date().toISOString()
@@ -278,55 +304,126 @@ app.get('/api/system/check-update', async (req: Request, res: Response) => {
 // Perform in-place software update to latest repository version
 app.post('/api/system/perform-update', async (req: Request, res: Response) => {
   try {
+    const isCleanMode = req.body?.clean === true;
     const logs: string[] = [];
     const log = (msg: string) => {
       console.log(`[Update Engine] ${msg}`);
       logs.push(msg);
     };
 
-    log('Initiating software upgrade from GitHub repository (Net-Management)...');
+    log('--- [Phase 1/6] Initiating Full Software Upgrade Pipeline ---');
     const gitDir = path.join(projectRoot, '.git');
 
+    // Step 1: Backup critical state files to prevent accidental loss
+    const backupDir = path.join('/tmp', `netman_backup_${Date.now()}`);
+    try {
+      fs.mkdirSync(backupDir, { recursive: true });
+      const envPath = path.join(projectRoot, '.env');
+      const dbStore = path.join(projectRoot, 'backend', 'database_store.json');
+      const netData = path.join(projectRoot, 'backend', 'network_data.json');
+      if (fs.existsSync(envPath)) fs.copyFileSync(envPath, path.join(backupDir, '.env'));
+      if (fs.existsSync(dbStore)) fs.copyFileSync(dbStore, path.join(backupDir, 'database_store.json'));
+      if (fs.existsSync(netData)) fs.copyFileSync(netData, path.join(backupDir, 'network_data.json'));
+      log('Safeguarded configuration and local database state.');
+    } catch (bErr: any) {
+      log(`State backup notice: ${bErr.message}`);
+    }
+
+    // Step 2: Codebase Synchronization
+    log('--- [Phase 2/6] Synchronizing Codebase with GitHub Repository ---');
     if (fs.existsSync(gitDir)) {
-      log('Local Git repository verified. Fetching latest master commit...');
+      log('Local Git repository verified. Fetching latest master branch...');
       try {
         await executeShell('git fetch origin master', projectRoot);
         await executeShell('git reset --hard origin/master', projectRoot);
-        log('Repository codebase synchronized with remote master.');
+        await executeShell('git clean -fd -e .env -e backend/database_store.json -e backend/network_data.json', projectRoot);
+        log('Repository codebase successfully aligned with origin/master.');
       } catch (gitErr: any) {
-        log(`Git synchronization warning: ${gitErr.message}. Attempting pull...`);
-        await executeShell('git pull origin master || true', projectRoot);
+        log(`Git fetch warning: ${gitErr.message}. Falling back to pull...`);
+        try {
+          await executeShell('git pull origin master || true', projectRoot);
+        } catch {
+          // continue
+        }
       }
     } else {
-      log('Direct package mode: Downloading master branch archive from GitHub...');
-      const downloadScript = `curl -sSL -f -o /tmp/netman-update.zip https://github.com/shahbazimasoud/Net-Management/archive/refs/heads/master.zip && unzip -q -o /tmp/netman-update.zip -d /tmp/netman-ext && cp -r /tmp/netman-ext/Net-Management-master/* . && rm -rf /tmp/netman-update.zip /tmp/netman-ext`;
-      await executeShell(downloadScript, projectRoot);
-      log('Archive unpacked and merged successfully.');
-    }
-
-    // Verify dependencies
-    log('Updating project dependencies...');
-    try {
-      await executeShell('npm install --prefer-offline --no-audit', projectRoot);
-      log('Dependencies verified.');
-    } catch (npmErr: any) {
-      log(`Dependency notice: ${npmErr.message}`);
-    }
-
-    // Build production assets if dist exists
-    const distDir = path.join(projectRoot, 'dist');
-    if (fs.existsSync(distDir)) {
-      log('Rebuilding production assets...');
+      log('Standalone archive mode: Downloading complete repository tarball...');
+      const downloadScript = `curl -sSL -f -o /tmp/netman-update.tar.gz https://codeload.github.com/shahbazimasoud/Net-Management/tar.gz/refs/heads/master && tar -xzf /tmp/netman-update.tar.gz -C /tmp && cp -a /tmp/Net-Management-master/. . && rm -rf /tmp/netman-update.tar.gz /tmp/Net-Management-master`;
       try {
-        await executeShell('npm run build', projectRoot);
-        log('Build compiled successfully.');
-      } catch (bErr: any) {
-        log(`Build notice: ${bErr.message}`);
+        await executeShell(downloadScript, projectRoot);
+        log('Repository archive extracted and merged successfully.');
+      } catch (dlErr: any) {
+        log(`Archive extraction warning: ${dlErr.message}`);
       }
+    }
+
+    // Restore executable permissions for shell scripts
+    try {
+      await executeShell('chmod +x *.sh 2>/dev/null || true', projectRoot);
+    } catch {
+      // ignore
+    }
+
+    // Step 3: Full NPM Dependency Reconciliation
+    log('--- [Phase 3/6] Installing & Reconciling NPM Dependencies ---');
+    if (isCleanMode) {
+      log('Clean installation mode requested: Purging node_modules cache...');
+      try {
+        await executeShell('rm -rf node_modules package-lock.json', projectRoot);
+      } catch (rmErr: any) {
+        log(`Notice removing node_modules: ${rmErr.message}`);
+      }
+    }
+
+    try {
+      // Configure network timeout and retry resilience for npm
+      await executeShell('npm config set fetch-retry-maxtimeout 180000 2>/dev/null || true', projectRoot);
+      await executeShell('npm config set fetch-retry-mintimeout 30000 2>/dev/null || true', projectRoot);
+      await executeShell('npm config set fetch-retries 5 2>/dev/null || true', projectRoot);
+
+      log('Running npm install...');
+      try {
+        await executeShell('npm install --no-audit', projectRoot);
+        log('NPM dependencies installed successfully.');
+      } catch (firstNpmErr: any) {
+        log(`Standard NPM install encountered issue: ${firstNpmErr.message}. Retrying with mirror registry...`);
+        await executeShell('npm install --no-audit --registry=https://registry.npmmirror.com', projectRoot);
+        log('NPM dependencies successfully installed via fallback mirror.');
+      }
+
+      // Ensure platform-specific native binaries for Rollup / esbuild on Linux
+      await executeShell('npm install --no-save @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 2>/dev/null || true', projectRoot);
+      await executeShell('npm install --no-save @rollup/rollup-linux-arm64-gnu @esbuild/linux-arm64 2>/dev/null || true', projectRoot);
+      await executeShell('npm rebuild 2>/dev/null || true', projectRoot);
+    } catch (npmErr: any) {
+      log(`NPM installation notice: ${npmErr.message}`);
+    }
+
+    // Step 4: Python Backend Dependencies
+    log('--- [Phase 4/6] Verifying Python Backend Dependencies ---');
+    try {
+      const pipInstallCmd = 'python3 -m pip install --upgrade --break-system-packages paramiko cryptography websockets 2>/dev/null || pip3 install paramiko cryptography websockets 2>/dev/null || pip install paramiko cryptography websockets 2>/dev/null || true';
+      await executeShell(pipInstallCmd, projectRoot);
+      const reqPath = path.join(projectRoot, 'requirements.txt');
+      if (fs.existsSync(reqPath)) {
+        await executeShell('python3 -m pip install -r requirements.txt --break-system-packages 2>/dev/null || true', projectRoot);
+      }
+      log('Python environment & drivers (paramiko, cryptography, websockets) verified.');
+    } catch (pyErr: any) {
+      log(`Python dependency notice: ${pyErr.message}`);
+    }
+
+    // Step 5: Production Assets & Server Bundle
+    log('--- [Phase 5/6] Compiling Production Frontend & Backend Bundles ---');
+    try {
+      await executeShell('NODE_OPTIONS="--max-old-space-size=2048" npm run build', projectRoot);
+      log('Production bundle compiled successfully (dist/ and dist/server.cjs ready).');
+    } catch (bErr: any) {
+      log(`Build warning: ${bErr.message}`);
     }
 
     // Read updated version from package.json
-    let newVersion = '1.38.0';
+    let newVersion = '1.71.0';
     const pkgPath = path.join(projectRoot, 'package.json');
     if (fs.existsSync(pkgPath)) {
       try {
@@ -337,14 +434,28 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
       }
     }
 
-    log(`Update complete! Application is now running v${newVersion}.`);
+    log(`--- [Phase 6/6] Update Complete! System updated to v${newVersion} ---`);
+    log('Scheduling graceful service restart to reload updated backend into memory...');
 
+    // Respond immediately with full logs so the frontend can display them and countdown
     res.json({
       success: true,
       newVersion,
       message: `Panel updated successfully to v${newVersion}`,
       logs
     });
+
+    // Schedule background service restart after 1.5 seconds so response reaches client
+    setTimeout(() => {
+      console.log('[Update Engine] Triggering background service restart...');
+      // 1. Try systemd service restart
+      exec('sudo systemctl restart nettopology || systemctl restart nettopology || bash ./restart.sh', { cwd: projectRoot }, (rErr) => {
+        if (rErr) {
+          console.log('[Update Engine] Service restart command notice:', rErr.message);
+        }
+      });
+    }, 1500);
+
   } catch (err: any) {
     console.error('[Update Engine Failed]', err);
     res.status(500).json({

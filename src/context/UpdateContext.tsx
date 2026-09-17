@@ -10,6 +10,22 @@ export interface UpdateInfo {
   checkedAt?: string;
 }
 
+export interface CheckUpdateResult {
+  success: boolean;
+  hasUpdate: boolean;
+  latestVersion: string;
+  currentVersion: string;
+  releaseNote: ReleaseNote | null;
+  error?: string;
+}
+
+export interface UpdateFeedback {
+  type: 'checking' | 'latest' | 'update_available' | 'error';
+  message: string;
+  message_en: string;
+  timestamp: number;
+}
+
 interface UpdateContextType {
   updateInfo: UpdateInfo | null;
   checking: boolean;
@@ -18,8 +34,11 @@ interface UpdateContextType {
   updateLogs: string[];
   error: string | null;
   countdown: number | null;
-  checkUpdate: (simulate?: boolean) => Promise<void>;
-  performUpdate: () => Promise<boolean>;
+  lastCheckedAt: string | null;
+  checkFeedback: UpdateFeedback | null;
+  dismissFeedback: () => void;
+  checkUpdate: (simulate?: boolean, forceFresh?: boolean) => Promise<CheckUpdateResult>;
+  performUpdate: (options?: { clean?: boolean }) => Promise<boolean>;
   toggleSimulatedUpdate: () => void;
   isSimulated: boolean;
   dismissUpdateAlert: () => void;
@@ -38,68 +57,148 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isSimulated, setIsSimulated] = useState<boolean>(false);
   const [isAlertDismissed, setIsAlertDismissed] = useState<boolean>(false);
+  const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
+  const [checkFeedback, setCheckFeedback] = useState<UpdateFeedback | null>(null);
 
-  const checkUpdate = useCallback(async (simulate: boolean = false) => {
+  const dismissFeedback = useCallback(() => {
+    setCheckFeedback(null);
+  }, []);
+
+  const checkUpdate = useCallback(async (simulate: boolean = false, forceFresh: boolean = true): Promise<CheckUpdateResult> => {
     setChecking(true);
     setError(null);
+    setCheckFeedback({
+      type: 'checking',
+      message: 'در حال استعلام بی‌درنگ از مخزن گیت‌هاب...',
+      message_en: 'Checking GitHub repository in real-time...',
+      timestamp: Date.now()
+    });
+
     try {
-      const url = `/api/system/check-update${simulate ? '?simulate=true' : ''}`;
-      const res = await fetch(url);
+      const sep = simulate ? '&' : '?';
+      const cacheBuster = forceFresh ? `${sep}_t=${Date.now()}` : '';
+      const url = `/api/system/check-update${simulate ? '?simulate=true' : ''}${cacheBuster}`;
+      
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+
       if (!res.ok) {
         throw new Error(`Server returned HTTP ${res.status}`);
       }
+
       const data: UpdateInfo = await res.json();
       setUpdateInfo(data);
+      const nowIso = new Date().toISOString();
+      setLastCheckedAt(nowIso);
+
       if (simulate) {
         setIsSimulated(true);
         setIsAlertDismissed(false);
       } else {
         setIsSimulated(false);
       }
+
+      if (data.hasUpdate) {
+        setCheckFeedback({
+          type: 'update_available',
+          message: `نگارش جدید v${data.latestVersion} آماده نصب است!`,
+          message_en: `New release v${data.latestVersion} is ready to install!`,
+          timestamp: Date.now()
+        });
+      } else {
+        setCheckFeedback({
+          type: 'latest',
+          message: `سامانه شما کاملاً به‌روز است (v${data.currentVersion || APP_VERSION})`,
+          message_en: `Your panel is running the latest version (v${data.currentVersion || APP_VERSION})`,
+          timestamp: Date.now()
+        });
+      }
+
+      return {
+        success: true,
+        hasUpdate: data.hasUpdate,
+        latestVersion: data.latestVersion,
+        currentVersion: data.currentVersion,
+        releaseNote: data.releaseNote
+      };
     } catch (err: any) {
       console.warn('[UpdateContext] Failed to check for updates:', err.message);
       setError(err.message);
+      setCheckFeedback({
+        type: 'error',
+        message: `خطا در بررسی به‌روزرسانی: ${err.message}`,
+        message_en: `Failed to check for updates: ${err.message}`,
+        timestamp: Date.now()
+      });
+      return {
+        success: false,
+        hasUpdate: false,
+        latestVersion: APP_VERSION,
+        currentVersion: APP_VERSION,
+        releaseNote: null,
+        error: err.message
+      };
     } finally {
       setChecking(false);
     }
   }, []);
 
-  const performUpdate = useCallback(async (): Promise<boolean> => {
+  const performUpdate = useCallback(async (options?: { clean?: boolean }): Promise<boolean> => {
     setUpdating(true);
     setError(null);
     setUpdateSuccess(false);
+    const isCleanMode = options?.clean === true;
     const currentLang = typeof window !== 'undefined' ? localStorage.getItem('nettopology_lang') || 'en' : 'en';
     const isPersian = currentLang === 'fa';
 
     setUpdateLogs([
       isPersian
-        ? 'در حال اتصال به سرور و مخزن گیت‌هاب (Net-Management)...'
-        : 'Connecting to server and GitHub repository (Net-Management)...'
+        ? `[گام ۱/۶] شروع فرآیند به‌روزرسانی ${isCleanMode ? 'کامل و پاکسازی عمیق' : 'استاندارد'} پنل...`
+        : `[Phase 1/6] Starting ${isCleanMode ? 'clean deep rebuild' : 'standard update'} pipeline...`
     ]);
 
     try {
       // If in simulated test mode, simulate real steps for demonstration
       if (isSimulated) {
-        await new Promise((r) => setTimeout(r, 800));
+        await new Promise((r) => setTimeout(r, 700));
         setUpdateLogs((prev) => [
           ...prev,
           isPersian
-            ? 'همگام‌سازی فایل‌های سیستمی با برنچ master...'
-            : 'Synchronizing system files with master branch...'
+            ? '[گام ۲/۶] همگام‌سازی کامل کدهای مخزن با گیت‌هاب (master)...'
+            : '[Phase 2/6] Synchronizing repository files with GitHub (master)...'
         ]);
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 700));
         setUpdateLogs((prev) => [
           ...prev,
           isPersian
-            ? 'بررسی پکیج‌ها و بازسازی فایل‌های باندلینگ...'
-            : 'Verifying dependencies and compiling production bundles...'
+            ? '[گام ۳/۶] بررسی و نصب تمام وابستگی‌های NPM و ماژول‌های سیستمی...'
+            : '[Phase 3/6] Installing and verifying all NPM and system packages...'
         ]);
-        await new Promise((r) => setTimeout(r, 900));
+        await new Promise((r) => setTimeout(r, 700));
         setUpdateLogs((prev) => [
           ...prev,
           isPersian
-            ? 'به‌روزرسانی با موفقیت به اتمام رسید!'
-            : 'Update completed successfully!'
+            ? '[گام ۴/۶] بررسی و نصب پیش‌نیازهای پایتون (paramiko, cryptography, websockets)...'
+            : '[Phase 4/6] Verifying Python backend requirements (paramiko, cryptography, websockets)...'
+        ]);
+        await new Promise((r) => setTimeout(r, 700));
+        setUpdateLogs((prev) => [
+          ...prev,
+          isPersian
+            ? '[گام ۵/۶] ساخت و کامپایل مجدد باندل اجرایی فرانت‌اند و بک‌اند...'
+            : '[Phase 5/6] Compiling production frontend and backend bundles...'
+        ]);
+        await new Promise((r) => setTimeout(r, 700));
+        setUpdateLogs((prev) => [
+          ...prev,
+          isPersian
+            ? '[گام ۶/۶] به‌روزرسانی با موفقیت کامل انجام شد! راه‌اندازی مجدد در ۳ ثانیه...'
+            : '[Phase 6/6] Full update completed successfully! Reloading in 3 seconds...'
         ]);
         setUpdateSuccess(true);
         setUpdating(false);
@@ -110,6 +209,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const res = await fetch('/api/system/perform-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clean: isCleanMode })
       });
 
       const data = await res.json();
@@ -158,10 +258,10 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Initial update check on application load
   useEffect(() => {
-    checkUpdate(false);
+    checkUpdate(false, true);
     // Periodically re-check every 15 minutes
     const interval = setInterval(() => {
-      checkUpdate(false);
+      checkUpdate(false, true);
     }, 15 * 60 * 1000);
     return () => clearInterval(interval);
   }, [checkUpdate]);
@@ -176,6 +276,9 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateLogs,
         error,
         countdown,
+        lastCheckedAt,
+        checkFeedback,
+        dismissFeedback,
         checkUpdate,
         performUpdate,
         toggleSimulatedUpdate,
@@ -196,3 +299,4 @@ export const useUpdate = (): UpdateContextType => {
   }
   return context;
 };
+

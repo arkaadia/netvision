@@ -10,9 +10,32 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.70.0';
+export const APP_VERSION = '1.71.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.71.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'ارتقای جامع موتور بررسی و نصب به‌روزرسانی پنل، همگام‌سازی بی‌درنگ با گیت‌هاب و رفع مشکل پکیج‌ها و کدهای بک‌اند',
+    title_en: 'Comprehensive In-Panel Update Engine Overhaul, Immediate GitHub Release Checker & Complete Clean Sync',
+    changes: [
+      'بررسی آنی و بی‌درنگ مخزن گیت‌هاب با کلیک بر روی دکمه Check for Updates در منوی پروفایل هدر بدون کش، همراه با نمایش نشانگر چرخان، وضعیت بررسی و بازخورد اختصاصی.',
+      'افزودن هدرهای ضد کش (Cache-Control: no-store) و بررسی همزمان کامیت‌های Git با دستورات مستقیم git ls-remote جهت تشخیص فوری نسخه‌های جدید در سرور.',
+      'بازنویسی کامل پایپ‌لاین به‌روزرسانی پنل در سرور (Phase 1 تا 6) شامل بک‌آپ ایمن از تنظیمات و دیتابیس محلی، همگام‌سازی صددرصد فایل‌ها، نصب و بازسازی کامل پکیج‌های NPM با پشتیبانی از ریپازیتوری پشتیبان (Mirror fallback).',
+      'نصب خودکار پکیج‌های پیش‌نیاز بک‌اند پایتون (paramiko, cryptography, websockets) و فایل requirements.txt جهت برطرف شدن نیاز به نصب مجدد دستی.',
+      'ساخت مجدد باندل‌های فرانت‌اند و بک‌اند به همراه بازسازی باینری‌های لینوکس Rollup/esbuild و زمان‌بندی راه‌اندازی مجدد خودکار سرویس پس از اتمام ارتقا.',
+      'پشتیبانی از حالت ارتقای عمیق و پاکسازی کامل (Clean Reinstall Mode) در مودال انتشار برای رفع کامل مشکل پکیج‌های ناقص یا باقیمانده‌های قدیمی.'
+    ],
+    changes_en: [
+      'Instant GitHub release check on clicking Check for Updates in the profile dropdown, bypassing browser/server caching with real-time spinners and status feedback.',
+      'Added strict anti-cache response headers and direct git ls-remote remote commit verification to immediately detect new updates on GitHub.',
+      'Complete overhaul of server-side update pipeline (Phases 1-6) including automatic configuration & database safeguarding, comprehensive git code sync, and robust NPM package reconciliation with mirror registry fallback.',
+      'Automatic installation and verification of Python backend dependencies (paramiko, cryptography, websockets) and requirements.txt, eliminating the need for manual server wipes.',
+      'Automatic rebuilding of production frontend and backend bundles, Linux native binary rebuilds (Rollup/esbuild), and graceful service restart scheduling.',
+      'Added deep clean reinstallation option in Release Notes modal to resolve stale package issues or partial updates.'
+    ]
+  },
   {
     version: '1.70.0',
     releaseDate: '2026-09-17',

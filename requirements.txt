@@ -1,0 +1,4 @@
+# NetTopology Python Backend Dependencies
+paramiko>=3.4.0
+cryptography>=42.0.0
+websockets>=12.0

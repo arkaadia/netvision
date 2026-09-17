@@ -33,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
 }) => {
   const { t, language, setLanguage, isRtl, isEn } = useLanguage();
-  const { updateInfo, checking, checkUpdate } = useUpdate();
+  const { updateInfo, checking, checkUpdate, checkFeedback, dismissFeedback } = useUpdate();
   const { user, logout } = useAuth();
   const hasUpdate = Boolean(updateInfo?.hasUpdate);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -339,31 +339,87 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 )}
 
-                {/* Section 3: Release Notes & System Status Link */}
-                <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      if (onOpenReleaseNotes) onOpenReleaseNotes();
-                    }}
-                    className="flex items-center gap-1.5 text-xs text-indigo-300 hover:text-indigo-200 transition cursor-pointer"
-                  >
-                    <FileText className="w-3 h-3" />
-                    <span>v{APP_VERSION} {t('sidebar_release_notes')}</span>
-                    {hasUpdate && (
-                      <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)] animate-ping" />
-                    )}
-                  </button>
+                {/* Section 3: Release Notes & Check for Updates */}
+                <div className="pt-2 border-t border-white/10 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        if (onOpenReleaseNotes) onOpenReleaseNotes();
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-indigo-300 hover:text-indigo-200 transition cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="font-mono font-semibold">v{APP_VERSION}</span>
+                      <span>{t('sidebar_release_notes')}</span>
+                      {hasUpdate && (
+                        <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)] animate-ping" />
+                      )}
+                    </button>
 
+                    {hasUpdate && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        {isEn ? 'Update' : 'آپدیت'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Prominent Direct GitHub Check Button */}
                   <button
-                    onClick={() => checkUpdate(false)}
+                    onClick={async () => {
+                      await checkUpdate(false, true);
+                    }}
                     disabled={checking}
-                    className="text-[10px] text-slate-400 hover:text-cyan-300 transition flex items-center gap-1 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 border border-cyan-500/25 hover:border-cyan-500/40 text-xs font-semibold transition cursor-pointer active:scale-98 disabled:opacity-50"
                     title={t('update_btn_check_now')}
                   >
-                    <RefreshCw className={`w-2.5 h-2.5 ${checking ? 'animate-spin text-cyan-400' : ''}`} />
-                    <span>{checking ? '...' : 'GitHub'}</span>
+                    <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${checking ? 'animate-spin' : ''}`} />
+                    <span>
+                      {checking
+                        ? (isEn ? 'Checking GitHub...' : 'در حال بررسی گیت‌هاب...')
+                        : (isEn ? 'Check for Updates' : 'بررسی نسخه جدید (GitHub)')}
+                    </span>
                   </button>
+
+                  {/* Live Status / Toast Feedback */}
+                  {checkFeedback && (
+                    <div
+                      className={`text-[11px] p-2 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                        checkFeedback.type === 'checking'
+                          ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                          : checkFeedback.type === 'update_available'
+                          ? 'bg-rose-500/15 border-rose-500/35 text-rose-200'
+                          : checkFeedback.type === 'latest'
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                          : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 leading-tight">
+                        {checkFeedback.type === 'checking' && (
+                          <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin shrink-0" />
+                        )}
+                        {checkFeedback.type === 'latest' && (
+                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        )}
+                        {checkFeedback.type === 'update_available' && (
+                          <ArrowUpCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                        )}
+                        <span>{isEn ? checkFeedback.message_en : checkFeedback.message}</span>
+                      </div>
+
+                      {checkFeedback.type === 'update_available' && (
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            if (onOpenReleaseNotes) onOpenReleaseNotes();
+                          }}
+                          className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] shrink-0 transition cursor-pointer"
+                        >
+                          {isEn ? 'View' : 'مشاهده'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Section 4: Log Out Action */}
