@@ -515,8 +515,8 @@ def execute_real_hardware_probe(
         except Exception:
             pass
         clean_err = str(conn_err or "Connection failed")
-        err_en = f"SSH Authentication failed on {ip}:{port} for user '{username}': {clean_err}"
-        err_fa = f"احراز هویت SSH در {ip}:{port} برای کاربر '{username}' ناموفق بود: {clean_err}"
+        err_en = f"SSH connection failed on {ip}:{port} for user '{username}': {clean_err}"
+        err_fa = f"اتصال SSH در {ip}:{port} برای کاربر '{username}' ناموفق بود: {clean_err}"
         return {
             "success": False,
             "connected": False,

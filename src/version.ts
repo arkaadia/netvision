@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.72.1';
+export const APP_VERSION = '1.72.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.72.2',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'موتور تطبیقی چندپروفایلی الگوریتم‌های SSH و رفع خطای ناشناخته بودن سایفر (unknown cipher)',
+    title_en: 'Adaptive Multi-Profile SSH Algorithm Engine & Fix for Unknown Cipher Errors',
+    changes: [
+      'رفع خطای "unknown cipher" از طریق فیلتر هوشمند و انطباق سایفرها صرفاً با الگوریتم‌های استاندارد و قابل رمزگشایی در Paramiko (نظیر AES-CTR, AES-CBC, 3DES-CBC).',
+      'طراحی موتور تطبیقی چندپروفایلی (Adaptive Multi-Profile Cascade) برای آزمایش پیوسته و بدون توقف پروفایل‌های گوناگون KEX و Cipher هنگام تست اتصال SSH در ثبت تجهیز جدید.',
+      'پشتیبانی هم‌زمان، هوشمند و خودکار از نسل‌های گوناگون تجهیزات: سوئیچ‌های کلاسیک سیسکو کاتالیست (2960/3560)، تجهیزات نوین (IOS-XE/Nexus)، روترهای میکروتیک (v6/v7) و سرورهای لینوکسی.',
+      'عدم توقف در صورت عدم تطابق یک الگوریتم؛ بررسی متوالی پروفایل‌های تبادل کلید تا برقراری موفقیت‌آمیز ارتباط همراه با پشتیبانی از احراز هویت تعاملی (keyboard-interactive).'
+    ],
+    changes_en: [
+      'Resolved the "unknown cipher" error by strictly validating and filtering ciphers against supported Paramiko decryption suites (such as AES-CTR, AES-CBC, and 3DES-CBC).',
+      'Engineered an adaptive multi-profile cascade that sequentially tests diverse KEX, Cipher, and Key negotiation profiles without stopping during SSH connection tests in Register New Device.',
+      'Seamless multi-generation device interoperability: simultaneously supports classic legacy Cisco Catalyst (2960/3560), modern Cisco IOS-XE/Nexus, MikroTik RouterOS (v6 & v7), and modern Linux servers.',
+      'Non-halting negotiation loop: gracefully cycles through alternate algorithm suites upon mismatch until connection succeeds, with automated keyboard-interactive authentication fallback.'
+    ]
+  },
   {
     version: '1.72.1',
     releaseDate: '2026-09-17',
