@@ -2035,7 +2035,7 @@ export async function getDeviceStickyNotes(): Promise<any[]> {
   return Array.from(noteMap.values());
 }
 
-export async function saveDeviceStickyNote(note: any): Promise<any> {
+export async function saveDeviceStickyNote(note: any, previousDeviceId?: string): Promise<any> {
   if (!note) throw new Error('Invalid note data');
   const id = note.id || `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   const deviceId = note.linkedDeviceId || note.deviceId;
@@ -2043,6 +2043,9 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
 
   const cleanDeviceId = deviceId.replace(/^hw-/, '');
   const hwDeviceId = 'hw-' + cleanDeviceId;
+
+  const cleanPrev = previousDeviceId ? previousDeviceId.replace(/^hw-/, '') : undefined;
+  const hwPrev = cleanPrev ? 'hw-' + cleanPrev : undefined;
 
   const normalizedNote = {
     id,
@@ -2062,6 +2065,18 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
   if (!Array.isArray(store.device_sticky_notes)) {
     store.device_sticky_notes = [];
   }
+
+  // If reassigning from another device, clean up old device record in fallback store
+  if (previousDeviceId && previousDeviceId !== deviceId) {
+    store.device_sticky_notes = store.device_sticky_notes.filter(
+      (n: any) =>
+        n &&
+        n.linkedDeviceId !== previousDeviceId &&
+        n.linkedDeviceId !== cleanPrev &&
+        n.linkedDeviceId !== hwPrev
+    );
+  }
+
   const existingIdx = store.device_sticky_notes.findIndex(
     (n: any) =>
       n.id === id ||
@@ -2094,6 +2109,7 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
           title: normalizedNote.title,
           content: normalizedNote.content,
           color: normalizedNote.color,
+          linkedDeviceId: normalizedNote.linkedDeviceId,
           updatedAt: normalizedNote.updatedAt,
         };
       } else {
@@ -2123,6 +2139,14 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
   await ensurePostgresConnection();
   if (isPostgresReady && pool) {
     try {
+      // If reassigning from another device, clean up old device record in PostgreSQL
+      if (previousDeviceId && previousDeviceId !== deviceId) {
+        await pool.query(
+          'DELETE FROM device_sticky_notes WHERE device_id = $1 OR device_id = $2',
+          [previousDeviceId, cleanPrev]
+        );
+      }
+
       // Find if this device or id already has a record in device_sticky_notes table
       const existingRes = await pool.query(
         'SELECT id FROM device_sticky_notes WHERE id = $1 OR device_id = $2 OR device_id = $3 LIMIT 1',
@@ -2181,6 +2205,7 @@ export async function saveDeviceStickyNote(note: any): Promise<any> {
               title: normalizedNote.title,
               content: normalizedNote.content,
               color: normalizedNote.color,
+              linkedDeviceId: normalizedNote.linkedDeviceId,
               updatedAt: normalizedNote.updatedAt,
             };
             updated = true;

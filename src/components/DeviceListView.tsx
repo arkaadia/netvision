@@ -150,14 +150,16 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
     loadDeviceNotes();
     const handleUpdate = (e: Event) => {
       const detail = (e as CustomEvent)?.detail;
-      if (detail?.previousDeviceId) {
-        const prevId = detail.previousDeviceId;
-        const cleanPrev = prevId.replace(/^hw-/, '');
+      if (detail) {
         setDeviceNotes((current) => {
           const next = { ...current };
-          delete next[prevId];
-          delete next[cleanPrev];
-          delete next['hw-' + cleanPrev];
+          if (detail.previousDeviceId) {
+            const prevId = detail.previousDeviceId;
+            const cleanPrev = prevId.replace(/^hw-/, '');
+            delete next[prevId];
+            delete next[cleanPrev];
+            delete next['hw-' + cleanPrev];
+          }
           if (detail.newDeviceId && detail.note) {
             const newId = detail.newDeviceId;
             const cleanNew = newId.replace(/^hw-/, '');

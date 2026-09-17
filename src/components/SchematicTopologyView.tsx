@@ -3444,6 +3444,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
   // Helper to find device position for auto-attaching sticky notes
   const getDevicePositionForNote = useCallback(
     (deviceId: string): { x: number; y: number } | null => {
+      if (!deviceId) return null;
       const cleanId = deviceId.replace(/^hw-/, '');
       const hwId = 'hw-' + cleanId;
       return (
@@ -3453,10 +3454,15 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         customPositions[deviceId] ||
         customPositions[cleanId] ||
         customPositions[hwId] ||
+        (currentCustomMap?.devicePositions && (
+          currentCustomMap.devicePositions[deviceId] ||
+          currentCustomMap.devicePositions[cleanId] ||
+          currentCustomMap.devicePositions[hwId]
+        )) ||
         null
       );
     },
-    [nodePositions, customPositions]
+    [nodePositions, customPositions, currentCustomMap]
   );
 
   // Synchronize device sticky notes from database & localStorage
@@ -3621,6 +3627,51 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         return;
       }
 
+      if (detail.unlinked) {
+        const targetId = detail.id;
+        const prevDevId = detail.previousDeviceId;
+        const cleanPrev = prevDevId?.replace(/^hw-/, '');
+        const hwPrev = cleanPrev ? 'hw-' + cleanPrev : undefined;
+
+        setCustomMaps((prev) => {
+          const updated = prev.map((m) => ({
+            ...m,
+            stickyNotes: (m.stickyNotes || []).map((sn) => {
+              if (
+                sn.id === targetId ||
+                (prevDevId && (sn.linkedDeviceId === prevDevId || sn.linkedDeviceId === cleanPrev || sn.linkedDeviceId === hwPrev))
+              ) {
+                const next = { ...sn, updatedAt: new Date().toISOString() };
+                delete next.linkedDeviceId;
+                return next;
+              }
+              return sn;
+            }),
+          }));
+          saveCustomMaps(updated);
+          return updated;
+        });
+
+        setDefaultStickyNotes((prev) => {
+          const updated = prev.map((sn) => {
+            if (
+              sn.id === targetId ||
+              (prevDevId && (sn.linkedDeviceId === prevDevId || sn.linkedDeviceId === cleanPrev || sn.linkedDeviceId === hwPrev))
+            ) {
+              const next = { ...sn, updatedAt: new Date().toISOString() };
+              delete next.linkedDeviceId;
+              return next;
+            }
+            return sn;
+          });
+          try {
+            localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+        return;
+      }
+
       if (detail.deleted) {
         const deletedId = detail.id;
         const deletedDevId = detail.deviceId;
@@ -3664,166 +3715,203 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
           } catch (e) {}
           return updated;
         });
-      } else {
-        // Saved / updated note from Inventory or anywhere else
-        const note: CustomTopologyStickyNote = detail;
-        if (!note || !note.id) return;
+        return;
+      }
 
-        // Clear tombstones for this note and device immediately so it is never suppressed
-        deletedNoteIdsRef.current.delete(note.id);
+      // Saved / updated note from Inventory or anywhere else (link / reassign / edit)
+      const note: CustomTopologyStickyNote = (detail.note || detail) as CustomTopologyStickyNote;
+      if (!note || !note.id) return;
+      if (detail.newDeviceId) {
+        note.linkedDeviceId = detail.newDeviceId;
+      }
+
+      // Clear tombstones for this note and device immediately so it is never suppressed
+      deletedNoteIdsRef.current.delete(note.id);
+      if (note.linkedDeviceId) {
+        const clean = note.linkedDeviceId.replace(/^hw-/, '');
+        deletedDeviceIdsRef.current.delete(note.linkedDeviceId);
+        deletedDeviceIdsRef.current.delete(clean);
+        deletedDeviceIdsRef.current.delete('hw-' + clean);
+      }
+      try {
+        const storedNotes = sessionStorage.getItem('nettopology_deleted_notes_tombstone');
+        if (storedNotes) {
+          const arr = JSON.parse(storedNotes);
+          if (Array.isArray(arr)) {
+            sessionStorage.setItem('nettopology_deleted_notes_tombstone', JSON.stringify(arr.filter((id) => id !== note.id)));
+          }
+        }
         if (note.linkedDeviceId) {
           const clean = note.linkedDeviceId.replace(/^hw-/, '');
-          deletedDeviceIdsRef.current.delete(note.linkedDeviceId);
-          deletedDeviceIdsRef.current.delete(clean);
-          deletedDeviceIdsRef.current.delete('hw-' + clean);
-        }
-        try {
-          const storedNotes = sessionStorage.getItem('nettopology_deleted_notes_tombstone');
-          if (storedNotes) {
-            const arr = JSON.parse(storedNotes);
-            if (Array.isArray(arr)) {
-              sessionStorage.setItem('nettopology_deleted_notes_tombstone', JSON.stringify(arr.filter((id) => id !== note.id)));
-            }
-          }
           const storedDevs = sessionStorage.getItem('nettopology_deleted_devices_tombstone');
           if (storedDevs) {
             const arr = JSON.parse(storedDevs);
             if (Array.isArray(arr)) {
-              sessionStorage.setItem('nettopology_deleted_devices_tombstone', JSON.stringify(arr.filter((id) => id !== note.linkedDeviceId && id !== note.linkedDeviceId?.replace(/^hw-/, ''))));
+              sessionStorage.setItem('nettopology_deleted_devices_tombstone', JSON.stringify(arr.filter((id) => id !== note.linkedDeviceId && id !== clean)));
             }
           }
-        } catch (e) {}
+        }
+      } catch (e) {}
 
-        setShowStickyNotes(true);
-        try {
-          localStorage.setItem('nettopology_show_sticky_notes', 'true');
-        } catch (e) {}
+      setShowStickyNotes(true);
+      try {
+        localStorage.setItem('nettopology_show_sticky_notes', 'true');
+      } catch (e) {}
 
-        const targetDevId = note.linkedDeviceId;
-        const cleanDevId = targetDevId?.replace(/^hw-/, '');
-        const hwDevId = cleanDevId ? 'hw-' + cleanDevId : undefined;
+      const targetDevId = note.linkedDeviceId;
+      const cleanDevId = targetDevId?.replace(/^hw-/, '');
+      const hwDevId = cleanDevId ? 'hw-' + cleanDevId : undefined;
 
-        setCustomMaps((prev) => {
-          const updated = prev.map((m) => {
-            const currentNotes = (m.stickyNotes || []).filter((sn) => !isTombstoned(sn.id, sn.linkedDeviceId));
-            const exists = currentNotes.some(
-              (n) =>
-                n.id === note.id ||
-                (targetDevId &&
-                  (n.linkedDeviceId === targetDevId ||
-                    n.linkedDeviceId === cleanDevId ||
-                    n.linkedDeviceId === hwDevId))
-            );
+      const prevDevId = detail.previousDeviceId;
+      const cleanPrevId = prevDevId?.replace(/^hw-/, '');
+      const hwPrevId = cleanPrevId ? 'hw-' + cleanPrevId : undefined;
 
-            let newNotes: CustomTopologyStickyNote[];
-            if (exists) {
-              newNotes = currentNotes.map((n) =>
-                n.id === note.id ||
-                (targetDevId &&
-                  (n.linkedDeviceId === targetDevId ||
-                    n.linkedDeviceId === cleanDevId ||
-                    n.linkedDeviceId === hwDevId))
-                  ? {
-                      ...n,
-                      id: note.id,
-                      title: note.title,
-                      content: note.content,
-                      color: note.color || n.color,
-                      updatedAt: note.updatedAt || new Date().toISOString(),
-                    }
-                  : n
-              );
-            } else {
-              const hasDev =
-                (Array.isArray(m.deviceIds) &&
-                  (m.deviceIds.includes(targetDevId!) ||
-                    (cleanDevId && m.deviceIds.includes(cleanDevId)) ||
-                    (hwDevId && m.deviceIds.includes(hwDevId)))) ||
-                (m.devicePositions &&
-                  (m.devicePositions[targetDevId!] ||
-                    (cleanDevId && m.devicePositions[cleanDevId]) ||
-                    (hwDevId && m.devicePositions[hwDevId])));
-
-              if (hasDev) {
-                const devPos =
-                  (m.devicePositions &&
-                    (m.devicePositions[targetDevId!] ||
-                      (cleanDevId && m.devicePositions[cleanDevId]) ||
-                      (hwDevId && m.devicePositions[hwDevId]))) ||
-                  { x: 200, y: 150 };
-                newNotes = [
-                  ...currentNotes,
-                  {
-                    ...note,
-                    x: (devPos.x || 200) + 120,
-                    y: (devPos.y || 150) + 40,
-                    viewMode: (targetDevId && m.deviceDisplayModes?.[targetDevId]) || 'card',
-                  },
-                ];
-              } else {
-                newNotes = currentNotes;
-              }
-            }
-
-            return {
-              ...m,
-              stickyNotes: newNotes,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          saveCustomMaps(updated);
-          return updated;
-        });
-
-        setDefaultStickyNotes((prev) => {
-          const currentNotes = prev.filter((sn) => !isTombstoned(sn.id, sn.linkedDeviceId));
+      setCustomMaps((prev) => {
+        const updated = prev.map((m) => {
+          const currentNotes = (m.stickyNotes || []).filter((sn) => !isTombstoned(sn.id, sn.linkedDeviceId));
           const exists = currentNotes.some(
             (n) =>
               n.id === note.id ||
               (targetDevId &&
                 (n.linkedDeviceId === targetDevId ||
                   n.linkedDeviceId === cleanDevId ||
-                  n.linkedDeviceId === hwDevId))
+                  n.linkedDeviceId === hwDevId)) ||
+              (prevDevId &&
+                (n.linkedDeviceId === prevDevId ||
+                  n.linkedDeviceId === cleanPrevId ||
+                  n.linkedDeviceId === hwPrevId))
           );
 
-          let updated: CustomTopologyStickyNote[];
+          let newNotes: CustomTopologyStickyNote[];
           if (exists) {
-            updated = currentNotes.map((n) =>
+            newNotes = currentNotes.map((n) => {
+              if (
+                n.id === note.id ||
+                (targetDevId &&
+                  (n.linkedDeviceId === targetDevId ||
+                    n.linkedDeviceId === cleanDevId ||
+                    n.linkedDeviceId === hwDevId)) ||
+                (prevDevId &&
+                  (n.linkedDeviceId === prevDevId ||
+                    n.linkedDeviceId === cleanPrevId ||
+                    n.linkedDeviceId === hwPrevId))
+              ) {
+                return {
+                  ...n,
+                  id: note.id,
+                  title: note.title,
+                  content: note.content,
+                  color: note.color || n.color,
+                  linkedDeviceId: targetDevId,
+                  updatedAt: note.updatedAt || new Date().toISOString(),
+                };
+              }
+              return n;
+            });
+          } else {
+            const hasDev =
+              (Array.isArray(m.deviceIds) &&
+                (m.deviceIds.includes(targetDevId!) ||
+                  (cleanDevId && m.deviceIds.includes(cleanDevId)) ||
+                  (hwDevId && m.deviceIds.includes(hwDevId)))) ||
+              (m.devicePositions &&
+                (m.devicePositions[targetDevId!] ||
+                  (cleanDevId && m.devicePositions[cleanDevId]) ||
+                  (hwDevId && m.devicePositions[hwDevId])));
+
+            if (hasDev) {
+              const devPos =
+                (m.devicePositions &&
+                  (m.devicePositions[targetDevId!] ||
+                    (cleanDevId && m.devicePositions[cleanDevId]) ||
+                    (hwDevId && m.devicePositions[hwDevId]))) ||
+                { x: 200, y: 150 };
+              newNotes = [
+                ...currentNotes,
+                {
+                  ...note,
+                  linkedDeviceId: targetDevId,
+                  x: (devPos.x || 200) + 120,
+                  y: (devPos.y || 150) + 40,
+                  viewMode: (targetDevId && m.deviceDisplayModes?.[targetDevId]) || 'card',
+                },
+              ];
+            } else {
+              newNotes = currentNotes;
+            }
+          }
+
+          return {
+            ...m,
+            stickyNotes: newNotes,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+
+        saveCustomMaps(updated);
+        return updated;
+      });
+
+      setDefaultStickyNotes((prev) => {
+        const currentNotes = prev.filter((sn) => !isTombstoned(sn.id, sn.linkedDeviceId));
+        const exists = currentNotes.some(
+          (n) =>
+            n.id === note.id ||
+            (targetDevId &&
+              (n.linkedDeviceId === targetDevId ||
+                n.linkedDeviceId === cleanDevId ||
+                n.linkedDeviceId === hwDevId)) ||
+            (prevDevId &&
+              (n.linkedDeviceId === prevDevId ||
+                n.linkedDeviceId === cleanPrevId ||
+                n.linkedDeviceId === hwPrevId))
+        );
+
+        let updated: CustomTopologyStickyNote[];
+        if (exists) {
+          updated = currentNotes.map((n) => {
+            if (
               n.id === note.id ||
               (targetDevId &&
                 (n.linkedDeviceId === targetDevId ||
                   n.linkedDeviceId === cleanDevId ||
-                  n.linkedDeviceId === hwDevId))
-                ? {
-                    ...n,
-                    id: note.id,
-                    title: note.title,
-                    content: note.content,
-                    color: note.color || n.color,
-                    updatedAt: note.updatedAt || new Date().toISOString(),
-                  }
-                : n
-            );
-          } else {
-            const devPos = (targetDevId && getDevicePositionForNote(targetDevId)) || { x: 200, y: 150 };
-            updated = [
-              ...currentNotes,
-              {
-                ...note,
-                x: devPos.x + 120,
-                y: devPos.y + 40,
-                viewMode: 'card',
-              },
-            ];
-          }
+                  n.linkedDeviceId === hwDevId)) ||
+              (prevDevId &&
+                (n.linkedDeviceId === prevDevId ||
+                  n.linkedDeviceId === cleanPrevId ||
+                  n.linkedDeviceId === hwPrevId))
+            ) {
+              return {
+                ...n,
+                id: note.id,
+                title: note.title,
+                content: note.content,
+                color: note.color || n.color,
+                linkedDeviceId: targetDevId,
+                updatedAt: note.updatedAt || new Date().toISOString(),
+              };
+            }
+            return n;
+          });
+        } else {
+          const devPos = (targetDevId && getDevicePositionForNote(targetDevId)) || { x: 200, y: 150 };
+          updated = [
+            ...currentNotes,
+            {
+              ...note,
+              linkedDeviceId: targetDevId,
+              x: devPos.x + 120,
+              y: devPos.y + 40,
+              viewMode: 'card',
+            },
+          ];
+        }
 
-          try {
-            localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
-          } catch (e) {}
-          return updated;
-        });
-      }
+        try {
+          localStorage.setItem('nettopology_default_sticky_notes_v1', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
     };
 
     const handleCustomMapsUpdated = () => {
@@ -6816,6 +6904,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                 if (!note.linkedDeviceId) return null;
                 const cleanId = note.linkedDeviceId.replace(/^hw-/, '');
                 const devPos =
+                  getDevicePositionForNote(note.linkedDeviceId) ||
                   nodePositions.get(note.linkedDeviceId) ||
                   customPositions[note.linkedDeviceId] ||
                   nodePositions.get(cleanId) ||
@@ -6854,7 +6943,8 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                 .map((note) => {
                   const cleanId = note.linkedDeviceId ? note.linkedDeviceId.replace(/^hw-/, '') : '';
                   const linkedDevPos = note.linkedDeviceId
-                    ? nodePositions.get(note.linkedDeviceId) ||
+                    ? getDevicePositionForNote(note.linkedDeviceId) ||
+                      nodePositions.get(note.linkedDeviceId) ||
                       customPositions[note.linkedDeviceId] ||
                       nodePositions.get(cleanId) ||
                       customPositions[cleanId] ||

@@ -1035,21 +1035,14 @@ export async function handleDeviceNoteLinkChange(
         headers,
       });
     } else if (updatedNote) {
-      // Reassign: first ensure old device is cleared if old device was different
-      if (previousDeviceId && previousDeviceId !== newDeviceId) {
-        const qp = new URLSearchParams();
-        qp.set('deviceId', previousDeviceId);
-        qp.set('keepInMap', 'true');
-        await fetch(`/api/settings/device-notes/${encodeURIComponent(noteId)}?${qp.toString()}`, {
-          method: 'DELETE',
-          headers,
-        }).catch(() => {});
-      }
-      // Then save new note with newDeviceId
+      // Reassign or Link: save new note with newDeviceId and pass previousDeviceId for atomic cleanup
       await fetch('/api/settings/device-notes', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ note: { ...updatedNote, linkedDeviceId: newDeviceId } }),
+        body: JSON.stringify({
+          note: { ...updatedNote, id: noteId, linkedDeviceId: newDeviceId },
+          previousDeviceId,
+        }),
       }).catch(() => {});
     }
   } catch (e) {

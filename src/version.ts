@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.66.8';
+export const APP_VERSION = '1.66.9';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.66.9',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'اصلاح کامل منطق اتصال یادداشت، ترسیم خطوط ارتباطی در نقشه و همگام‌سازی لیست تجهیزات',
+    title_en: 'Fix Note-Device Linking Logic, Schematic Connector Lines and Device List Synchronization',
+    changes: [
+      'اصلاح و ساده‌سازی کامل منطق اتصال یادداشت به تجهیزات بدون مودال‌های مزاحم؛ با کلیک روی تجهیز در لیست یادداشت، اتصال بلافاصله برقرار می‌گردد.',
+      'ترسیم لحظه‌ای و بی‌درنگ خط اتصال (Connector Line) از یادداشت به کارت تجهیز جدید متصل‌شده در نقشه شماتیک با استفاده از تابع بهینه‌شده getDevicePositionForNote.',
+      'همگام‌سازی بلادرنگ وضعیت یادداشت‌ها در جدول لیست تجهیزات (Device List View) به طوری که نشان یادداشت از تجهیز قبلی فوراً حذف و در مقابل تجهیز جدید نمایش داده می‌شود.',
+      'مدیریت اتمیک و دقیق رویدادهای nettopology_device_notes_updated برای حالات اتصال جدید، آنلینک، و تغییر انتساب (Reassign) میان دو تجهیز.',
+      'رعایت صددرصدی استاندارد دو زبانه و عدم نمایش هیچ متن فارسی در حالت انگلیسی.'
+    ],
+    changes_en: [
+      'Streamlined note-to-device linking by removing blocking confirmation dialogs so single-click reassignment is instant and seamless.',
+      'Restored and verified immediate dashed connector line rendering from sticky notes to the newly linked target device on the schematic canvas using optimized getDevicePositionForNote.',
+      'Fixed real-time synchronization in Device List View to instantly remove the note badge from the previous device and attach it to the new device without page refresh.',
+      'Atomic handling of nettopology_device_notes_updated events across link, unlink, and reassign transitions between devices.',
+      'Maintained strict bilingual localization compliance with zero untranslated strings in English mode.'
+    ]
+  },
   {
     version: '1.66.8',
     releaseDate: '2026-09-17',

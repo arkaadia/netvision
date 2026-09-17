@@ -577,7 +577,8 @@ apiRouter.get('/settings/device-notes', async (_req: Request, res: Response) => 
 apiRouter.post('/settings/device-notes', async (req: Request, res: Response) => {
   try {
     const noteData = req.body?.note || req.body;
-    const saved = await saveDeviceStickyNote(noteData);
+    const previousDeviceId = req.body?.previousDeviceId;
+    const saved = await saveDeviceStickyNote(noteData, previousDeviceId);
     res.json({ success: true, note: saved });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
