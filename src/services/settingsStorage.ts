@@ -6,7 +6,8 @@ import {
   LocalUser,
   LocalGroup,
   ADSecurityGroup,
-  ADUser
+  ADUser,
+  CustomTopologyStickyNote
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -16,6 +17,7 @@ const STORAGE_KEYS = {
   ACTIVE_SIMULATED_ROLE: 'nettopology_simulated_role_v1',
   LOCAL_USERS: 'nettopology_local_users_v1',
   LOCAL_GROUPS: 'nettopology_local_groups_v1',
+  DEVICE_STICKY_NOTES: 'nettopology_device_sticky_notes_v1',
 };
 
 // Initial Seed: Local Groups
@@ -694,3 +696,127 @@ export async function simulateTestADConnection(cfg: ActiveDirectoryConfig): Prom
     logs,
   };
 }
+
+// ==========================================
+// Device Sticky Notes Persistence (DB & Local)
+// ==========================================
+
+export async function syncDeviceNotesFromDatabase(): Promise<CustomTopologyStickyNote[]> {
+  try {
+    const token = localStorage.getItem('nettopology_auth_token_v1') || sessionStorage.getItem('nettopology_auth_token_v1');
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/settings/device-notes', { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const notes: CustomTopologyStickyNote[] = Array.isArray(data?.notes)
+        ? data.notes
+        : Array.isArray(data)
+        ? data
+        : [];
+      if (Array.isArray(notes)) {
+        localStorage.setItem(STORAGE_KEYS.DEVICE_STICKY_NOTES, JSON.stringify(notes));
+        return notes;
+      }
+    }
+  } catch (e) {
+    console.warn('[Sync Device Notes Error]', e);
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function persistDeviceNoteToDatabase(note: CustomTopologyStickyNote): Promise<CustomTopologyStickyNote> {
+  // Update local cache immediately
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
+    const existing: CustomTopologyStickyNote[] = raw ? JSON.parse(raw) : [];
+    const targetDevId = note.linkedDeviceId;
+    const idx = existing.findIndex((n) => n.id === note.id || (targetDevId && n.linkedDeviceId === targetDevId));
+
+    let updated: CustomTopologyStickyNote[];
+    if (idx >= 0) {
+      updated = existing.map((n, i) => (i === idx ? note : n));
+    } else {
+      updated = [note, ...existing];
+    }
+    localStorage.setItem(STORAGE_KEYS.DEVICE_STICKY_NOTES, JSON.stringify(updated));
+  } catch (e) {}
+
+  try {
+    const token = localStorage.getItem('nettopology_auth_token_v1') || sessionStorage.getItem('nettopology_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/settings/device-notes', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ note }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.note) {
+        window.dispatchEvent(new CustomEvent('nettopology_device_notes_updated', { detail: data.note }));
+        return data.note;
+      }
+    }
+  } catch (e) {
+    console.warn('[Persist Device Note Error]', e);
+  }
+
+  window.dispatchEvent(new CustomEvent('nettopology_device_notes_updated', { detail: note }));
+  return note;
+}
+
+export async function deleteDeviceNoteFromDatabase(noteId: string, deviceId?: string): Promise<void> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
+    const existing: CustomTopologyStickyNote[] = raw ? JSON.parse(raw) : [];
+    const updated = existing.filter((n) => n.id !== noteId && (!deviceId || n.linkedDeviceId !== deviceId));
+    localStorage.setItem(STORAGE_KEYS.DEVICE_STICKY_NOTES, JSON.stringify(updated));
+  } catch (e) {}
+
+  try {
+    const token = localStorage.getItem('nettopology_auth_token_v1') || sessionStorage.getItem('nettopology_auth_token_v1');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    await fetch(`/api/settings/device-notes/${encodeURIComponent(noteId)}`, {
+      method: 'DELETE',
+      headers,
+    });
+  } catch (e) {
+    console.warn('[Delete Device Note Error]', e);
+  }
+
+  window.dispatchEvent(
+    new CustomEvent('nettopology_device_notes_updated', {
+      detail: { id: noteId, deviceId, deleted: true },
+    })
+  );
+}
+
+export function getDeviceNote(
+  deviceId: string,
+  notes?: CustomTopologyStickyNote[]
+): CustomTopologyStickyNote | undefined {
+  if (!deviceId) return undefined;
+  if (Array.isArray(notes)) {
+    return notes.find((n) => n && n.linkedDeviceId === deviceId);
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DEVICE_STICKY_NOTES);
+    if (!raw) return undefined;
+    const list: CustomTopologyStickyNote[] = JSON.parse(raw);
+    return Array.isArray(list) ? list.find((n) => n && n.linkedDeviceId === deviceId) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+

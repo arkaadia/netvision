@@ -513,8 +513,11 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  type SubmitAction = 'save_close' | 'save_new' | 'save_terminal';
+  const [isSubmitMenuOpen, setIsSubmitMenuOpen] = useState(false);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  const handlePerformSubmit = async (action: SubmitAction = 'save_close') => {
     if (!name.trim()) {
       setError(isEn ? 'Device hostname cannot be empty' : 'نام یا شناسه تجهیز نمی‌تواند خالی باشد');
       return;
@@ -527,8 +530,10 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     try {
       setIsSubmitting(true);
       setError(null);
+      setSuccessNotice(null);
+      setIsSubmitMenuOpen(false);
 
-      const created = await onAdd({
+      const devicePayload: any = {
         name: name.trim(),
         ip: ip.trim(),
         ssh_host: sshHost.trim() || ip.trim(),
@@ -569,7 +574,9 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         master_session_id: masterSessionId || undefined,
         detected_ports: discoveredPorts.length > 0 ? discoveredPorts : undefined,
         ports: discoveredPorts.length > 0 ? discoveredPorts : undefined,
-      } as any);
+      };
+
+      const created = await onAdd(devicePayload);
 
       // Persist any new building, floor, unit, or rack to localStorage hierarchy
       try {
@@ -612,16 +619,56 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         window.dispatchEvent(new CustomEvent('nettopology_hierarchy_updated'));
       } catch (e) {}
 
-      onClose();
-
       // If user selected an initial configuration template, trigger template deployment
       if (selectedTemplateId && onDeviceCreatedWithTemplate && created) {
         onDeviceCreatedWithTemplate(created as Device, selectedTemplateId);
+      }
+
+      if (action === 'save_close') {
+        onClose();
+      } else if (action === 'save_new') {
+        // Prepare form for next device registration
+        setSuccessNotice(
+          isEn
+            ? `Device "${name.trim()}" registered successfully! Enter details for the next device.`
+            : `تجهیز «${name.trim()}» با موفقیت ثبت شد! مشخصات تجهیز جدید را وارد نمایید.`
+        );
+        setName('');
+        // Suggest next IP by incrementing last octet
+        const ipParts = ip.trim().split('.');
+        if (ipParts.length === 4) {
+          const lastOctet = parseInt(ipParts[3], 10);
+          if (!isNaN(lastOctet) && lastOctet < 254) {
+            setIp(`${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.${lastOctet + 1}`);
+            setSshHost(`${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.${lastOctet + 1}`);
+          }
+        }
+        setSerialNumber('');
+        setMac('');
+        setDiscoveredPorts([]);
+        setSshTestResult(null);
+        setPingTestResult(null);
+      } else if (action === 'save_terminal') {
+        const devForTerminal: Device = (created as Device) || {
+          ...devicePayload,
+          id: `dev-${Date.now()}`,
+        };
+        onClose();
+        setDirectTerminalDev(devForTerminal);
       }
     } catch (err: any) {
       setError(err.message || (isEn ? 'Failed to register device' : 'خطا در ثبت مشخصات تجهیز جدید'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitMenuOpen) {
+      setIsSubmitMenuOpen(false);
+    } else {
+      setIsSubmitMenuOpen(true);
     }
   };
 
@@ -740,6 +787,17 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
               }`}>
                 <AlertCircle className={`w-4 h-4 shrink-0 ${isLightMode ? 'text-rose-600' : 'text-rose-400'}`} />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {successNotice && (
+              <div className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
+                isLightMode
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+              }`}>
+                <CheckCircle2 className={`w-4 h-4 shrink-0 ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                <span>{successNotice}</span>
               </div>
             )}
 
@@ -1322,16 +1380,6 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                         <span>{isEn ? `Test ${connectionProtocol.toUpperCase()}` : `تست اتصال ${connectionProtocol.toUpperCase()}`}</span>
                       </>
                     )}
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-ssh-console-direct"
-                    onClick={handleOpenDirectTerminal}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition shadow-xs cursor-pointer"
-                    title={isEn ? 'Open direct interactive SSH CLI Console' : 'باز کردن کنسول تعاملی مستقیم SSH'}
-                  >
-                    <Terminal className="w-3 h-3" />
-                    <span>{isEn ? 'SSH Console Direct (CLI Terminal)' : 'کنسول مستقیم SSH (ترمینال CLI)'}</span>
                   </button>
                 </div>
               </div>
@@ -2177,23 +2225,118 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
               >
                 {isEn ? 'Cancel' : 'انصراف'}
               </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-              >
-                {isSubmitting ? (
+              {/* Submit Dropdown Menu Container */}
+              <div className="relative">
+                <button
+                  type="button"
+                  id="btn-register-device-menu"
+                  onClick={() => setIsSubmitMenuOpen((prev) => !prev)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>{isEn ? 'Registering...' : 'در حال ثبت...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Register Device' : 'ثبت تجهیز در شبکه'}</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isSubmitMenuOpen ? 'rotate-180' : ''}`} />
+                    </>
+                  )}
+                </button>
+
+                {/* Dropdown Menu popping upward */}
+                {isSubmitMenuOpen && (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>{isEn ? 'Registering Device...' : 'در حال ثبت تجهیز...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>{isEn ? 'Register Device' : 'ثبت تجهیز در شبکه'}</span>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setIsSubmitMenuOpen(false)}
+                    />
+                    <div
+                      className={`absolute bottom-full mb-2 ${
+                        isRtl ? 'left-0' : 'right-0'
+                      } z-50 w-64 rounded-xl border p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${
+                        isLightMode
+                          ? 'bg-white/95 border-slate-200 shadow-slate-900/20 text-slate-800'
+                          : 'bg-slate-900/95 border-slate-700/80 shadow-black/60 text-slate-100'
+                      }`}
+                    >
+                      <div className="px-2.5 py-1.5 border-b border-white/10 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        {isEn ? 'Select Registration Action' : 'شیوه ثبت تجهیز'}
+                      </div>
+
+                      {/* 1. Save & Close */}
+                      <button
+                        type="button"
+                        id="btn-action-save-close"
+                        onClick={() => handlePerformSubmit('save_close')}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-start transition cursor-pointer ${
+                          isLightMode
+                            ? 'hover:bg-slate-100 text-slate-800'
+                            : 'hover:bg-white/10 text-white'
+                        }`}
+                      >
+                        <div className="p-1.5 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-bold">{isEn ? '1. Save & Close' : '۱- ثبت و بستن'}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {isEn ? 'Save device and close window' : 'ثبت قطعی مشخصات و بستن پنجره'}
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* 2. Save & Register New */}
+                      <button
+                        type="button"
+                        id="btn-action-save-new"
+                        onClick={() => handlePerformSubmit('save_new')}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-start transition cursor-pointer ${
+                          isLightMode
+                            ? 'hover:bg-slate-100 text-slate-800'
+                            : 'hover:bg-white/10 text-white'
+                        }`}
+                      >
+                        <div className="p-1.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <Plus className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-bold">{isEn ? '2. Save & Register New' : '۲- ثبت و دیوایس جدید'}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {isEn ? 'Save and reset form for next device' : 'ثبت و فرم خالی برای تجهیز بعدی'}
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* 3. Save & Open Terminal */}
+                      <button
+                        type="button"
+                        id="btn-action-save-terminal"
+                        onClick={() => handlePerformSubmit('save_terminal')}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-start transition cursor-pointer ${
+                          isLightMode
+                            ? 'hover:bg-slate-100 text-slate-800'
+                            : 'hover:bg-white/10 text-white'
+                        }`}
+                      >
+                        <div className="p-1.5 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                          <Terminal className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-bold">{isEn ? '3. Save & Open Terminal' : '۳- ثبت و اتصال به ترمینال دیوایس'}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {isEn ? 'Save and open interactive CLI console' : 'ثبت و باز کردن فوری ترمینال تعاملی'}
+                          </div>
+                        </div>
+                      </button>
+                    </div>
                   </>
                 )}
-              </button>
+              </div>
             </div>
           </div>
         </form>

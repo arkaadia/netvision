@@ -117,6 +117,7 @@ interface FallbackStore {
   node_positions: Record<string, Record<string, { x: number; y: number }>>;
   audit_logs: any[];
   ad_config: any;
+  device_sticky_notes?: any[];
 }
 
 function loadInitialDevices(): any[] {
@@ -537,6 +538,9 @@ function loadFallbackStore(): FallbackStore {
   if (!store.ad_config) {
     store.ad_config = DEFAULT_AD_CONFIG;
   }
+  if (!Array.isArray(store.device_sticky_notes)) {
+    store.device_sticky_notes = [];
+  }
   if (!Array.isArray(store.audit_logs)) {
     store.audit_logs = [
       {
@@ -815,6 +819,35 @@ async function syncFallbackToPostgres(client: PoolClient, initialData: FallbackS
     }
   } catch (err: any) {
     console.warn('[Database Sync Notice] AD Config sync notice:', err.message);
+  }
+
+  // 10. Sync Device Sticky Notes
+  try {
+    if (Array.isArray(initialData.device_sticky_notes) && initialData.device_sticky_notes.length > 0) {
+      for (const n of initialData.device_sticky_notes) {
+        if (!n || !n.id || (!n.linkedDeviceId && !n.device_id)) continue;
+        await client.query(
+          `INSERT INTO device_sticky_notes (id, device_id, title, content, color, x, y, width, view_mode, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            n.id,
+            n.linkedDeviceId || n.device_id,
+            n.title || '',
+            n.content || '',
+            n.color || 'yellow',
+            Number(n.x) || 100,
+            Number(n.y) || 100,
+            Number(n.width) || 230,
+            n.viewMode || n.view_mode || 'card',
+            n.createdAt || n.created_at || new Date().toISOString(),
+            n.updatedAt || n.updated_at || new Date().toISOString(),
+          ]
+        );
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Database Sync Notice] Device Sticky Notes sync notice:', err.message);
   }
 }
 
@@ -1862,6 +1895,211 @@ export async function addAuditLog(log: any): Promise<void> {
       );
     } catch (e) {
       console.error('[DB Query Error]', e);
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// 12. Device Sticky Notes & Canvas Map Linking
+// -------------------------------------------------------------
+export async function getDeviceStickyNotes(): Promise<any[]> {
+  let pgNotes: any[] = [];
+  await ensurePostgresConnection();
+  if (isPostgresReady && pool) {
+    try {
+      const res = await pool.query('SELECT * FROM device_sticky_notes ORDER BY updated_at DESC');
+      pgNotes = res.rows.map((r: any) => ({
+        id: r.id,
+        linkedDeviceId: r.device_id,
+        title: r.title || '',
+        content: r.content || '',
+        color: r.color || 'yellow',
+        x: Number(r.x) || 100,
+        y: Number(r.y) || 100,
+        width: Number(r.width) || 230,
+        viewMode: r.view_mode || 'card',
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+      }));
+    } catch (e) {
+      console.error('[DB Query Error in getDeviceStickyNotes]', e);
+    }
+  }
+
+  const store = loadFallbackStore();
+  const fallbackNotes = Array.isArray(store.device_sticky_notes) ? store.device_sticky_notes : [];
+
+  // Also collect any sticky notes in custom maps that have a linkedDeviceId
+  const maps = Array.isArray(store.custom_maps) ? store.custom_maps : [];
+  const mapNotes: any[] = [];
+  for (const m of maps) {
+    if (Array.isArray(m.stickyNotes)) {
+      for (const sn of m.stickyNotes) {
+        if (sn && sn.linkedDeviceId) {
+          mapNotes.push({
+            id: sn.id,
+            linkedDeviceId: sn.linkedDeviceId,
+            title: sn.title || '',
+            content: sn.content || '',
+            color: sn.color || 'yellow',
+            x: Number(sn.x) || 100,
+            y: Number(sn.y) || 100,
+            width: Number(sn.width) || 230,
+            viewMode: sn.viewMode || 'card',
+            createdAt: sn.createdAt || new Date().toISOString(),
+            updatedAt: sn.updatedAt || new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
+
+  // Deduplicate and prioritize most recent
+  const noteMap = new Map<string, any>();
+  for (const n of mapNotes) {
+    if (n && (n.linkedDeviceId || n.id)) {
+      noteMap.set(n.linkedDeviceId || n.id, n);
+    }
+  }
+  for (const n of fallbackNotes) {
+    if (n && (n.linkedDeviceId || n.id)) {
+      noteMap.set(n.linkedDeviceId || n.id, n);
+    }
+  }
+  for (const n of pgNotes) {
+    if (n && (n.linkedDeviceId || n.id)) {
+      noteMap.set(n.linkedDeviceId || n.id, n);
+    }
+  }
+
+  return Array.from(noteMap.values());
+}
+
+export async function saveDeviceStickyNote(note: any): Promise<any> {
+  if (!note) throw new Error('Invalid note data');
+  const id = note.id || `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+  const deviceId = note.linkedDeviceId || note.deviceId;
+  if (!deviceId) throw new Error('Device ID is required for device sticky note');
+
+  const normalizedNote = {
+    id,
+    linkedDeviceId: deviceId,
+    title: note.title || '',
+    content: note.content || '',
+    color: note.color || 'yellow',
+    x: Number(note.x) || 100,
+    y: Number(note.y) || 100,
+    width: Number(note.width) || 230,
+    viewMode: note.viewMode || 'card',
+    createdAt: note.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const store = loadFallbackStore();
+  if (!Array.isArray(store.device_sticky_notes)) {
+    store.device_sticky_notes = [];
+  }
+  const existingIdx = store.device_sticky_notes.findIndex(
+    (n: any) => n.id === id || n.linkedDeviceId === deviceId
+  );
+  if (existingIdx >= 0) {
+    store.device_sticky_notes[existingIdx] = normalizedNote;
+  } else {
+    store.device_sticky_notes.push(normalizedNote);
+  }
+
+  // Update or attach in custom maps containing this device
+  if (Array.isArray(store.custom_maps)) {
+    for (const m of store.custom_maps) {
+      if (Array.isArray(m.deviceIds) && m.deviceIds.includes(deviceId)) {
+        if (!Array.isArray(m.stickyNotes)) m.stickyNotes = [];
+        const snIdx = m.stickyNotes.findIndex(
+          (sn: any) => sn.id === id || sn.linkedDeviceId === deviceId
+        );
+        if (snIdx >= 0) {
+          m.stickyNotes[snIdx] = {
+            ...m.stickyNotes[snIdx],
+            title: normalizedNote.title,
+            content: normalizedNote.content,
+            color: normalizedNote.color,
+            updatedAt: normalizedNote.updatedAt,
+          };
+        } else {
+          const devPos = m.devicePositions?.[deviceId] || { x: 200, y: 150 };
+          m.stickyNotes.push({
+            ...normalizedNote,
+            x: (devPos.x || 200) + 80,
+            y: (devPos.y || 150) + 40,
+          });
+        }
+      }
+    }
+  }
+
+  saveFallbackStore(store);
+
+  await ensurePostgresConnection();
+  if (isPostgresReady && pool) {
+    try {
+      await pool.query(
+        `INSERT INTO device_sticky_notes (id, device_id, title, content, color, x, y, width, view_mode, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (id) DO UPDATE SET
+           device_id = EXCLUDED.device_id,
+           title = EXCLUDED.title,
+           content = EXCLUDED.content,
+           color = EXCLUDED.color,
+           x = EXCLUDED.x,
+           y = EXCLUDED.y,
+           width = EXCLUDED.width,
+           view_mode = EXCLUDED.view_mode,
+           updated_at = EXCLUDED.updated_at`,
+        [
+          normalizedNote.id,
+          normalizedNote.linkedDeviceId,
+          normalizedNote.title,
+          normalizedNote.content,
+          normalizedNote.color,
+          normalizedNote.x,
+          normalizedNote.y,
+          normalizedNote.width,
+          normalizedNote.viewMode,
+          normalizedNote.createdAt,
+          normalizedNote.updatedAt,
+        ]
+      );
+    } catch (e) {
+      console.error('[DB Save Error in saveDeviceStickyNote]', e);
+    }
+  }
+
+  return normalizedNote;
+}
+
+export async function deleteDeviceStickyNote(noteId: string): Promise<void> {
+  const store = loadFallbackStore();
+  if (Array.isArray(store.device_sticky_notes)) {
+    store.device_sticky_notes = store.device_sticky_notes.filter(
+      (n: any) => n.id !== noteId && n.linkedDeviceId !== noteId
+    );
+  }
+  if (Array.isArray(store.custom_maps)) {
+    for (const m of store.custom_maps) {
+      if (Array.isArray(m.stickyNotes)) {
+        m.stickyNotes = m.stickyNotes.filter(
+          (sn: any) => sn.id !== noteId && sn.linkedDeviceId !== noteId
+        );
+      }
+    }
+  }
+  saveFallbackStore(store);
+
+  await ensurePostgresConnection();
+  if (isPostgresReady && pool) {
+    try {
+      await pool.query('DELETE FROM device_sticky_notes WHERE id = $1 OR device_id = $1', [noteId]);
+    } catch (e) {
+      console.error('[DB Delete Error in deleteDeviceStickyNote]', e);
     }
   }
 }

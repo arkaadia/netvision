@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus,
@@ -20,13 +20,16 @@ import {
   Save,
   FileCode2,
   MoreVertical,
-  Edit3
+  Edit3,
+  StickyNote
 } from 'lucide-react';
-import { Device, DeviceType } from '../types';
+import { Device, DeviceType, CustomTopologyStickyNote } from '../types';
 import { useLanguage } from '../i18n';
 import { updateDevice } from '../services/api';
+import { syncDeviceNotesFromDatabase } from '../services/settingsStorage';
 import { EditDeviceModal } from './EditDeviceModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { DeviceStickyNoteModal } from './DeviceStickyNoteModal';
 
 interface DeviceListViewProps {
   devices: Device[];
@@ -64,6 +67,9 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
   const [writingId, setWritingId] = useState<string | null>(null);
   const [internalEditingDevice, setInternalEditingDevice] = useState<Device | null>(null);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
+  const [deviceNotes, setDeviceNotes] = useState<Record<string, CustomTopologyStickyNote>>({});
+  const [selectedNoteDevice, setSelectedNoteDevice] = useState<Device | null>(null);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{
     id: string;
     top?: number;
@@ -72,6 +78,71 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
     right?: number;
     device: Device;
   } | null>(null);
+
+  // Synchronize and load device-linked sticky notes
+  const loadDeviceNotes = useCallback(async () => {
+    const notesMap: Record<string, CustomTopologyStickyNote> = {};
+    try {
+      // 1. Read from dedicated device sticky notes cache
+      const raw = localStorage.getItem('nettopology_device_sticky_notes_v1');
+      if (raw) {
+        const list: CustomTopologyStickyNote[] = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach((n) => {
+            if (n.linkedDeviceId) notesMap[n.linkedDeviceId] = n;
+          });
+        }
+      }
+      // 2. Scan custom maps for notes linked to devices
+      const rawMaps = localStorage.getItem('net_topology_custom_maps_v2');
+      if (rawMaps) {
+        const maps = JSON.parse(rawMaps);
+        if (Array.isArray(maps)) {
+          maps.forEach((m) => {
+            if (Array.isArray(m.stickyNotes)) {
+              m.stickyNotes.forEach((sn: CustomTopologyStickyNote) => {
+                if (sn.linkedDeviceId && !notesMap[sn.linkedDeviceId]) {
+                  notesMap[sn.linkedDeviceId] = sn;
+                }
+              });
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    setDeviceNotes(notesMap);
+
+    // 3. Background sync from database
+    try {
+      const dbNotes = await syncDeviceNotesFromDatabase();
+      if (Array.isArray(dbNotes)) {
+        setDeviceNotes((prev) => {
+          const updated = { ...prev };
+          dbNotes.forEach((n) => {
+            if (n.linkedDeviceId) updated[n.linkedDeviceId] = n;
+          });
+          return updated;
+        });
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    loadDeviceNotes();
+    const handleUpdate = () => {
+      loadDeviceNotes();
+    };
+    window.addEventListener('nettopology_device_notes_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('nettopology_device_notes_updated', handleUpdate);
+    };
+  }, [loadDeviceNotes]);
+
+  const handleOpenDeviceNote = (dev: Device) => {
+    setSelectedNoteDevice(dev);
+    setIsNoteModalOpen(true);
+  };
 
   // Close 3-dots action menu on outside scroll or window resize
   useEffect(() => {
@@ -175,39 +246,42 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
 
   return (
     <div className={`p-4 sm:p-6 space-y-4 max-w-7xl mx-auto ${isRtl ? 'text-right' : 'text-left'} text-slate-100`}>
-      {/* Page Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 spatial-glass p-5 rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-base sm:text-lg font-bold text-white glow-text-cyan">
-              {t('devicelist_title')}
-            </h2>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
-              {t('status_devices_count', { count: devices.length })}
-            </span>
+      {/* Page Header (Sticky header so Register New Device remains fixed on scroll) */}
+      <div className="sticky top-0 z-20 -mt-2 pt-2 pb-2 bg-slate-950/85 backdrop-blur-xl border-b border-white/5 -mx-4 sm:-mx-6 px-4 sm:px-6 transition-all">
+        <div className="flex flex-wrap items-center justify-between gap-3 spatial-glass p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base sm:text-lg font-bold text-white glow-text-cyan">
+                {t('devicelist_title')}
+              </h2>
+              <span className="text-xs font-mono px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                {t('status_devices_count', { count: devices.length })}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+              {t('devicelist_subtitle')}
+            </p>
           </div>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            {t('devicelist_subtitle')}
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onRefreshAll}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-medium shadow-xs transition active:scale-95 cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-400' : ''}`} />
-            <span>{t('devicelist_btn_ping_all')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onRefreshAll}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-medium shadow-xs transition active:scale-95 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-400' : ''}`} />
+              <span>{t('devicelist_btn_ping_all')}</span>
+            </button>
 
-          <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-medium shadow-[0_0_15px_rgba(99,102,241,0.35)] transition border border-white/10 active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{t('devicelist_btn_add_device')}</span>
-          </button>
+            <button
+              id="btn-sticky-register-device"
+              onClick={onOpenAddModal}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-medium shadow-[0_0_15px_rgba(99,102,241,0.35)] transition border border-white/10 active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t('devicelist_btn_add_device')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -371,6 +445,7 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
               ) : (
                 filteredDevices.map((dev) => {
                   const isPinging = pingingId === dev.id;
+                  const devNote = deviceNotes[dev.id];
                   return (
                     <tr key={dev.id} className="border-b border-white/10 hover:bg-white/5 transition-colors group">
                       {/* Name & Role */}
@@ -394,8 +469,38 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                             )}
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-white font-mono text-xs">{dev.name}</span>
+
+                              {/* Sticky Note Badge / Indicator Button */}
+                              {devNote ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDeviceNote(dev);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-500/40 text-[10px] font-medium shadow-xs transition active:scale-95 cursor-pointer"
+                                  title={isEn ? `Sticky Note: "${devNote.title || 'Device Note'}" - Click to view or edit` : `یادداشت چسبان: «${devNote.title || 'یادداشت تجهیز'}» - کلیک جهت مشاهده یا ویرایش`}
+                                >
+                                  <StickyNote className="w-2.5 h-2.5 text-amber-400 fill-amber-400/40 shrink-0" />
+                                  <span className="max-w-[110px] truncate">{devNote.title || (isEn ? 'Note' : 'یادداشت')}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDeviceNote(dev);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-white/10 hover:border-amber-500/30 text-[10px] transition cursor-pointer"
+                                  title={isEn ? 'Add sticky note for this device' : 'افزودن یادداشت استیکی برای این تجهیز'}
+                                >
+                                  <StickyNote className="w-2.5 h-2.5 shrink-0" />
+                                  <span>{isEn ? '+ Note' : '+ یادداشت'}</span>
+                                </button>
+                              )}
+
                               {dev.has_unsaved_changes && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold" title={isEn ? 'Unsaved changes in NVRAM (Startup-Config)' : 'دارای تغییرات ذخیره نشده در Startup-Config (Running vs Startup)'}>
                                   <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
@@ -516,9 +621,27 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                         </button>
                       </td>
 
-                      {/* Actions with 3-Dots Menu */}
+                      {/* Actions with Note & 3-Dots Menu */}
                       <td className="p-3.5 text-center">
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Dedicated Sticky Note direct button */}
+                          <button
+                            onClick={() => handleOpenDeviceNote(dev)}
+                            className={`p-1.5 sm:p-2 rounded-xl border transition active:scale-95 shadow-xs cursor-pointer ${
+                              devNote
+                                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                                : 'bg-white/5 hover:bg-amber-500/15 text-slate-300 hover:text-amber-300 border-white/10 hover:border-amber-500/30'
+                            }`}
+                            title={
+                              devNote
+                                ? (isEn ? `Sticky Note: "${devNote.title || 'Device Note'}" (Click to view or edit)` : `یادداشت چسبان: «${devNote.title || 'یادداشت تجهیز'}» (جهت مشاهده یا ویرایش کلیک کنید)`)
+                                : (isEn ? 'Add Sticky Note for this device' : 'افزودن یادداشت استیکی برای این تجهیز')
+                            }
+                          >
+                            <StickyNote className={`w-4 h-4 ${devNote ? 'text-amber-400 fill-amber-400/40' : ''}`} />
+                          </button>
+
+                          {/* 3-Dots Menu Trigger */}
                           <button
                             onClick={(e) => handleToggleActionMenu(e, dev)}
                             className={`p-1.5 sm:p-2 rounded-xl border transition active:scale-95 shadow-xs cursor-pointer ${
@@ -612,6 +735,32 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                     </div>
                   </button>
                 )}
+
+                {/* Device Sticky Note */}
+                <button
+                  onClick={() => {
+                    const dev = menuAnchor.device;
+                    setMenuAnchor(null);
+                    handleOpenDeviceNote(dev);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-amber-300 hover:bg-amber-500/15 hover:text-amber-200 transition ${
+                    isRtl ? 'text-right' : 'text-left'
+                  } group/item cursor-pointer`}
+                >
+                  <StickyNote className="w-4 h-4 text-amber-400 group-hover/item:scale-110 transition shrink-0" />
+                  <div className="flex flex-col">
+                    <span>
+                      {deviceNotes[menuAnchor.device.id]
+                        ? (isEn ? 'View / Edit Sticky Note' : 'مشاهده و ویرایش یادداشت چسبان')
+                        : (isEn ? 'Add Sticky Note' : 'افزودن یادداشت چسبان')}
+                    </span>
+                    <span className="text-[10px] text-amber-400/80 font-mono">
+                      {deviceNotes[menuAnchor.device.id]
+                        ? (deviceNotes[menuAnchor.device.id].title || 'Note')
+                        : (isEn ? 'Attach note to device' : 'پیوست یادداشت به تجهیز')}
+                    </span>
+                  </div>
+                </button>
 
                 {/* Edit Device Properties */}
                 <button
@@ -749,6 +898,36 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
           setDeviceToDelete(null);
         }}
       />
+
+      {/* Device Sticky Note Modal */}
+      {isNoteModalOpen && selectedNoteDevice && (
+        <DeviceStickyNoteModal
+          isOpen={isNoteModalOpen}
+          device={selectedNoteDevice}
+          existingNote={deviceNotes[selectedNoteDevice.id]}
+          onClose={() => {
+            setIsNoteModalOpen(false);
+            setSelectedNoteDevice(null);
+          }}
+          onSaved={(savedNote) => {
+            setDeviceNotes((prev) => ({
+              ...prev,
+              [selectedNoteDevice.id]: savedNote,
+            }));
+            setIsNoteModalOpen(false);
+            setSelectedNoteDevice(null);
+          }}
+          onDeleted={(deletedId) => {
+            setDeviceNotes((prev) => {
+              const copy = { ...prev };
+              delete copy[selectedNoteDevice.id];
+              return copy;
+            });
+            setIsNoteModalOpen(false);
+            setSelectedNoteDevice(null);
+          }}
+        />
+      )}
     </div>
   );
 };

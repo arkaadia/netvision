@@ -75,6 +75,11 @@ import {
 import { useLanguage } from '../i18n';
 import { useAuth } from '../context/AuthContext';
 import { updateDevice } from '../services/api';
+import {
+  persistDeviceNoteToDatabase,
+  deleteDeviceNoteFromDatabase,
+  syncDeviceNotesFromDatabase,
+} from '../services/settingsStorage';
 import { CustomMapPortSelectorModal } from './CustomMapPortSelectorModal';
 import { CustomMapLinkConfigModal } from './CustomMapLinkConfigModal';
 import { CustomMapAddDeviceModal } from './CustomMapAddDeviceModal';
@@ -836,10 +841,16 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       updatedAt: new Date().toISOString(),
     };
     saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+
+    // If note is linked to a device, persist to global device sticky notes storage & DB
+    if (updatedNote.linkedDeviceId) {
+      persistDeviceNoteToDatabase(updatedNote).catch(() => {});
+    }
   }, [currentCustomMap, customMaps, saveCustomMaps]);
 
   const handleDeleteStickyNote = useCallback((noteId: string) => {
     if (!currentCustomMap) return;
+    const noteToDelete = (currentCustomMap.stickyNotes || []).find((n) => n.id === noteId);
     const updatedNotes = (currentCustomMap.stickyNotes || []).filter((n) => n.id !== noteId);
     const updatedMap: CustomTopologyMap = {
       ...currentCustomMap,
@@ -847,6 +858,11 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       updatedAt: new Date().toISOString(),
     };
     saveCustomMaps(customMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+
+    // If note was linked to a device, remove from global device sticky notes
+    if (noteToDelete?.linkedDeviceId) {
+      deleteDeviceNoteFromDatabase(noteId, noteToDelete.linkedDeviceId).catch(() => {});
+    }
   }, [currentCustomMap, customMaps, saveCustomMaps]);
 
   const handleStickyNoteStartDrag = useCallback((e: React.MouseEvent, noteId: string) => {
@@ -1944,6 +1960,25 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       y: 180 + row * 260,
     };
 
+    // Auto-attach any device sticky note associated with this device
+    let updatedStickyNotes = currentCustomMap.stickyNotes || [];
+    try {
+      const rawNotes = localStorage.getItem('nettopology_device_sticky_notes_v1');
+      const devNotes: CustomTopologyStickyNote[] = rawNotes ? JSON.parse(rawNotes) : [];
+      const matchingNote = devNotes.find((n) => n.linkedDeviceId === device.id);
+      if (matchingNote && !updatedStickyNotes.some((n) => n.id === matchingNote.id || n.linkedDeviceId === device.id)) {
+        updatedStickyNotes = [
+          ...updatedStickyNotes,
+          {
+            ...matchingNote,
+            x: (mode === 'physical' ? newPhysicalPos.x : newPos.x) + 120,
+            y: (mode === 'physical' ? newPhysicalPos.y : newPos.y) + 60,
+            viewMode: mode === 'physical' ? 'physical' : 'card',
+          },
+        ];
+      }
+    } catch (e) {}
+
     const updatedMap: CustomTopologyMap = {
       ...currentCustomMap,
       deviceIds: isAlreadyOnMap
@@ -1962,6 +1997,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         [device.id]: mode,
       },
       racks: updatedRacks,
+      stickyNotes: updatedStickyNotes,
       updatedAt: new Date().toISOString(),
     };
 
@@ -2974,7 +3010,10 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
         })
         .catch(() => {});
 
-      await Promise.allSettled([posPromise, mapsPromise, hierarchyPromise]);
+      // 7. Fetch latest device sticky notes from DB
+      const notesPromise = syncDeviceNotesFromDatabase().catch(() => []);
+
+      await Promise.allSettled([posPromise, mapsPromise, hierarchyPromise, notesPromise]);
 
       setFeedbackToast({
         type: 'success',

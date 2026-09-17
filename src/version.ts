@@ -10,9 +10,32 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.63.2';
+export const APP_VERSION = '1.64.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.64.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'یکپارچه‌سازی یادداشت‌های چسبان تجهیزات بین مدیریت انبار و نقشه شماتیک، بازنشانی و همگام‌سازی کامل نقشه با دیتابیس، منوی ثبت چندگانه دیوایس و نوار هدر چسبان',
+    title_en: 'Device Sticky Notes Integration in Inventory & Schematic Map, Full Database Map Sync on Reset View, Multi-Action Device Registration Dropdown & Sticky Inventory Header',
+    changes: [
+      'افزودن امکان ثبت، مشاهده و ویرایش یادداشت‌های چسبان (Sticky Notes) به ازای هر تجهیز در بخش مدیریت انبار شبکه (Network Equipment Inventory).',
+      'نمایش آیکون و نشانگر یادداشت در کنار نام تجهیز و در ستون عملیات، به همراه گزینه دسترسی سریع در منوی سه‌نقطه دیوایس.',
+      'همگام‌سازی دوطرفه یادداشت‌های تجهیزات در دیتابیس؛ به گونه‌ای که با افزودن تجهیز به نقشه شماتیک، یادداشت متصل به آن نیز به صورت خودکار روی نقشه قرار می‌گیرد.',
+      'ارتقای دکمه «بازنشانی زوم و مرکز صفحه» در نقشه شماتیک به منظور دریافت و همگام‌سازی آنی کلیه تغییرات، موقعیت‌ها، نقشه‌های سفارشی و سلسله‌مراتب فیزیکی ذخیره‌شده در پایگاه‌داده.',
+      'تبدیل دکمه ثبت در مدال ثبت دیوایس جدید به منوی کشویی سه‌حالته: ذخیره و بستن، ذخیره و ثبت دیوایس جدید، و ذخیره و اتصال به ترمینال.',
+      'چسبان (Sticky) شدن نوار هدر بخش مدیریت انبار تجهیزات جهت دسترسی همیشگی به دکمه ثبت تجهیز جدید حین اسکرول.'
+    ],
+    changes_en: [
+      'Integrated dedicated Sticky Notes for devices within the Network Equipment Inventory & Management view with full database persistence.',
+      'Added note indicator badges next to device names and a direct note button in table actions, alongside an option in the device 3-dots action menu.',
+      'Enabled bidirectional synchronization between inventory and schematic topology maps: adding an inventoried device to a custom map automatically attaches its sticky note on the canvas.',
+      'Enhanced the "Reset Zoom & Center View" action in schematic topology to fetch and synchronize all latest device movements, custom maps, physical hierarchies, and notes from the database.',
+      'Upgraded the device registration button in AddDeviceModal to a multi-action dropdown: "Save & Close", "Save & Register New", and "Save & Open Terminal".',
+      'Made the inventory header section sticky so the "Register New Device" button stays permanently accessible while scrolling.'
+    ]
+  },
   {
     version: '1.63.2',
     releaseDate: '2026-09-17',

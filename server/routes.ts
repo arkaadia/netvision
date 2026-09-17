@@ -34,6 +34,9 @@ import {
   saveHierarchy,
   getAuditLogs,
   addAuditLog,
+  getDeviceStickyNotes,
+  saveDeviceStickyNote,
+  deleteDeviceStickyNote,
 } from './db';
 import { testAndDiscoverDeviceViaSsh } from './sshDiscovery';
 import {
@@ -556,6 +559,36 @@ apiRouter.post('/settings/hierarchy', async (req: Request, res: Response) => {
     const items = Array.isArray(req.body?.hierarchy) ? req.body.hierarchy : req.body;
     await saveHierarchy(items);
     res.json({ success: true, count: items.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Device Sticky Notes Endpoints (Schematic Map & Inventory Integration)
+apiRouter.get('/settings/device-notes', async (_req: Request, res: Response) => {
+  try {
+    const notes = await getDeviceStickyNotes();
+    res.json({ notes, total: notes.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/settings/device-notes', async (req: Request, res: Response) => {
+  try {
+    const noteData = req.body?.note || req.body;
+    const saved = await saveDeviceStickyNote(noteData);
+    res.json({ success: true, note: saved });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.delete('/settings/device-notes/:id', async (req: Request, res: Response) => {
+  try {
+    const noteId = req.params.id;
+    await deleteDeviceStickyNote(noteId);
+    res.json({ success: true, id: noteId });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

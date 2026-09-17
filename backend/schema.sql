@@ -214,3 +214,20 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+-- 12. Device Sticky Notes (Schematic Map & Inventory Integration)
+CREATE TABLE IF NOT EXISTS device_sticky_notes (
+    id VARCHAR(128) PRIMARY KEY,
+    device_id VARCHAR(128) NOT NULL,
+    title VARCHAR(255),
+    content TEXT,
+    color VARCHAR(32) DEFAULT 'yellow',
+    x NUMERIC DEFAULT 100,
+    y NUMERIC DEFAULT 100,
+    width NUMERIC DEFAULT 230,
+    view_mode VARCHAR(32) DEFAULT 'card',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_sticky_notes_dev ON device_sticky_notes(device_id);
