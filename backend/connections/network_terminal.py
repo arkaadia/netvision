@@ -398,13 +398,16 @@ class NetworkTerminalSession:
                         pass
 
                 if data:
+                    raw_len = len(data)
                     while chan.recv_ready():
                         extra = chan.recv(4096)
                         if not extra:
                             break
                         data += extra
+                        raw_len += len(extra)
                     self.last_activity = time.time()
                     text = data.decode("utf-8", errors="replace")
+                    print(f"[SSH-PTY-RAW-RECV] session={self.session_id} bytes={raw_len} preview={repr(text[:120])}")
                     if self.is_cisco and ("--More--" in text or "-- More --" in text):
                         try:
                             chan.send(" ")
@@ -559,11 +562,13 @@ class NetworkTerminalSession:
         self.status = "ACTIVE"
 
         try:
+            encoded_bytes = data.encode("utf-8")
+            print(f"[SSH-PTY-INPUT-RAW] session={self.session_id} protocol={self.protocol} bytes={len(encoded_bytes)} data={repr(data)}")
             if self.protocol == "ssh" and self._ssh_channel and not self._ssh_channel.closed:
-                self._ssh_channel.send(data.encode("utf-8"))
+                self._ssh_channel.send(encoded_bytes)
                 return True
             elif self.protocol == "telnet" and self._raw_socket:
-                self._raw_socket.sendall(data.encode("utf-8"))
+                self._raw_socket.sendall(encoded_bytes)
                 return True
         except Exception as e:
             print(f"[NetworkTerminal] Write error in session {self.session_id}: {e}")

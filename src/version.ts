@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.63.1';
+export const APP_VERSION = '1.63.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.63.2',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'حذف کامل کدهای شبیه‌ساز و فال‌بک جعلی خروجی سخت‌افزار، اتصال مستقیم به تجهیز واقعی و ردیابی بایت‌های خام',
+    title_en: 'Complete Removal of Mock/Simulated Output Fallback, Direct Authentic Hardware Execution, and End-to-End Raw Byte Tracing',
+    changes: [
+      'حذف کامل و قطعی هرگونه منطق شبیه‌ساز، تولید خروجی جعلی یا فال‌بک ساختگی برای دستورات show و سایر دستورات در ترمینال تجهیزات.',
+      'تضمین اجرای ۱۰۰٪ مستقیم دستورات بر روی سخت‌افزار فیزیکی واقعی از طریق PTY تعاملی وب‌سوکت و لایه ارتباطی زنده بدون هیچ‌گونه دستکاری در محتوا.',
+      'پیاده‌سازی سیستم ردیابی و لاگینگ بایت‌های خام (Raw Byte Tracing) در تمامی لایه‌ها (SSH Reader، سرور وب‌سوکت پایتون، پروکسی ترمینال Node.js و فرانت‌اند React) جهت عیب‌یابی دقیق انتقال داده.',
+      'اصلاح استریم داده‌ها در فرانت‌اند برای دریافت و نمایش بلادرنگ جریان کاراکترهای سخت‌افزار بدون بافرینگ مخرب.',
+      'نمایش پیام‌های صریح در صورت توقف یا خطای سخت‌افزار بدون ارائه اطلاعات گمراه‌کننده یا شبیه‌سازی‌شده.'
+    ],
+    changes_en: [
+      'Completely removed all mock fallback generators and synthetic Cisco show command output from the terminal execution pipeline.',
+      'Guaranteed 100% direct authentic execution against physical hardware via the persistent interactive PTY WebSocket channel without content alteration.',
+      'Implemented end-to-end raw byte tracing across all layers (SSH Reader loop, Python WebSocket server, Node.js terminal proxy, and React frontend) for precise stream diagnostics.',
+      'Enhanced real-time stream decoding in the frontend to process device chunks with standard ANSI parsing and continuous newline preservation.',
+      'Enforced explicit timeout and error reporting from physical hardware without presenting misleading simulated data.'
+    ]
+  },
   {
     version: '1.63.1',
     releaseDate: '2026-09-17',

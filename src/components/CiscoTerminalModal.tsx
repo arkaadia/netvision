@@ -436,9 +436,10 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
   // Helper to append streaming raw text from SSH terminal, preserving line continuity across chunk boundaries
   const appendStreamText = (rawChunk: string) => {
     if (!rawChunk) return;
-    const cleanText = rawChunk.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    // Strip ANSI escape sequences (colors, cursor positioning, VT100 control codes)
-    const textWithoutAnsi = cleanText.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    console.log(`[FRONTEND-APPEND-STREAM] rawChunkLength=${rawChunk.length} preview=${JSON.stringify(rawChunk.slice(0, 80))}`);
+    const cleanText = rawChunk.replace(/\r\r\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Strip standard ANSI escape sequences (colors, cursor positioning, VT100 control codes)
+    const textWithoutAnsi = cleanText.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
     if (!textWithoutAnsi) return;
 
     // Detect remote prompt transitions to sync local cliMode and prompt
@@ -685,6 +686,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
               return;
             }
             if (msg.type === 'data' && msg.data) {
+              console.log(`[FRONTEND-WS-DATA] chars=${msg.data.length} preview=${JSON.stringify(msg.data.slice(0, 100))}`);
               appendStreamText(msg.data);
             } else if (msg.type === 'status') {
               if (msg.status === 'connected') {
@@ -986,223 +988,11 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
     );
 
     const isSocketReady = wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
-    const isRealHardwareSession = isSocketReady && wsRef.current && sshSessionMode === 'real_ssh';
 
-    // If session is not actively connected to real hardware, activate interactive CLI session
-    if (sshSessionMode !== 'real_ssh' && sshSessionMode !== 'simulated') {
-      setSshSessionMode('simulated');
-    }
-
-    // Unified Show Commands Handling for BOTH Real Hardware SSH & Interactive Sessions
-    const isShowCmd = cmdLower.startsWith('sh ') || cmdLower.startsWith('show ') || cmdLower === 'sh' || cmdLower === 'show';
-
-    if (isShowCmd) {
-      const isPrivilegedShow =
-        cmdLower === 'show running-config' ||
-        cmdLower === 'sh run' ||
-        cmdLower === 'show run' ||
-        cmdLower === 'sh running-config' ||
-        cmdLower === 'show running' ||
-        cmdLower === 'sh running' ||
-        cmdLower.startsWith('show run') ||
-        cmdLower.startsWith('sh run') ||
-        cmdLower.startsWith('show startup') ||
-        cmdLower.startsWith('sh start');
-
-      if (isPrivilegedShow && cliMode === 'USER_EXEC') {
-        appendLines([
-          inputLine,
-          { id: String(Date.now() + 1), type: 'error', text: `% Command authorization failed. Type 'enable' first.` },
-        ]);
-        return;
-      }
-
-      // If active WebSocket session with real hardware is open, forward raw command into PTY
-      if (isRealHardwareSession && wsRef.current) {
-        try {
-          wsRef.current.send(JSON.stringify({ type: 'input', data: trimmed + '\r\n' }));
-        } catch {}
-      }
-
-      let hardwareOutput = '';
-      if (sshSessionMode === 'real_ssh') {
-        try {
-          const res = await sshExecute({
-            deviceId: fullDev?.id || device?.id,
-            host: targetHost,
-            port: sshPort,
-            username: device?.ssh_username || 'admin',
-            password: device?.ssh_password || '',
-            command: trimmed,
-            sessionId: activeSessionIdRef.current || undefined,
-          });
-          if (res && res.success && res.output && typeof res.output === 'string') {
-            const rawOut = res.output.trim();
-            if (
-              rawOut.length > 25 &&
-              !rawOut.includes('% Invalid input detected') &&
-              !rawOut.includes('% Unknown command') &&
-              !rawOut.includes('% Command authorization failed') &&
-              rawOut !== '(Command executed on device)'
-            ) {
-              hardwareOutput = rawOut;
-            }
-          }
-        } catch (err) {
-          console.warn('[CiscoTerminal] Hardware query warning:', err);
-        }
-      }
-
-      // If physical hardware returned genuine output over live SSH, render it directly in the console
-      if (hardwareOutput) {
-        appendLines([
-          inputLine,
-          { id: String(Date.now() + 1), type: 'output', text: hardwareOutput },
-        ]);
-        setTimeout(() => handleSyncPorts(true), 1200);
-        return;
-      }
-
-      // If hardware output is pending, empty, or running in simulated/interactive session,
-      // render the authentic, comprehensive Cisco show command output:
-      let formattedShow = '';
-      if (
-        cmdLower === 'show running-config' ||
-        cmdLower === 'sh run' ||
-        cmdLower === 'show run' ||
-        cmdLower === 'sh running-config' ||
-        cmdLower === 'show running' ||
-        cmdLower === 'sh running' ||
-        cmdLower.startsWith('show run') ||
-        cmdLower.startsWith('sh run')
-      ) {
-        formattedShow = formatShowRunningConfig(hostname, device, ports, vlans);
-      } else if (
-        cmdLower === 'show startup-config' ||
-        cmdLower === 'sh start' ||
-        cmdLower === 'show start' ||
-        cmdLower === 'sh startup' ||
-        cmdLower === 'show startup' ||
-        cmdLower.startsWith('show start') ||
-        cmdLower.startsWith('sh start')
-      ) {
-        formattedShow = formatShowStartupConfig(hostname, device, ports, vlans);
-      } else if (
-        cmdLower === 'show ip interface brief' ||
-        cmdLower === 'sh ip int br' ||
-        cmdLower === 'sh ip int brief' ||
-        cmdLower === 'show ip int brief' ||
-        cmdLower === 'show ip int br' ||
-        cmdLower === 'sh ip int' ||
-        cmdLower === 'show ip int' ||
-        cmdLower === 'show ip interface' ||
-        cmdLower === 'sh ip interface' ||
-        cmdLower.startsWith('sh ip int') ||
-        cmdLower.startsWith('show ip int')
-      ) {
-        formattedShow = formatShowIpIntBrief(ports, device);
-      } else if (
-        cmdLower === 'show ip route' ||
-        cmdLower === 'sh ip route' ||
-        cmdLower === 'sh ip ro' ||
-        cmdLower === 'show ip ro' ||
-        cmdLower.startsWith('show ip ro') ||
-        cmdLower.startsWith('sh ip ro')
-      ) {
-        formattedShow = formatShowIpRoute(device);
-      } else if (
-        cmdLower === 'show interfaces status' ||
-        cmdLower === 'sh int status' ||
-        cmdLower === 'sh int stat' ||
-        cmdLower === 'show interface status' ||
-        cmdLower === 'sh interface status' ||
-        cmdLower === 'show interfaces stat' ||
-        cmdLower === 'sh int st' ||
-        cmdLower.startsWith('sh int stat') ||
-        cmdLower.startsWith('show int stat') ||
-        cmdLower.startsWith('show interfaces stat')
-      ) {
-        formattedShow = formatShowInterfacesStatus(ports);
-      } else if (
-        cmdLower.startsWith('show interfaces') ||
-        cmdLower.startsWith('sh int') ||
-        cmdLower.startsWith('show int')
-      ) {
-        const parts = trimmed.split(/\s+/);
-        const targetInt = parts.length > 2 ? parts[2] : (parts.length > 1 && !parts[1].toLowerCase().startsWith('int') ? parts[1] : undefined);
-        formattedShow = formatShowInterfacesDetailed(ports, device, targetInt);
-      } else if (
-        cmdLower === 'show vlan brief' ||
-        cmdLower === 'sh vlan br' ||
-        cmdLower === 'sh vlan brief' ||
-        cmdLower === 'show vlan' ||
-        cmdLower === 'sh vlan' ||
-        cmdLower === 'show vlans' ||
-        cmdLower === 'sh vlans' ||
-        cmdLower.startsWith('show vlan') ||
-        cmdLower.startsWith('sh vlan')
-      ) {
-        formattedShow = formatShowVlanBrief(vlans, ports);
-      } else if (
-        cmdLower === 'show version' ||
-        cmdLower === 'sh ver' ||
-        cmdLower === 'show ver' ||
-        cmdLower === 'sh version'
-      ) {
-        formattedShow = formatShowVersion(device);
-      } else if (
-        cmdLower.startsWith('show cdp') ||
-        cmdLower.startsWith('sh cdp')
-      ) {
-        formattedShow = formatShowCdpNeighbors(device, ports);
-      } else if (
-        cmdLower.startsWith('show mac') ||
-        cmdLower.startsWith('sh mac')
-      ) {
-        formattedShow = formatShowMacTable(ports);
-      } else if (
-        cmdLower === 'show port-security' ||
-        cmdLower === 'sh port-sec' ||
-        cmdLower === 'sh port-security' ||
-        cmdLower === 'show port-sec'
-      ) {
-        formattedShow = formatShowPortSecurity(ports);
-      } else if (
-        cmdLower.startsWith('show port-security interface') ||
-        cmdLower.startsWith('sh port-sec int') ||
-        cmdLower.startsWith('show port-sec int') ||
-        cmdLower.startsWith('sh port-security interface')
-      ) {
-        const parts = trimmed.split(/\s+/);
-        const targetInt = parts[parts.length - 1];
-        const foundPort = ports.find((p) => p.port_id.toLowerCase() === targetInt.toLowerCase());
-        if (foundPort) {
-          formattedShow = formatShowPortSecurityInterface(foundPort);
-        } else {
-          appendLines([inputLine, { id: String(Date.now() + 1), type: 'error', text: `% Port ${targetInt} not found on this device.` }]);
-          return;
-        }
-      } else if (cmdLower === 'show clock' || cmdLower === 'sh clock') {
-        formattedShow = formatShowClock();
-      } else if (cmdLower === 'show arp' || cmdLower === 'sh arp') {
-        formattedShow = formatShowArp(device, ports);
-      } else if (cmdLower === 'show inventory' || cmdLower === 'sh inv' || cmdLower === 'show inv' || cmdLower === 'sh inventory') {
-        formattedShow = formatShowInventory(device);
-      } else if (cmdLower === 'show logging' || cmdLower === 'sh log' || cmdLower === 'show log' || cmdLower === 'sh logging') {
-        formattedShow = formatShowLogging();
-      } else if (cmdLower.startsWith('show spanning-tree') || cmdLower.startsWith('sh span') || cmdLower.startsWith('show span')) {
-        formattedShow = formatShowSpanningTree(ports);
-      } else {
-        formattedShow = formatGenericShowCommand(trimmed, hostname, device, ports, vlans);
-      }
-
-      appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: formattedShow }]);
-      setTimeout(() => handleSyncPorts(true), 600);
-      return;
-    }
-
-    // Direct hardware CLI execution via interactive WebSocket stream ONLY for active real hardware SSH
-    if (isRealHardwareSession && wsRef.current) {
+    // 1. Direct hardware CLI execution via interactive WebSocket stream ONLY for active real hardware SSH
+    if (isSocketReady && wsRef.current) {
+      console.log(`[FRONTEND-EXEC-CMD-WS] Sending to hardware PTY: "${trimmed}" (mode=${cliMode})`);
+      lastExecutedCommandRef.current = trimmed;
       appendLines([inputLine]);
 
       // Keep local CLI mode in sync with standard transitions
@@ -1248,13 +1038,34 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         cmdLower === 'exit' ||
         cmdLower === 'end'
       ) {
-        setTimeout(() => handleSyncPorts(true), 1500);
+        setTimeout(() => handleSyncPorts(true), 1200);
       }
       return;
     }
 
-    // Direct hardware CLI execution via live SSH API if WebSocket is not open
-    if (sshSessionMode === 'real_ssh') {
+    // 2. If terminal is currently establishing SSH connection, wait rather than inventing fake output
+    if (sshSessionMode === 'connecting') {
+      appendLines([
+        inputLine,
+        {
+          id: 'wait-' + Date.now(),
+          type: 'system',
+          text: isEn ? '% Terminal is establishing connection to hardware. Please wait...' : '% ترمینال در حال برقراری ارتباط با سخت‌افزار است. لطفاً شکیبا باشید...',
+        },
+      ]);
+      return;
+    }
+
+    // 3. Direct hardware CLI execution via live SSH API if WebSocket is not open
+    if (targetHost || sshSessionMode === 'real_ssh') {
+      appendLines([
+        inputLine,
+        {
+          id: 'load-' + Date.now(),
+          type: 'system',
+          text: isEn ? '[SSH] Executing command on device...' : '[SSH] در حال ارسال و اجرای دستور روی تجهیز...',
+        },
+      ]);
       try {
         const res = await sshExecute({
           deviceId: fullDev?.id || device?.id,
@@ -1265,9 +1076,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           command: trimmed,
           sessionId: activeSessionIdRef.current || undefined,
         });
-        if (res.success && res.output !== undefined) {
+        if (res && res.success && res.output !== undefined) {
           appendLines([
-            inputLine,
             { id: String(Date.now() + 1), type: 'output', text: res.output || '(Command executed on device)' },
           ]);
           if (
@@ -1291,19 +1101,36 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           }
         } else {
           appendLines([
-            inputLine,
-            { id: String(Date.now() + 1), type: 'error', text: `% Error executing on device: ${res.error || 'Execution failed'}` },
+            {
+              id: String(Date.now() + 1),
+              type: 'error',
+              text: res?.error || res?.output || (isEn ? '% No response from device or command timed out.' : '% پاسخی از تجهیز دریافت نشد یا زمان دستور به پایان رسید.'),
+            },
           ]);
         }
         return;
       } catch (err: any) {
         appendLines([
-          inputLine,
-          { id: String(Date.now() + 1), type: 'error', text: `% Hardware execution error: ${err.message}` },
+          {
+            id: String(Date.now() + 1),
+            type: 'error',
+            text: `% Hardware execution error: ${err.message || (isEn ? 'No response from device' : 'عدم پاسخ‌دهی تجهیز')}`,
+          },
         ]);
         return;
       }
     }
+
+    // 4. If device is not configured for network connection
+    appendLines([
+      inputLine,
+      {
+        id: 'err-' + Date.now(),
+        type: 'error',
+        text: isEn ? '% Device is not connected. Configure IP and SSH credentials.' : '% اتصال به تجهیز برقرار نیست. آدرس IP و مشخصات SSH را تنظیم کنید.',
+      },
+    ]);
+    return;
 
     // 2. Help
     if (trimmed === '?' || cmdLower === 'help') {
@@ -3201,297 +3028,3 @@ function generateHelpOutput(mode: CliMode, isRouter: boolean): string {
   return `VLAN configuration commands:\n  name     Ascii name of the VLAN\n  exit     Apply changes and bump to previous mode`;
 }
 
-function formatShowIpIntBrief(ports: SwitchPort[], device: Device): string {
-  let res = 'Interface                  IP-Address      OK? Method Status                Protocol\n';
-  res += '----------------------------------------------------------------------------------------\n';
-  // Vlan1 / Management
-  res += `Vlan1                      ${device.ip.padEnd(15)} YES NVRAM  up                    up\n`;
-  for (const p of ports) {
-    const ipStr = p.mode === 'trunk' ? 'unassigned' : 'unassigned';
-    const st = p.status === 'up' ? 'up' : (p.admin_status === 'disabled' ? 'administratively down' : 'down');
-    const proto = p.status === 'up' ? 'up' : 'down';
-    res += `${p.port_id.padEnd(26)} ${ipStr.padEnd(15)} YES unset  ${st.padEnd(21)} ${proto}\n`;
-  }
-  return res;
-}
-
-function formatShowInterfacesStatus(ports: SwitchPort[]): string {
-  let res = 'Port         Name               Status       Vlan       Duplex  Speed Type\n';
-  res += '--------------------------------------------------------------------------------\n';
-  for (const p of ports) {
-    const st = p.status === 'up' ? 'connected' : (p.admin_status === 'disabled' ? 'disabled' : 'notconnect');
-    const vlanStr = p.mode === 'trunk' ? 'trunk' : String(p.vlan);
-    const desc = (p.description || p.connected_device || '--').slice(0, 18);
-    res += `${p.port_id.padEnd(12)} ${desc.padEnd(18)} ${st.padEnd(12)} ${vlanStr.padEnd(10)} ${p.duplex.padEnd(7)} ${p.speed.padEnd(5)} 10/100/1000BaseTX\n`;
-  }
-  return res;
-}
-
-function formatShowVlanBrief(vlans: VlanInfo[], ports: SwitchPort[]): string {
-  let res = 'VLAN Name                             Status    Ports\n';
-  res += '---- -------------------------------- --------- ---------------------------------------\n';
-  for (const v of vlans) {
-    const assignedPorts = ports.filter((p) => p.vlan === v.id && p.mode === 'access').map((p) => p.port_id);
-    const portsList = assignedPorts.length > 0 ? assignedPorts.slice(0, 6).join(', ') : '';
-    res += `${String(v.id).padEnd(4)} ${v.name.padEnd(32)} active    ${portsList}\n`;
-  }
-  return res;
-}
-
-function formatShowRunningConfig(hostname: string, device: Device, ports: SwitchPort[], vlans: VlanInfo[]): string {
-  let res = `Building configuration...\n\nCurrent configuration : 3845 bytes\n!\nversion 17.9\nservice timestamps debug datetime msec\nservice timestamps log datetime msec\nno service password-encryption\n!\nhostname ${hostname}\n!\nspanning-tree mode rapid-pvst\nspanning-tree extend system-id\n!\n`;
-  for (const v of vlans) {
-    res += `vlan ${v.id}\n name ${v.name.replace(/\s+/g, '_')}\n!\n`;
-  }
-  for (const p of ports.slice(0, 10)) {
-    res += `interface ${p.port_id}\n`;
-    if (p.description) res += ` description ${p.description}\n`;
-    if (p.mode === 'trunk') {
-      res += ` switchport mode trunk\n switchport trunk allowed vlan ${p.allowed_vlans}\n`;
-    } else {
-      res += ` switchport mode access\n switchport access vlan ${p.vlan}\n`;
-    }
-    if (p.admin_status === 'disabled') {
-      res += ` shutdown\n`;
-    }
-    res += `!\n`;
-  }
-  res += `interface Vlan1\n ip address ${device.ip} 255.255.255.0\n no shutdown\n!\nip default-gateway 192.168.1.254\n!\nline con 0\nline vty 0 4\n transport input ssh\n!\nend`;
-  return res;
-}
-
-function formatShowVersion(device: Device): string {
-  return `Cisco IOS XE Software, Version 17.09.03\nCisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.3, RELEASE SOFTWARE (fc3)\nTechnical Support: http://www.cisco.com/techsupport\nCopyright (c) 1986-2023 by Cisco Systems, Inc.\n\nROM: IOS-XE ROMMON\n${device.name} uptime is ${device.uptime || '142 days, 6 hours'}\nUptime for this control processor is ${device.uptime || '142 days, 6 hours'}\nSystem image file is "bootflash:packages.conf"\n\ncisco ${device.model} (X86) processor with 3298456K/6147K bytes of memory.\nProcessor board ID FOC2239401A\n1 Virtual Ethernet interface\n${device.total_ports || 48} Gigabit Ethernet interfaces\nBase Ethernet MAC Address: ${device.mac}\nConfiguration register is 0x102`;
-}
-
-function formatShowCdpNeighbors(device: Device, ports: SwitchPort[]): string {
-  let res = 'Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge\n';
-  res += '                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, D - Remote\n\n';
-  res += 'Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID\n';
-  res += '-------------------------------------------------------------------------------\n';
-  for (const p of ports.filter((pt) => pt.connected_device && pt.connected_device !== 'Disconnected' && pt.status === 'up').slice(0, 5)) {
-    const devId = p.connected_device.split(' ')[0];
-    res += `${devId.padEnd(16)} ${p.port_id.padEnd(17)} 165        S I         C9300     Gi1/0/1\n`;
-  }
-  return res;
-}
-
-function formatShowMacTable(ports: SwitchPort[]): string {
-  let res = '          Mac Address Table\n';
-  res += '-------------------------------------------\n';
-  res += 'Vlan    Mac Address       Type        Ports\n';
-  res += '----    -----------       --------    -----\n';
-  let i = 1;
-  for (const p of ports.filter((pt) => pt.status === 'up')) {
-    const macEntries: { mac: string; type: string }[] = [];
-    if (p.port_security_configured_mac) {
-      macEntries.push({ mac: p.port_security_configured_mac, type: 'STATIC' });
-    }
-    if (p.port_security_learned_macs && p.port_security_learned_macs.length > 0) {
-      p.port_security_learned_macs.forEach((m) => {
-        macEntries.push({ mac: m, type: p.port_security_mode === 'sticky' ? 'STICKY' : 'DYNAMIC' });
-      });
-    }
-    if (macEntries.length === 0) {
-      macEntries.push({ mac: `0050.56a1.b2${(10 + i).toString(16).padStart(2, '0')}`, type: 'DYNAMIC' });
-    }
-    for (const entry of macEntries) {
-      res += `${String(p.vlan).padEnd(7)} ${entry.mac.padEnd(17)} ${entry.type.padEnd(11)} ${p.port_id}\n`;
-    }
-    i++;
-  }
-  return res;
-}
-
-function formatShowPortSecurity(ports: SwitchPort[]): string {
-  let res = 'Secure Port  MaxSecureAddr  CurrentAddr  SecurityViolation  Security Action\n';
-  res += '                (Count)       (Count)          (Count)\n';
-  res += '---------------------------------------------------------------------------\n';
-  const secPorts = ports.filter((p) => p.port_security_enabled);
-  if (secPorts.length === 0) {
-    return 'No secure ports configured on this device.\n';
-  }
-  for (const p of secPorts) {
-    const maxAddr = p.port_security_max_mac || 1;
-    const currAddr = (p.port_security_learned_macs?.length || 0) + (p.port_security_configured_mac ? 1 : 0);
-    const action = (p.port_security_violation || 'shutdown').charAt(0).toUpperCase() + (p.port_security_violation || 'shutdown').slice(1);
-    res += `${p.port_id.padEnd(12)} ${String(maxAddr).padEnd(14)} ${String(currAddr).padEnd(12)} 0                  ${action}\n`;
-  }
-  res += '---------------------------------------------------------------------------\n';
-  res += `Total Addresses in System (excluding one max per port)     : 0\n`;
-  res += `Max Addresses limit in System (excluding one max per port) : 4096\n`;
-  return res;
-}
-
-function formatShowPortSecurityInterface(p: SwitchPort): string {
-  const isEnabled = !!p.port_security_enabled;
-  const status = isEnabled ? (p.port_security_status || 'Secure-up') : 'Disabled';
-  const violation = (p.port_security_violation || 'shutdown').charAt(0).toUpperCase() + (p.port_security_violation || 'shutdown').slice(1);
-  const maxMacs = p.port_security_max_mac || 1;
-  const currMacs = (p.port_security_learned_macs?.length || 0) + (p.port_security_configured_mac ? 1 : 0);
-  const stickyCount = p.port_security_mode === 'sticky' ? (p.port_security_learned_macs?.length || 0) : 0;
-  const lastMac = p.port_security_configured_mac || p.port_security_learned_macs?.[0] || '0000.0000.0000';
-
-  let res = `Port Security              : ${isEnabled ? 'Enabled' : 'Disabled'}\n`;
-  res += `Port Status                : ${status}\n`;
-  res += `Violation Mode             : ${violation}\n`;
-  res += `Aging Time                 : 0 mins\n`;
-  res += `Aging Type                 : Absolute\n`;
-  res += `SecureStatic Address Aging : Disabled\n`;
-  res += `Maximum MAC Addresses      : ${maxMacs}\n`;
-  res += `Total MAC Addresses        : ${currMacs}\n`;
-  res += `Configured MAC Addresses   : ${p.port_security_configured_mac ? 1 : 0}\n`;
-  res += `Sticky MAC Addresses       : ${stickyCount}\n`;
-  res += `Last Source Address:Vlan   : ${lastMac}:${p.vlan}\n`;
-  res += `Security Violation Count   : 0\n`;
-  return res;
-}
-
-function formatShowIpRoute(device: Device): string {
-  return `Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP\n       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area\n\nGateway of last resort is 192.168.1.254 to network 0.0.0.0\n\nS*    0.0.0.0/0 [1/0] via 192.168.1.254\nC     192.168.1.0/24 is directly connected, Vlan1\nL     ${device.ip}/32 is directly connected, Vlan1\nC     10.10.10.0/24 is directly connected, Vlan10\nC     10.20.20.0/24 is directly connected, Vlan20\nC     10.30.30.0/24 is directly connected, Vlan30`;
-}
-
-function formatShowInterfacesDetailed(ports: SwitchPort[], device: Device, targetPortId?: string): string {
-  const selectedPorts = targetPortId
-    ? ports.filter((p) => p.port_id.toLowerCase().includes(targetPortId.toLowerCase()) || targetPortId.toLowerCase().includes(p.port_id.toLowerCase()))
-    : ports.slice(0, 4);
-
-  if (selectedPorts.length === 0) {
-    return `% Interface ${targetPortId || ''} not found on this device.`;
-  }
-
-  return selectedPorts.map((p) => {
-    const isUp = p.status === 'up';
-    const isDis = p.admin_status === 'disabled';
-    const statusLine = isUp
-      ? `${p.port_id} is up, line protocol is up (connected)`
-      : isDis
-      ? `${p.port_id} is administratively down, line protocol is down`
-      : `${p.port_id} is down, line protocol is down (notconnect)`;
-
-    const mac = `0050.56a1.b2${(ports.indexOf(p) + 10).toString(16).padStart(2, '0')}`;
-    const desc = p.description ? `\n  Description: ${p.description}` : '';
-
-    return `${statusLine}
-  Hardware is Gigabit Ethernet, address is ${mac} (bia ${mac})${desc}
-  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
-     reliability 255/255, txload 1/255, rxload 1/255
-  Encapsulation ARPA, loopback not set
-  Keepalive set (10 sec)
-  Full-duplex, ${p.speed || '1000Mb/s'}, media type is 10/100/1000BaseTX
-  output flow-control is unsupported, input flow-control is off
-  ARP type: ARPA, ARP Timeout 04:00:00
-  Last input 00:00:01, output 00:00:02, output hang never
-  Last clearing of "show interface" counters never
-  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
-  Queueing strategy: fifo
-  Output queue: 0/40 (size/max)
-  5 minute input rate 24000 bits/sec, 32 packets/sec
-  5 minute output rate 38000 bits/sec, 45 packets/sec
-     14829312 packets input, 3819283719 bytes, 0 no buffer
-     Received 48123 broadcasts (19231 multicasts)
-     0 runts, 0 giants, 0 throttles
-     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
-     0 watchdog, 0 multicast, 0 pause input
-     19382103 packets output, 4920192841 bytes, 0 underruns
-     0 output errors, 0 collisions, 0 interface resets
-     0 unknown protocol drops
-     0 babbles, 0 late collision, 0 deferred
-     0 lost carrier, 0 no carrier, 0 pause output
-     0 output buffer failures, 0 output buffers swapped out`;
-  }).join('\n\n');
-}
-
-function formatShowClock(): string {
-  const d = new Date();
-  const timeStr = d.toTimeString().split(' ')[0];
-  const dateStr = d.toDateString();
-  return `*${timeStr}.412 UTC ${dateStr}`;
-}
-
-function formatShowArp(device: Device, ports: SwitchPort[]): string {
-  let res = 'Protocol  Address          Age (min)  Hardware Addr   Type   Interface\n';
-  res += '--------------------------------------------------------------------------\n';
-  res += `Internet  ${device.ip.padEnd(15)}         -   ${device.mac.padEnd(15)} ARPA   Vlan1\n`;
-  res += `Internet  192.168.1.254          12   0050.56a1.b2fe  ARPA   Vlan1\n`;
-  let idx = 10;
-  for (const p of ports.filter((pt) => pt.status === 'up').slice(0, 4)) {
-    const ip = `192.168.1.${idx}`;
-    const mac = `0050.56a1.b2${idx.toString(16).padStart(2, '0')}`;
-    res += `Internet  ${ip.padEnd(15)}         ${idx + 2}   ${mac.padEnd(15)} ARPA   ${p.port_id}\n`;
-    idx += 5;
-  }
-  return res;
-}
-
-function formatShowStartupConfig(hostname: string, device: Device, ports: SwitchPort[], vlans: VlanInfo[]): string {
-  return `Using 3845 out of 262144 bytes\n!\n` + formatShowRunningConfig(hostname, device, ports, vlans);
-}
-
-function formatShowInventory(device: Device): string {
-  return `NAME: "Chassis", DESCR: "Cisco Catalyst 9300 48-Port Switch"
-PID: C9300-48P         , VID: V02  , SN: FOC2239401A
-
-NAME: "Power Supply Module 0", DESCR: "715W AC Power Supply"
-PID: PWR-C1-715WAC     , VID: V01  , SN: LIT214501AB
-
-NAME: "Fan Tray 1", DESCR: "Catalyst 9300 Fan Tray"
-PID: FAN-T2            , VID: V01  , SN: DUA214008FA`;
-}
-
-function formatShowLogging(): string {
-  return `Syslog logging: enabled (0 messages dropped, 0 messages rate-limited)
-    Console logging: level debugging, 128 messages logged
-    Monitor logging: level debugging, 0 messages logged
-    Buffer logging:  level debugging, 128 messages logged
-Log Buffer (4096 bytes):
-%SYS-5-CONFIG_I: Configured from console by admin on vty0
-%LINK-3-UPDOWN: Interface GigabitEthernet1/0/1, changed state to up
-%LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1/0/1, changed state to up
-%SPANTREE-5-TOPOTX: Topology Change Notice for VLAN 1 received`;
-}
-
-function formatShowSpanningTree(ports: SwitchPort[]): string {
-  let res = `VLAN0001
-  Spanning tree enabled protocol rstp
-  Root ID    Priority    32769
-             Address     0050.56a1.b201
-             This bridge is the root
-             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
-
-  Bridge ID  Priority    32769  (priority 32768 sys-id-ext 1)
-             Address     0050.56a1.b201
-             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
-             Aging Time  300 sec
-
-Interface           Role Sts Cost      Prio.Nbr Type
-------------------- ---- --- --------- -------- --------------------------------\n`;
-  for (const p of ports.slice(0, 8)) {
-    const isUp = p.status === 'up';
-    const sts = isUp ? 'FWD' : 'BLK';
-    const role = isUp ? 'Desg' : 'Altn';
-    res += `${p.port_id.padEnd(19)} ${role.padEnd(4)} ${sts.padEnd(3)} 4         128.${p.port_id.slice(-1) || '1'}    P2p\n`;
-  }
-  return res;
-}
-
-function formatGenericShowCommand(cmd: string, hostname: string, device: Device, ports: SwitchPort[], vlans: VlanInfo[]): string {
-  const sub = cmd.trim().toLowerCase().replace(/^(show|sh)\s+/, '');
-  if (sub.startsWith('env') || sub.startsWith('power')) {
-    return `FAN 1 is OK, Speed: 6200 RPM
-FAN 2 is OK, Speed: 6150 RPM
-SYSTEM TEMPERATURE is OK (34 C)
-PS1: 715W AC (Operational)
-PS2: Not Installed`;
-  }
-  if (sub.startsWith('user') || sub.startsWith('who')) {
-    return `    Line       User       Host(s)              Idle       Location
-   *  0 con 0    admin      idle                 00:00:00   192.168.1.100`;
-  }
-  if (sub.startsWith('crypto') || sub.startsWith('ssh')) {
-    return `SSH Enabled - version 2.0
-Authentication timeout: 120 secs; Authentication retries: 3
-RSA key generation: 2048 bits`;
-  }
-  return `% Command executed: show ${sub}\nData retrieved from device cache for ${hostname} (${device.ip}).`;
-}

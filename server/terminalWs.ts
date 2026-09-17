@@ -84,6 +84,8 @@ export function setupTerminalWebSocket(
       });
 
       pyWs.on('message', (data: WebSocket.Data, isBinary: boolean) => {
+        const textPreview = typeof data === 'string' ? data : (data instanceof Buffer ? data.toString('utf-8') : '');
+        console.log(`[PROXY-STREAM-OUT] len=${textPreview.length} preview=${JSON.stringify(textPreview.slice(0, 80))}`);
         if (clientWs.readyState === WebSocket.OPEN) {
           clientWs.send(data, { binary: isBinary });
         }
@@ -116,6 +118,8 @@ export function setupTerminalWebSocket(
       });
 
       clientWs.on('message', (data: WebSocket.Data, isBinary: boolean) => {
+        const textPreview = typeof data === 'string' ? data : (data instanceof Buffer ? data.toString('utf-8') : '');
+        console.log(`[PROXY-CLIENT-IN] len=${textPreview.length} preview=${JSON.stringify(textPreview.slice(0, 80))}`);
         if (isPyOpen && pyWs && pyWs.readyState === WebSocket.OPEN) {
           try {
             pyWs.send(data, { binary: isBinary });

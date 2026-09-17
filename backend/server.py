@@ -3195,12 +3195,13 @@ def start_websocket_server(ws_port: int):
 
             def on_data_received(chunk: str):
                 try:
+                    print(f"[WS-BACKEND-SEND] session={session.session_id} chars={len(chunk)} preview={repr(chunk[:100])}")
                     asyncio.run_coroutine_threadsafe(
                         websocket.send(json.dumps({"type": "data", "data": chunk})),
                         loop
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[WS-BACKEND-SEND-ERR] {e}")
 
             def on_session_closed():
                 try:
@@ -3280,6 +3281,7 @@ def start_websocket_server(ws_port: int):
                 elif msg_type in ("input", "stdin"):
                     data_str = msg.get("data", "")
                     if data_str:
+                        print(f"[WS-BACKEND-RECV-INPUT] session={session.session_id} chars={len(data_str)} data={repr(data_str)}")
                         session.write_input(data_str)
                 elif msg_type == "resize":
                     c = int(msg.get("cols", cols))
