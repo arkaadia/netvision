@@ -10,9 +10,34 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.68.0';
+export const APP_VERSION = '1.69.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.69.0',
+    releaseDate: '2026-09-17',
+    type: 'minor',
+    title: 'افزودن راهنمای تعاملی و جامع (Info Tooltips & Examples) برای تمام قالب‌ها و متغیرهای پیکربندی گروهی',
+    title_en: 'Add Interactive Info Tooltips, Purpose Explanations & Real Scenarios to Bulk Configuration Suite',
+    changes: [
+      'افزودن آیکون اطلاعات (i) در کنار تمام قالب‌های دستورات در لیست پیکربندی گروهی (Bulk Device Configuration).',
+      'نمایش پاپ‌اور تعاملی و هوشمند برای هر قالب شامل سه بخش مشخص: «چیست؟» (تعریف فنی الگو)، «چرا نیاز است؟» (چرایی و ارزش عملیاتی) و «مثال کاربردی» (دستورات و سناریوی نمونه).',
+      'افزودن آیکون راهنمای اختصاصی (i) کنار تک‌تک فیلدها و متغیرهای ورودی قالب‌ها همراه با مقادیر نمونه واقعی.',
+      'افزودن راهنمای تعاملی به گزینه‌ها و سیاست‌های امنیتی (بکاپ خودکار، ذخیره دائمی write memory، مهلت زمانی و تاخیر بین تجهیزات).',
+      'تعبیه دکمه «توضیحات و مثال / Guide & Example» در هدر الگوی فعال جهت نمایش بنر راهنمای باز شونده با ۳ کارت مجزا.',
+      'طراحی پاپ‌اور کاملاً واکنش‌گرا و قابل جابه‌جایی با بسته شدن خودکار در کلیک بیرون و پشتیبانی از بستن با کلید Escape.',
+      'پشتیبانی کامل و صددرصدی از زبان‌های فارسی و انگلیسی بر اساس تنظیمات پنل (Strict i18n).'
+    ],
+    changes_en: [
+      'Added interactive information (i) icons alongside every command template in the Bulk Device Configuration list.',
+      'Engineered structured popovers detailing "What is this?" (technical definition), "Why is it needed?" (operational rationale), and "Practical Example" (exact CLI syntax & scenarios).',
+      'Equipped every input parameter and form field with dedicated contextual info tooltips and realistic input examples.',
+      'Integrated guidance tooltips across all execution policies (Pre-Change Backup, Write Memory, SSH Timeout, and Inter-device Delay).',
+      'Added a "Guide & Example" banner toggle in the active template header revealing a comprehensive 3-card overview.',
+      'Designed responsive popovers with outside click detection and keyboard Escape dismissal.',
+      'Strictly maintained bilingual localization with zero Persian text displayed in English mode.'
+    ]
+  },
   {
     version: '1.68.0',
     releaseDate: '2026-09-17',

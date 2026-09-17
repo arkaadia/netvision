@@ -62,6 +62,12 @@ class CommandTemplate:
     supports_idempotency: bool = True
     default_timeout_sec: int = 25
     requires_save_step: bool = True
+    info_what_fa: str = ""
+    info_what_en: str = ""
+    info_why_fa: str = ""
+    info_why_en: str = ""
+    info_example_fa: str = ""
+    info_example_en: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -79,6 +85,12 @@ class CommandTemplate:
             "supports_idempotency": self.supports_idempotency,
             "default_timeout_sec": self.default_timeout_sec,
             "requires_save_step": self.requires_save_step,
+            "info_what_fa": self.info_what_fa,
+            "info_what_en": self.info_what_en,
+            "info_why_fa": self.info_why_fa,
+            "info_why_en": self.info_why_en,
+            "info_example_fa": self.info_example_fa,
+            "info_example_en": self.info_example_en,
         }
 
 @dataclass

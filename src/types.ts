@@ -1045,6 +1045,12 @@ export interface BulkConfigParameter {
   placeholder?: string;
   default?: any;
   options?: Array<{ value: string; labelFa: string; labelEn: string }>;
+  info_what_fa?: string;
+  info_what_en?: string;
+  info_why_fa?: string;
+  info_why_en?: string;
+  info_example_fa?: string;
+  info_example_en?: string;
 }
 
 export interface BulkConfigTemplate {
@@ -1062,6 +1068,12 @@ export interface BulkConfigTemplate {
   supports_idempotency: boolean;
   default_timeout_sec: number;
   requires_save_step: boolean;
+  info_what_fa?: string;
+  info_what_en?: string;
+  info_why_fa?: string;
+  info_why_en?: string;
+  info_example_fa?: string;
+  info_example_en?: string;
 }
 
 export interface BulkDevicePreviewStep {

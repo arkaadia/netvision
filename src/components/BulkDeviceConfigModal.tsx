@@ -52,6 +52,8 @@ import {
   cancelBulkJob,
   fetchBackupContent,
 } from '../services/bulkConfigService';
+import { InfoTooltipPopover } from './bulk-config/InfoTooltipPopover';
+import { getTemplateGuide, getParameterGuide } from './bulk-config/templateInfoGuide';
 
 export interface BulkDeviceConfigModalProps {
   isOpen: boolean;
@@ -93,6 +95,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
   // Form parameters
   const [formParams, setFormParams] = useState<Record<string, any>>({});
   const [dangerConfirmInput, setDangerConfirmInput] = useState('');
+  const [showTemplateGuideDetails, setShowTemplateGuideDetails] = useState(false);
 
   // Options
   const [autoBackup, setAutoBackup] = useState(true);
@@ -562,20 +565,21 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                   ) : (
                     filteredTemplates.map((tpl) => {
                       const isSelected = tpl.id === selectedTemplateId;
+                      const tplGuide = getTemplateGuide(tpl.id, isEn, tpl);
                       return (
                         <div
                           key={tpl.id}
                           onClick={() => setSelectedTemplateId(tpl.id)}
-                          className={`p-3 rounded-xl border transition cursor-pointer ${
+                          className={`p-3 rounded-xl border transition cursor-pointer relative ${
                             isSelected
                               ? 'bg-gradient-to-r from-cyan-950/40 to-slate-900 border-cyan-500/50 shadow-md ring-1 ring-cyan-500/30'
                               : 'bg-slate-950/40 border-white/5 hover:border-white/20 hover:bg-white/5'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
                               <div
-                                className={`p-1.5 rounded-lg ${
+                                className={`p-1.5 rounded-lg shrink-0 ${
                                   tpl.is_dangerous
                                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                                     : isSelected
@@ -595,8 +599,8 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                                   <Cpu className="w-4 h-4" />
                                 )}
                               </div>
-                              <div>
-                                <h5 className="text-xs font-bold text-white leading-tight">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="text-xs font-bold text-white leading-tight truncate">
                                   {isEn ? tpl.title_en : tpl.title}
                                 </h5>
                                 <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
@@ -605,14 +609,26 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                               </div>
                             </div>
 
-                            {tpl.is_dangerous && (
-                              <span
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0"
-                                title={isEn ? 'Dangerous command requiring confirmation' : 'دستور حساس نیازمند تاییدیه'}
-                              >
-                                {isEn ? 'Critical' : 'حساس'}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {tpl.is_dangerous && (
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0"
+                                  title={isEn ? 'Dangerous command requiring confirmation' : 'دستور حساس نیازمند تاییدیه'}
+                                >
+                                  {isEn ? 'Critical' : 'حساس'}
+                                </span>
+                              )}
+                              <InfoTooltipPopover
+                                title={isEn ? tpl.title_en : tpl.title}
+                                what={tplGuide.what}
+                                why={tplGuide.why}
+                                example={tplGuide.example}
+                                isEn={isEn}
+                                size="sm"
+                                align={isEn ? 'left' : 'right'}
+                                placement="bottom"
+                              />
+                            </div>
                           </div>
 
                           {/* Badges footer */}
@@ -645,27 +661,95 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                 {activeTemplate ? (
                   <>
                     {/* Active Template Header Details */}
-                    <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-white font-mono">
-                            {isEn ? activeTemplate.title_en : activeTemplate.title}
-                          </h4>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">
-                            ID: {activeTemplate.id}
-                          </span>
+                    {(() => {
+                      const activeTemplateGuide = getTemplateGuide(activeTemplate.id, isEn, activeTemplate);
+                      return (
+                        <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-white font-mono flex items-center gap-2">
+                                <span>{isEn ? activeTemplate.title_en : activeTemplate.title}</span>
+                                <InfoTooltipPopover
+                                  title={isEn ? activeTemplate.title_en : activeTemplate.title}
+                                  what={activeTemplateGuide.what}
+                                  why={activeTemplateGuide.why}
+                                  example={activeTemplateGuide.example}
+                                  isEn={isEn}
+                                  size="md"
+                                  align={isEn ? 'left' : 'right'}
+                                  placement="bottom"
+                                />
+                              </h4>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">
+                                ID: {activeTemplate.id}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowTemplateGuideDetails((prev) => !prev)}
+                                className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition border font-medium ${
+                                  showTemplateGuideDetails
+                                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm shadow-cyan-500/20'
+                                    : 'bg-white/5 text-slate-300 hover:text-cyan-300 hover:bg-white/10 border-white/10'
+                                }`}
+                                title={isEn ? 'Toggle complete guide & practical scenario' : 'نمایش / بستن راهنمای کاربردی و سناریوی نمونه'}
+                              >
+                                <Info className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>{isEn ? 'Guide & Example' : 'توضیحات و مثال'}</span>
+                              </button>
+
+                              {activeTemplate.is_dangerous && (
+                                <span className="flex items-center gap-1 text-xs text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded-lg border border-rose-500/30">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span>{isEn ? 'Dangerous Operation' : 'عملیات با ریسک بالا'}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {isEn ? activeTemplate.description_en : activeTemplate.description}
+                          </p>
+
+                          {/* Expanded Educational Guidance Banner */}
+                          {showTemplateGuideDetails && (
+                            <div className="pt-3 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-2.5 animate-in fade-in">
+                              <div className="p-2.5 rounded-lg bg-slate-900/90 border border-cyan-500/30 space-y-1">
+                                <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                                  <span>💡</span>
+                                  <span>{isEn ? 'What is this?' : 'این الگو چیست؟'}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+                                  {activeTemplateGuide.what}
+                                </p>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-slate-900/90 border border-amber-500/30 space-y-1">
+                                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                                  <span>🎯</span>
+                                  <span>{isEn ? 'Why is it needed?' : 'چرا مورد نیاز است؟'}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+                                  {activeTemplateGuide.why}
+                                </p>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 space-y-1">
+                                <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                  <span>{isEn ? 'Practical Example:' : 'مثال کاربردی سناریو:'}</span>
+                                </div>
+                                <p className="text-[11px] text-emerald-200/90 font-mono leading-relaxed bg-black/40 p-1.5 rounded border border-emerald-500/20 select-all break-words">
+                                  {activeTemplateGuide.example}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        {activeTemplate.is_dangerous && (
-                          <span className="flex items-center gap-1 text-xs text-rose-400 font-bold">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            <span>{isEn ? 'Dangerous Operation' : 'عملیات با ریسک بالا'}</span>
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        {isEn ? activeTemplate.description_en : activeTemplate.description}
-                      </p>
-                    </div>
+                      );
+                    })()}
 
                     {/* Parameters Fields Form */}
                     <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 space-y-3">
@@ -688,16 +772,29 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                             const isPassword = param.type === 'password';
                             const isSelect = param.type === 'select';
                             const isTextarea = param.type === 'textarea';
+                            const paramGuide = getParameterGuide(activeTemplate.id, param, isEn);
 
                             return (
                               <div
                                 key={param.name}
-                                className={`space-y-1 ${isTextarea || isBoolean ? 'sm:col-span-2' : ''}`}
+                                className={`space-y-1.5 ${isTextarea || isBoolean ? 'sm:col-span-2' : ''}`}
                               >
-                                <label className="block text-xs font-medium text-slate-300">
-                                  {isEn ? param.labelEn : param.labelFa}
-                                  {isRequired && <span className="text-rose-400 ml-1 font-bold">*</span>}
-                                </label>
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+                                    <span>{isEn ? param.labelEn : param.labelFa}</span>
+                                    {isRequired && <span className="text-rose-400 font-bold">*</span>}
+                                  </label>
+                                  <InfoTooltipPopover
+                                    title={isEn ? param.labelEn : param.labelFa}
+                                    what={paramGuide.what}
+                                    why={paramGuide.why}
+                                    example={paramGuide.example}
+                                    isEn={isEn}
+                                    size="sm"
+                                    align={isEn ? 'left' : 'right'}
+                                    placement="bottom"
+                                  />
+                                </div>
 
                                 {isBoolean ? (
                                   <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/80 border border-white/10">
@@ -809,9 +906,17 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Auto-Backup Toggle */}
                         <label className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition">
-                          <div>
-                            <div className="font-medium text-slate-200">
-                              {isEn ? 'Automatic Pre-Change Backup' : 'بکاپ خودکار قبل از اعمال'}
+                          <div className="flex-1 min-w-0 pr-2">
+                            <div className="font-medium text-slate-200 flex items-center gap-1.5">
+                              <span>{isEn ? 'Automatic Pre-Change Backup' : 'بکاپ خودکار قبل از اعمال'}</span>
+                              <InfoTooltipPopover
+                                title={isEn ? 'Pre-Change Backup' : 'بکاپ خودکار قبل از اعمال'}
+                                what={isEn ? 'Downloads running-config / export from the device before applying any changes.' : 'دریافت و آرشیو کامل کانفیگ فعال قبل از اعمال دستورات.'}
+                                why={isEn ? 'Provides instantaneous rollback capability in case of network disruptions.' : 'تضمین بازگشت سریع به کانفیگ سالم قبلی در صورت بروز خطا.'}
+                                example={isEn ? 'Saved to system database archives' : 'ذخیره خودکار در مخزن بکاپ‌های پنل'}
+                                isEn={isEn}
+                                size="sm"
+                              />
                             </div>
                             <div className="text-[10px] text-slate-400">
                               {isEn ? 'Saves running-config / compact export' : 'ذخیره کامل کانفیگ برای امکان بازگشت'}
@@ -821,15 +926,23 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                             type="checkbox"
                             checked={autoBackup}
                             onChange={(e) => setAutoBackup(e.target.checked)}
-                            className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 accent-cyan-500"
+                            className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 accent-cyan-500 shrink-0"
                           />
                         </label>
 
                         {/* Save to Permanent Memory Toggle */}
                         <label className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition">
-                          <div>
-                            <div className="font-medium text-slate-200">
-                              {isEn ? 'Write to Permanent Memory' : 'ذخیره دائمی (Write Memory)'}
+                          <div className="flex-1 min-w-0 pr-2">
+                            <div className="font-medium text-slate-200 flex items-center gap-1.5">
+                              <span>{isEn ? 'Write to Permanent Memory' : 'ذخیره دائمی (Write Memory)'}</span>
+                              <InfoTooltipPopover
+                                title={isEn ? 'Write Memory' : 'ذخیره دائمی (Write Memory)'}
+                                what={isEn ? 'Executes copy running-config startup-config on Cisco and saves system backup on MikroTik.' : 'همگام‌سازی Running-Config با حافظه دائمی NVRAM در سیسکو و بک‌آپ محلی در میکروتیک.'}
+                                why={isEn ? 'Ensures changes survive hardware power reboots or outages.' : 'جلوگیری از پاک شدن تنظیمات در صورت قطع برق یا ریبوت تجهیز.'}
+                                example={isEn ? 'copy run start / write memory' : 'write memory'}
+                                isEn={isEn}
+                                size="sm"
+                              />
                             </div>
                             <div className="text-[10px] text-slate-400">
                               {isEn ? 'write memory / system backup' : 'انتقال تغییرات به Startup-Config'}
@@ -839,7 +952,7 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                             type="checkbox"
                             checked={saveAfterApply}
                             onChange={(e) => setSaveAfterApply(e.target.checked)}
-                            className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 accent-cyan-500"
+                            className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 accent-cyan-500 shrink-0"
                           />
                         </label>
                       </div>
@@ -847,9 +960,17 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                       {/* Timeouts and Delays */}
                       <div className="grid grid-cols-2 gap-3 pt-1">
                         <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">
-                            {isEn ? 'Per-Device Timeout (seconds)' : 'مهلت زمانی هر دستگاه (ثانیه)'}
-                          </label>
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                            <label>{isEn ? 'Per-Device Timeout (seconds)' : 'مهلت زمانی هر دستگاه (ثانیه)'}</label>
+                            <InfoTooltipPopover
+                              title={isEn ? 'Timeout' : 'مهلت زمانی'}
+                              what={isEn ? 'Maximum wait time for SSH command response per device.' : 'حداکثر زمان انتظار برای دریافت خروجی از هر دستگاه.'}
+                              why={isEn ? 'Prevents unreachable or unresponsive targets from blocking the entire batch.' : 'جلوگیری از قفل شدن فرآیند در دستگاه‌های قطع یا کند.'}
+                              example={isEn ? '25s' : '۲۵ ثانیه'}
+                              isEn={isEn}
+                              size="sm"
+                            />
+                          </div>
                           <input
                             type="number"
                             min={5}
@@ -860,9 +981,17 @@ export const BulkDeviceConfigModal: React.FC<BulkDeviceConfigModalProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">
-                            {isEn ? 'Delay Between Devices (ms)' : 'وقفه بین اجرای تجهیزات (میلی‌ثانیه)'}
-                          </label>
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                            <label>{isEn ? 'Delay Between Devices (ms)' : 'وقفه بین اجرای تجهیزات (میلی‌ثانیه)'}</label>
+                            <InfoTooltipPopover
+                              title={isEn ? 'Inter-Device Delay' : 'تاخیر بین دستگاه‌ها'}
+                              what={isEn ? 'Staggered cooldown delay between sequential device executions.' : 'مکث کوتاه پیش از اتصال به دستگاه بعدی.'}
+                              why={isEn ? 'Reduces concurrent network bandwidth spikes and CPU load.' : 'کاهش بار پردازشی و کنترل جریان ترافیک شبکه.'}
+                              example={isEn ? '1500ms' : '۱۵۰۰ میلی‌ثانیه'}
+                              isEn={isEn}
+                              size="sm"
+                            />
+                          </div>
                           <input
                             type="number"
                             min={0}
