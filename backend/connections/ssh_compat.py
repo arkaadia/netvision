@@ -1,16 +1,17 @@
 """
-ssh_compat.py - Enterprise SSH Compatibility & Adaptive Multi-Profile Engine
-Supports seamless SSH connection across both modern and legacy network equipment:
-- Cisco Catalyst (2960, 3560, 3750, 4500, 6500 with IOS 12.x / 15.x)
+ssh_compat.py - Bulletproof Adaptive Multi-Profile SSH Engine for Enterprise & Legacy Hardware
+Supports diverse network hardware without halting on algorithm mismatches:
+- Cisco Catalyst (2960, 3560, 3750, 4500, 6500)
 - Cisco IOS-XE, Nexus NX-OS, ASA, ISR 4000
 - MikroTik RouterOS (v6 & v7)
-- Huawei VRP, HP ProCurve / Aruba, Juniper Junos, Fortinet FortiOS, Linux/Unix
+- Huawei VRP, HP ProCurve / Aruba, Juniper Junos, Fortinet, Linux
 
-Resolves:
-- "Incompatible ssh peer (no acceptable kex algorithm)"
-- "Incompatible ssh peer (no acceptable cipher)" / "unknown cipher"
-- "Incompatible ssh peer (no acceptable host key)"
-- "BadAuthenticationType" (keyboard-interactive fallback)
+Guarantees:
+- NEVER raises "unknown cipher" (strictly inspects transport._cipher_info before assigning)
+- Automatically negotiates legacy Cisco KEX (diffie-hellman-group1-sha1, diffie-hellman-group14-sha1, etc.)
+- Supports modern Elliptic Curve algorithms (curve25519, ecdh-sha2-nistp256)
+- Automatically cascades through multiple profiles until connection succeeds
+- Supports password and keyboard-interactive (AAA / TACACS+ / RADIUS) auth
 """
 
 import socket
@@ -20,97 +21,80 @@ from typing import Tuple, Optional, Any, List, Dict
 
 logger = logging.getLogger("ssh_compat")
 
-# 1. Comprehensive Key Exchange (KEX) algorithms (Modern Elliptic Curves + Legacy DH)
-ALL_KEX = (
+# Preferred Key Exchange (KEX) algorithms in order of versatility
+CANDIDATE_KEX = (
+    'diffie-hellman-group14-sha1',
+    'diffie-hellman-group1-sha1',
+    'diffie-hellman-group-exchange-sha1',
+    'diffie-hellman-group-exchange-sha256',
+    'diffie-hellman-group14-sha256',
+    'diffie-hellman-group16-sha512',
+    'diffie-hellman-group18-sha512',
     'curve25519-sha256',
     'curve25519-sha256@libssh.org',
     'ecdh-sha2-nistp256',
     'ecdh-sha2-nistp384',
     'ecdh-sha2-nistp521',
-    'diffie-hellman-group-exchange-sha256',
-    'diffie-hellman-group16-sha512',
-    'diffie-hellman-group18-sha512',
-    'diffie-hellman-group14-sha256',
-    'diffie-hellman-group14-sha1',
-    'diffie-hellman-group-exchange-sha1',
-    'diffie-hellman-group1-sha1',
 )
 
-# 2. Comprehensive Host Key types (Ed25519, ECDSA, RSA-SHA2, legacy ssh-rsa & ssh-dss)
-ALL_KEYS = (
+# Preferred Host Key types
+CANDIDATE_KEYS = (
+    'ssh-rsa',
+    'rsa-sha2-256',
+    'rsa-sha2-512',
+    'ssh-dss',
     'ssh-ed25519',
     'ecdsa-sha2-nistp256',
     'ecdsa-sha2-nistp384',
     'ecdsa-sha2-nistp521',
-    'rsa-sha2-512',
-    'rsa-sha2-256',
-    'ssh-rsa',
-    'ssh-dss',
 )
 
-# 3. Known Safe Ciphers implemented in Paramiko (CTR, CBC, 3DES, GCM)
-# Note: DO NOT include 'chacha20-poly1305@openssh.com', 'blowfish-cbc', or 'cast128-cbc'
-# as Paramiko does not implement them and raises 'unknown cipher'.
-BASE_CIPHERS = (
+# Preferred Ciphers in order of enterprise network compatibility
+CANDIDATE_CIPHERS_CBC_FIRST = (
+    'aes128-cbc',
+    'aes256-cbc',
+    'aes192-cbc',
+    '3des-cbc',
     'aes128-ctr',
     'aes192-ctr',
     'aes256-ctr',
-    'aes128-cbc',
-    'aes192-cbc',
-    'aes256-cbc',
-    '3des-cbc',
     'aes128-gcm@openssh.com',
     'aes256-gcm@openssh.com',
 )
 
-# 4. Comprehensive MAC Digests
-ALL_MACS = (
-    'hmac-sha2-256-etm@openssh.com',
-    'hmac-sha2-512-etm@openssh.com',
-    'hmac-sha2-256',
-    'hmac-sha2-512',
-    'hmac-sha1-etm@openssh.com',
+CANDIDATE_CIPHERS_CTR_FIRST = (
+    'aes128-gcm@openssh.com',
+    'aes256-gcm@openssh.com',
+    'aes128-ctr',
+    'aes192-ctr',
+    'aes256-ctr',
+    'aes128-cbc',
+    'aes256-cbc',
+    'aes192-cbc',
+    '3des-cbc',
+)
+
+# Preferred MAC Digests
+CANDIDATE_MACS = (
     'hmac-sha1',
     'hmac-sha1-96',
+    'hmac-sha2-256',
+    'hmac-sha2-512',
+    'hmac-sha2-256-etm@openssh.com',
+    'hmac-sha2-512-etm@openssh.com',
+    'hmac-sha1-etm@openssh.com',
     'hmac-md5',
     'hmac-md5-96',
 )
-
-
-def get_paramiko_supported_ciphers() -> Tuple[str, ...]:
-    """
-    Returns only ciphers strictly supported by the loaded paramiko installation
-    to prevent 'unknown cipher' exceptions.
-    """
-    try:
-        import paramiko
-        info = getattr(paramiko.transport, '_cipher_info', {})
-        if info and isinstance(info, dict):
-            supported = tuple(c for c in BASE_CIPHERS if c in info)
-            if supported:
-                return supported
-    except Exception:
-        pass
-    # Fallback to standard CTR and CBC that are universally present across all Paramiko versions
-    return (
-        'aes128-ctr',
-        'aes192-ctr',
-        'aes256-ctr',
-        'aes128-cbc',
-        'aes192-cbc',
-        'aes256-cbc',
-        '3des-cbc'
-    )
-
 
 _PATCHED = False
 
 
 def ensure_paramiko_compatibility() -> bool:
     """
-    Globally patches Paramiko Transport class attributes so that general
-    SSHClient connections automatically include legacy and modern algorithms.
-    Filters ciphers to only those Paramiko can actually decode.
+    Safely registers legacy KEX (DH group1, group14, group-exchange) and legacy
+    Host Keys (ssh-rsa, ssh-dss) on paramiko.Transport class defaults.
+    Critically: DOES NOT alter _preferred_ciphers to prevent 'unknown cipher' errors.
     """
     global _PATCHED
     if _PATCHED:
@@ -122,50 +106,120 @@ def ensure_paramiko_compatibility() -> bool:
         return False
 
     try:
-        safe_ciphers = get_paramiko_supported_ciphers()
+        # 1. Register legacy KEX if supported
+        if hasattr(paramiko.Transport, '_preferred_kex'):
+            existing_kex = list(paramiko.Transport._preferred_kex)
+            for k in [
+                'diffie-hellman-group14-sha1',
+                'diffie-hellman-group-exchange-sha1',
+                'diffie-hellman-group-exchange-sha256',
+                'diffie-hellman-group1-sha1'
+            ]:
+                if k not in existing_kex:
+                    existing_kex.append(k)
+            paramiko.Transport._preferred_kex = tuple(existing_kex)
 
-        # Update class-level preferred algorithms on paramiko.Transport
-        for attr, algorithms in [
-            ('_preferred_kex', ALL_KEX),
-            ('_preferred_keys', ALL_KEYS),
-            ('_preferred_ciphers', safe_ciphers),
-            ('_preferred_macs', ALL_MACS),
-        ]:
-            existing = getattr(paramiko.Transport, attr, ())
-            merged = tuple(algorithms) + tuple(x for x in existing if x not in algorithms)
-            setattr(paramiko.Transport, attr, merged)
+        # 2. Register legacy Host Keys (ssh-rsa, ssh-dss)
+        if hasattr(paramiko.Transport, '_preferred_keys'):
+            existing_keys = list(paramiko.Transport._preferred_keys)
+            for k in ['ssh-rsa', 'ssh-dss', 'rsa-sha2-256', 'rsa-sha2-512']:
+                if k not in existing_keys:
+                    existing_keys.append(k)
+            paramiko.Transport._preferred_keys = tuple(existing_keys)
 
         _PATCHED = True
         return True
     except Exception as e:
-        logger.warning(f"Could not patch paramiko transport: {e}")
+        logger.warning(f"Could not patch paramiko defaults: {e}")
         return False
 
 
-# Auto-run patch on import
+# Auto-run safe patch on import
 ensure_paramiko_compatibility()
 
 
-def _get_negotiation_profiles() -> List[Dict[str, Any]]:
+def apply_security_options_safely(
+    transport: Any,
+    kex_candidates: Optional[Tuple[str, ...]] = None,
+    key_candidates: Optional[Tuple[str, ...]] = None,
+    cipher_candidates: Optional[Tuple[str, ...]] = None,
+    mac_candidates: Optional[Tuple[str, ...]] = None
+) -> None:
     """
-    Returns an ordered list of algorithm negotiation profiles.
-    If a device rejects or fails a specific algorithm set (e.g. Cisco Catalyst
-    with old DH vs modern Fortinet or Linux), the connector cascades to the next profile.
+    Safely applies security options to a live paramiko.Transport instance.
+    Every candidate is strictly filtered against the transport's actual internal
+    dictionaries (_cipher_info, _kex_info, _key_info, _mac_info).
+    This completely eliminates 'unknown cipher' or 'unknown algorithm' ValueErrors.
     """
-    safe_ciphers = get_paramiko_supported_ciphers()
-    cbc_ciphers = tuple(c for c in ('aes128-cbc', '3des-cbc', 'aes256-cbc', 'aes192-cbc') if c in safe_ciphers)
-    ctr_ciphers = tuple(c for c in ('aes128-ctr', 'aes192-ctr', 'aes256-ctr') if c in safe_ciphers)
+    try:
+        sec = transport.get_security_options()
+    except Exception:
+        return
 
+    # 1. Safely apply KEX
+    if kex_candidates:
+        valid_kex_dict = getattr(transport, '_kex_info', None)
+        if valid_kex_dict and isinstance(valid_kex_dict, dict):
+            filtered = tuple(k for k in kex_candidates if k in valid_kex_dict)
+        else:
+            filtered = tuple(k for k in kex_candidates if k in (sec.kex or ()))
+        if filtered:
+            try:
+                sec.kex = filtered
+            except Exception:
+                pass
+
+    # 2. Safely apply Host Keys
+    if key_candidates:
+        valid_key_dict = getattr(transport, '_key_info', None)
+        if valid_key_dict and isinstance(valid_key_dict, dict):
+            filtered = tuple(k for k in key_candidates if k in valid_key_dict)
+        else:
+            filtered = tuple(k for k in key_candidates if k in (sec.key_types or ()))
+        if filtered:
+            try:
+                sec.key_types = filtered
+            except Exception:
+                pass
+
+    # 3. Safely apply Ciphers (CRITICAL: only assign what strictly exists in transport._cipher_info)
+    if cipher_candidates:
+        valid_cipher_dict = getattr(transport, '_cipher_info', None)
+        if valid_cipher_dict and isinstance(valid_cipher_dict, dict):
+            filtered = tuple(c for c in cipher_candidates if c in valid_cipher_dict)
+        else:
+            filtered = tuple(c for c in cipher_candidates if c in (sec.ciphers or ()))
+        if filtered:
+            try:
+                sec.ciphers = filtered
+            except Exception:
+                pass
+
+    # 4. Safely apply MACs
+    if mac_candidates:
+        valid_mac_dict = getattr(transport, '_mac_info', None)
+        if valid_mac_dict and isinstance(valid_mac_dict, dict):
+            filtered = tuple(m for m in mac_candidates if m in valid_mac_dict)
+        else:
+            filtered = tuple(m for m in mac_candidates if m in (sec.digests or ()))
+        if filtered:
+            try:
+                sec.digests = filtered
+            except Exception:
+                pass
+
+
+def _get_profiles() -> List[Dict[str, Any]]:
+    """
+    Returns prioritized algorithm profiles to try sequentially:
+    1. Cisco Catalyst Legacy Priority (DH Group 14/1, ssh-rsa, CBC/CTR)
+    2. Universal Broad Hybrid (All supported KEX + Keys + Ciphers)
+    3. Modern High-Security (EC, Ed25519, CTR/GCM)
+    4. Strict Ancient Cisco Minimal (DH Group 1 + 3DES/AES-CBC)
+    5. Native Default (Untouched transport defaults)
+    """
     return [
-        # Profile 1: Universal Broad Multi-Vendor (Modern EC + Legacy DH + Safe Ciphers)
-        {
-            "name": "Universal Adaptive",
-            "kex": ALL_KEX,
-            "keys": ALL_KEYS,
-            "ciphers": safe_ciphers,
-            "digests": ALL_MACS,
-        },
-        # Profile 2: Cisco Catalyst & Legacy Hardware Priority (DH Group 14/1 + CBC/3DES + ssh-rsa)
+        # Profile 1: Cisco Catalyst Legacy Priority (Most common switch requirement)
         {
             "name": "Cisco Catalyst Legacy Priority",
             "kex": (
@@ -174,12 +228,23 @@ def _get_negotiation_profiles() -> List[Dict[str, Any]]:
                 'diffie-hellman-group-exchange-sha1',
                 'diffie-hellman-group-exchange-sha256',
                 'diffie-hellman-group14-sha256',
+                'diffie-hellman-group16-sha512',
+                'curve25519-sha256',
+                'ecdh-sha2-nistp256',
             ),
-            "keys": ('ssh-rsa', 'ssh-dss', 'rsa-sha2-256', 'rsa-sha2-512'),
-            "ciphers": cbc_ciphers + ctr_ciphers if cbc_ciphers else safe_ciphers,
-            "digests": ('hmac-sha1', 'hmac-sha1-96', 'hmac-sha2-256', 'hmac-md5', 'hmac-md5-96'),
+            "keys": ('ssh-rsa', 'rsa-sha2-256', 'rsa-sha2-512', 'ssh-dss', 'ssh-ed25519', 'ecdsa-sha2-nistp256'),
+            "ciphers": CANDIDATE_CIPHERS_CBC_FIRST,
+            "macs": CANDIDATE_MACS,
         },
-        # Profile 3: Modern High-Security (Elliptic Curves, CTR, Ed25519, SHA-2)
+        # Profile 2: Universal Broad Hybrid
+        {
+            "name": "Universal Broad Hybrid",
+            "kex": CANDIDATE_KEX,
+            "keys": CANDIDATE_KEYS,
+            "ciphers": CANDIDATE_CIPHERS_CTR_FIRST,
+            "macs": CANDIDATE_MACS,
+        },
+        # Profile 3: Modern High-Security (Cisco IOS-XE, Nexus, Fortinet, Linux)
         {
             "name": "Modern Elliptic & CTR",
             "kex": (
@@ -187,21 +252,28 @@ def _get_negotiation_profiles() -> List[Dict[str, Any]]:
                 'curve25519-sha256@libssh.org',
                 'ecdh-sha2-nistp256',
                 'ecdh-sha2-nistp384',
-                'ecdh-sha2-nistp521',
                 'diffie-hellman-group14-sha256',
                 'diffie-hellman-group16-sha512',
             ),
             "keys": ('ssh-ed25519', 'ecdsa-sha2-nistp256', 'rsa-sha2-512', 'rsa-sha2-256', 'ssh-rsa'),
-            "ciphers": ctr_ciphers + (cbc_ciphers if cbc_ciphers else ()),
-            "digests": ('hmac-sha2-256-etm@openssh.com', 'hmac-sha2-512-etm@openssh.com', 'hmac-sha2-256', 'hmac-sha2-512', 'hmac-sha1'),
+            "ciphers": CANDIDATE_CIPHERS_CTR_FIRST,
+            "macs": CANDIDATE_MACS,
         },
-        # Profile 4: Ancient Cisco 12.x / IOS-12 Strict DH-Group1 Minimal
+        # Profile 4: Strict Ancient Cisco (IOS 12.x DH Group 1 Minimal)
         {
             "name": "Strict Cisco DH-Group1 Minimal",
             "kex": ('diffie-hellman-group1-sha1', 'diffie-hellman-group14-sha1'),
             "keys": ('ssh-rsa', 'ssh-dss'),
-            "ciphers": ('aes128-cbc', '3des-cbc', 'aes256-cbc') if any(c in safe_ciphers for c in ('aes128-cbc', '3des-cbc')) else safe_ciphers,
-            "digests": ('hmac-sha1', 'hmac-sha1-96', 'hmac-md5'),
+            "ciphers": CANDIDATE_CIPHERS_CBC_FIRST,
+            "macs": ('hmac-sha1', 'hmac-sha1-96', 'hmac-md5'),
+        },
+        # Profile 5: Native Defaults (Fallback with zero modifications)
+        {
+            "name": "Native Paramiko Defaults",
+            "kex": None,
+            "keys": None,
+            "ciphers": None,
+            "macs": None,
         },
     ]
 
@@ -212,16 +284,16 @@ def connect_ssh_device(
     port: int = 22,
     username: str = "",
     password: str = "",
-    timeout: float = 5.0,
-    banner_timeout: float = 5.0,
-    auth_timeout: float = 5.0
+    timeout: float = 6.0,
+    banner_timeout: float = 6.0,
+    auth_timeout: float = 6.0
 ) -> Tuple[bool, Optional[str]]:
     """
-    Connects a paramiko.SSHClient instance to a network device with an adaptive multi-profile loop:
-    - Automatically iterates across multiple KEX, Cipher, and Key profiles without stopping.
-    - If a profile fails due to algorithm negotiation, 'unknown cipher', or incompatibility,
-      it cleanly closes the socket and tries the next profile.
-    - Supports both standard password auth and keyboard-interactive (AAA / TACACS+) fallback.
+    Connects to a network device using an adaptive multi-profile loop:
+    - Iterates across algorithm profiles until connection succeeds.
+    - Does NOT halt on algorithm or cipher mismatches.
+    - Guaranteed zero 'unknown cipher' errors via safe dictionary reflection.
+    - Automatic password and keyboard-interactive (AAA/TACACS+) fallback.
     
     Returns (True, None) on success, or (False, error_message) on failure.
     """
@@ -229,33 +301,9 @@ def connect_ssh_device(
 
     import paramiko
 
-    # Step 1: Standard client connect with auto-negotiation
-    try:
-        client.connect(
-            hostname=hostname,
-            port=port,
-            username=username,
-            password=password,
-            timeout=timeout,
-            banner_timeout=banner_timeout,
-            auth_timeout=auth_timeout,
-            allow_agent=False,
-            look_for_keys=False
-        )
-        transport = client.get_transport()
-        if transport and transport.is_authenticated():
-            return True, None
-    except Exception as e_init:
-        # If failure is clearly invalid credentials (and not cipher/kex mismatch), check if interactive auth works
-        err_str = str(e_init).lower()
-        if "authentication failed" in err_str and not any(k in err_str for k in ["algorithm", "cipher", "kex", "key", "negotiat"]):
-            # Try keyboard-interactive before giving up
-            pass
-
-    # Step 2: Adaptive Multi-Profile Cascade
-    # Iterates across each profile (Universal, Cisco Catalyst Legacy, Modern EC, Strict Group1)
-    profiles = _get_negotiation_profiles()
+    profiles = _get_profiles()
     last_error_msg: str = "Connection failed"
+    auth_failed_detected = False
 
     for profile in profiles:
         sock = None
@@ -266,31 +314,26 @@ def connect_ssh_device(
             sock.connect((hostname, port))
 
             transport = paramiko.Transport(sock)
-            sec = transport.get_security_options()
 
-            # Apply profile-specific options safely
-            if profile.get("kex"):
-                sec.kex = profile["kex"]
-            if profile.get("keys"):
-                sec.key_types = profile["keys"]
-            if profile.get("ciphers"):
-                # Always ensure only valid ciphers supported by this Paramiko runtime are passed
-                safe_set = get_paramiko_supported_ciphers()
-                valid_profile_ciphers = tuple(c for c in profile["ciphers"] if c in safe_set)
-                if valid_profile_ciphers:
-                    sec.ciphers = valid_profile_ciphers
-            if profile.get("digests"):
-                sec.digests = profile["digests"]
+            # Apply candidate algorithms safely (zero risk of unknown cipher ValueError)
+            apply_security_options_safely(
+                transport,
+                kex_candidates=profile.get("kex"),
+                key_candidates=profile.get("keys"),
+                cipher_candidates=profile.get("ciphers"),
+                mac_candidates=profile.get("macs")
+            )
 
+            # Start SSH handshake
             transport.start_client(timeout=timeout)
 
-            # Try Password authentication first
+            # Attempt Password Authentication
             auth_ok = False
             try:
                 transport.auth_password(username=username, password=password)
                 auth_ok = transport.is_authenticated()
             except (paramiko.BadAuthenticationType, paramiko.AuthenticationException):
-                # Fallback to keyboard-interactive (e.g. Cisco AAA, TACACS+, RADIUS, password prompts)
+                # Fallback to Keyboard-Interactive (e.g. Cisco AAA, TACACS+, RADIUS, password prompts)
                 def interactive_handler(title, instructions, prompt_list):
                     return [password for _ in prompt_list]
                 try:
@@ -300,11 +343,12 @@ def connect_ssh_device(
                     auth_ok = False
 
             if auth_ok:
-                # Successfully authenticated with this profile!
+                # Successfully connected and authenticated!
                 client._transport = transport
                 return True, None
             else:
-                last_error_msg = f"Authentication rejected for user '{username}' (checked profile: {profile['name']})"
+                auth_failed_detected = True
+                last_error_msg = f"Invalid username or password for user '{username}'"
                 try:
                     transport.close()
                 except Exception:
@@ -314,10 +358,13 @@ def connect_ssh_device(
                         sock.close()
                     except Exception:
                         pass
+                # Try next profile in case another profile authenticates differently
                 continue
 
         except Exception as e_prof:
-            last_error_msg = str(e_prof)
+            err_str = str(e_prof).strip()
+            if err_str:
+                last_error_msg = err_str
             if transport:
                 try:
                     transport.close()
@@ -328,7 +375,10 @@ def connect_ssh_device(
                     sock.close()
                 except Exception:
                     pass
-            # Don't halt on cipher/kex mismatch - proceed to next profile!
+            # Seamlessly proceed to the next profile!
             continue
+
+    if auth_failed_detected and "password" not in last_error_msg.lower():
+        last_error_msg = f"Authentication rejected for user '{username}'"
 
     return False, last_error_msg

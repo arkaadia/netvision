@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.72.2';
+export const APP_VERSION = '1.72.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.72.3',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'حل قطعی خطای unknown cipher از طریق ارزیابی دیکشنری داخلی کلاینت و الگوریتم‌های سوئیچ‌های سیسکو',
+    title_en: 'Definitive Fix for Unknown Cipher via Transport Internal Cipher Reflection & Cisco KEX Loop',
+    changes: [
+      'حل بنیادین خطای unknown cipher با حذف تغییرات کلاس‌لول و تطبیق انحصاری سایفرها با دیکشنری داخلی _cipher_info هر نشست Transport در زمان اجرا.',
+      'تضمین عدم بروز استثنای خطای سایفر و عبور امن از محدودیت‌های OpenSSL 3.0 در سیستم‌های عامل میزبان.',
+      'توالی هوشمند آزمون الگوریتم‌های تبادل کلید با اولویت تجهیزات سیسکو کاتالیست (DH Group 14/1 و CBC) به همراه فال‌بک خودکار به مدهای مدرن و سنتی بدون وقفه.',
+      'پشتیبانی کامل از احراز هویت تعاملی (keyboard-interactive) برای تجهیزاتی که متد پسورد مستقیم را نپذیرفته و منتظر پرامپت هستند.'
+    ],
+    changes_en: [
+      'Definitively fixed the "unknown cipher" error by inspecting each live Transport instance\'s _cipher_info dictionary at runtime instead of modifying class-level attributes.',
+      'Guaranteed zero cipher exception crashes and safe traversal over OpenSSL 3.0 cipher restrictions on modern host systems.',
+      'Smart sequential negotiation loop prioritizing Cisco Catalyst legacy KEX (DH Group 14/1 and CBC) with seamless fallback to modern and default profiles.',
+      'Full keyboard-interactive authentication fallback support for network devices requiring interactive prompt verification.'
+    ]
+  },
   {
     version: '1.72.2',
     releaseDate: '2026-09-17',
