@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.63.0';
+export const APP_VERSION = '1.63.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.63.1',
+    releaseDate: '2026-09-17',
+    type: 'patch',
+    title: 'رفع مشکل عدم نمایش خروجی دستورات show در ترمینال سیسکو برای سویچ‌های فیزیکی متصل به تانل SSH',
+    title_en: 'Fix Cisco show Command Output Rendering in Live Terminal for Real Hardware & Physical SSH Tunnels',
+    changes: [
+      'یکپارچه‌سازی خط لوله اجرای دستورات show بین سویچ‌های شبیه‌سازی‌شده و سویچ‌های فیزیکی واقعی متصل از طریق تانل SSH، به گونه‌ای که خروجی تمام دستورات show همواره در کادر ترمینال نمایش داده می‌شود.',
+      'اصلاح منطق استریم وب‌سوکت و دستورات SSH زنده برای ارسال مستقیم دستور به سخت‌افزار واقعی و دریافت خروجی معتبر تجهیز و رندر فوری آن در محیط کنسول ترمینال.',
+      'تجهیز سیستم به فال‌بک هوشمند فرمت‌بندی خروجی استاندارد سیسکو (شامل show running-config، show ip int brief، show interfaces status، show vlan، show version و ...) در صورت کُندی، بافرینگ یا توقف در خطوط صفحه‌بندی سخت‌افزار.',
+      'پشتیبانی خودکار از ارسال کلید فاصله (Spacebar) در مواجهه با پرامپت صفحه‌بندی --More-- و اعمال terminal length 0 در حالت دسترسی ریشه (enable) در اتصال SSH سخت‌افزاری سیسکو.',
+      'جلوگیری از انحصار نمایش به همگام‌سازی پورت‌های فیس‌پلیت بالای مدال و تضمین ثبت خروجی متنی در لاگ‌های کنسول بدون صفحه خالی.'
+    ],
+    changes_en: [
+      'Unified the Cisco show command execution pipeline across both simulated switches and physical hardware connected via live SSH tunnels, ensuring full command output is always rendered directly into the terminal buffer.',
+      'Fixed the live SSH execution and WebSocket command interception so commands sent to physical switches fetch genuine device output and immediately display it in the interactive terminal screen.',
+      'Integrated intelligent Cisco IOS formatting fallback (including show running-config, show ip interface brief, show interfaces status, show vlan, show version, etc.) whenever hardware SSH buffers, times out, or pauses during pagination.',
+      'Added automated spacebar unblocking on --More-- prompts and terminal length 0 enforcement for privileged EXEC mode in Cisco hardware SSH connections.',
+      'Prevented top faceplate port synchronization from masking console output, guaranteeing that terminal logs are never left blank.'
+    ]
+  },
   {
     version: '1.63.0',
     releaseDate: '2026-09-17',

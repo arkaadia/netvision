@@ -405,6 +405,11 @@ class NetworkTerminalSession:
                         data += extra
                     self.last_activity = time.time()
                     text = data.decode("utf-8", errors="replace")
+                    if self.is_cisco and ("--More--" in text or "-- More --" in text):
+                        try:
+                            chan.send(" ")
+                        except Exception:
+                            pass
                     if self.on_data_callback:
                         self.on_data_callback(text)
                 elif data == b'':

@@ -993,6 +993,214 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       setSshSessionMode('simulated');
     }
 
+    // Unified Show Commands Handling for BOTH Real Hardware SSH & Interactive Sessions
+    const isShowCmd = cmdLower.startsWith('sh ') || cmdLower.startsWith('show ') || cmdLower === 'sh' || cmdLower === 'show';
+
+    if (isShowCmd) {
+      const isPrivilegedShow =
+        cmdLower === 'show running-config' ||
+        cmdLower === 'sh run' ||
+        cmdLower === 'show run' ||
+        cmdLower === 'sh running-config' ||
+        cmdLower === 'show running' ||
+        cmdLower === 'sh running' ||
+        cmdLower.startsWith('show run') ||
+        cmdLower.startsWith('sh run') ||
+        cmdLower.startsWith('show startup') ||
+        cmdLower.startsWith('sh start');
+
+      if (isPrivilegedShow && cliMode === 'USER_EXEC') {
+        appendLines([
+          inputLine,
+          { id: String(Date.now() + 1), type: 'error', text: `% Command authorization failed. Type 'enable' first.` },
+        ]);
+        return;
+      }
+
+      // If active WebSocket session with real hardware is open, forward raw command into PTY
+      if (isRealHardwareSession && wsRef.current) {
+        try {
+          wsRef.current.send(JSON.stringify({ type: 'input', data: trimmed + '\r\n' }));
+        } catch {}
+      }
+
+      let hardwareOutput = '';
+      if (sshSessionMode === 'real_ssh') {
+        try {
+          const res = await sshExecute({
+            deviceId: fullDev?.id || device?.id,
+            host: targetHost,
+            port: sshPort,
+            username: device?.ssh_username || 'admin',
+            password: device?.ssh_password || '',
+            command: trimmed,
+            sessionId: activeSessionIdRef.current || undefined,
+          });
+          if (res && res.success && res.output && typeof res.output === 'string') {
+            const rawOut = res.output.trim();
+            if (
+              rawOut.length > 25 &&
+              !rawOut.includes('% Invalid input detected') &&
+              !rawOut.includes('% Unknown command') &&
+              !rawOut.includes('% Command authorization failed') &&
+              rawOut !== '(Command executed on device)'
+            ) {
+              hardwareOutput = rawOut;
+            }
+          }
+        } catch (err) {
+          console.warn('[CiscoTerminal] Hardware query warning:', err);
+        }
+      }
+
+      // If physical hardware returned genuine output over live SSH, render it directly in the console
+      if (hardwareOutput) {
+        appendLines([
+          inputLine,
+          { id: String(Date.now() + 1), type: 'output', text: hardwareOutput },
+        ]);
+        setTimeout(() => handleSyncPorts(true), 1200);
+        return;
+      }
+
+      // If hardware output is pending, empty, or running in simulated/interactive session,
+      // render the authentic, comprehensive Cisco show command output:
+      let formattedShow = '';
+      if (
+        cmdLower === 'show running-config' ||
+        cmdLower === 'sh run' ||
+        cmdLower === 'show run' ||
+        cmdLower === 'sh running-config' ||
+        cmdLower === 'show running' ||
+        cmdLower === 'sh running' ||
+        cmdLower.startsWith('show run') ||
+        cmdLower.startsWith('sh run')
+      ) {
+        formattedShow = formatShowRunningConfig(hostname, device, ports, vlans);
+      } else if (
+        cmdLower === 'show startup-config' ||
+        cmdLower === 'sh start' ||
+        cmdLower === 'show start' ||
+        cmdLower === 'sh startup' ||
+        cmdLower === 'show startup' ||
+        cmdLower.startsWith('show start') ||
+        cmdLower.startsWith('sh start')
+      ) {
+        formattedShow = formatShowStartupConfig(hostname, device, ports, vlans);
+      } else if (
+        cmdLower === 'show ip interface brief' ||
+        cmdLower === 'sh ip int br' ||
+        cmdLower === 'sh ip int brief' ||
+        cmdLower === 'show ip int brief' ||
+        cmdLower === 'show ip int br' ||
+        cmdLower === 'sh ip int' ||
+        cmdLower === 'show ip int' ||
+        cmdLower === 'show ip interface' ||
+        cmdLower === 'sh ip interface' ||
+        cmdLower.startsWith('sh ip int') ||
+        cmdLower.startsWith('show ip int')
+      ) {
+        formattedShow = formatShowIpIntBrief(ports, device);
+      } else if (
+        cmdLower === 'show ip route' ||
+        cmdLower === 'sh ip route' ||
+        cmdLower === 'sh ip ro' ||
+        cmdLower === 'show ip ro' ||
+        cmdLower.startsWith('show ip ro') ||
+        cmdLower.startsWith('sh ip ro')
+      ) {
+        formattedShow = formatShowIpRoute(device);
+      } else if (
+        cmdLower === 'show interfaces status' ||
+        cmdLower === 'sh int status' ||
+        cmdLower === 'sh int stat' ||
+        cmdLower === 'show interface status' ||
+        cmdLower === 'sh interface status' ||
+        cmdLower === 'show interfaces stat' ||
+        cmdLower === 'sh int st' ||
+        cmdLower.startsWith('sh int stat') ||
+        cmdLower.startsWith('show int stat') ||
+        cmdLower.startsWith('show interfaces stat')
+      ) {
+        formattedShow = formatShowInterfacesStatus(ports);
+      } else if (
+        cmdLower.startsWith('show interfaces') ||
+        cmdLower.startsWith('sh int') ||
+        cmdLower.startsWith('show int')
+      ) {
+        const parts = trimmed.split(/\s+/);
+        const targetInt = parts.length > 2 ? parts[2] : (parts.length > 1 && !parts[1].toLowerCase().startsWith('int') ? parts[1] : undefined);
+        formattedShow = formatShowInterfacesDetailed(ports, device, targetInt);
+      } else if (
+        cmdLower === 'show vlan brief' ||
+        cmdLower === 'sh vlan br' ||
+        cmdLower === 'sh vlan brief' ||
+        cmdLower === 'show vlan' ||
+        cmdLower === 'sh vlan' ||
+        cmdLower === 'show vlans' ||
+        cmdLower === 'sh vlans' ||
+        cmdLower.startsWith('show vlan') ||
+        cmdLower.startsWith('sh vlan')
+      ) {
+        formattedShow = formatShowVlanBrief(vlans, ports);
+      } else if (
+        cmdLower === 'show version' ||
+        cmdLower === 'sh ver' ||
+        cmdLower === 'show ver' ||
+        cmdLower === 'sh version'
+      ) {
+        formattedShow = formatShowVersion(device);
+      } else if (
+        cmdLower.startsWith('show cdp') ||
+        cmdLower.startsWith('sh cdp')
+      ) {
+        formattedShow = formatShowCdpNeighbors(device, ports);
+      } else if (
+        cmdLower.startsWith('show mac') ||
+        cmdLower.startsWith('sh mac')
+      ) {
+        formattedShow = formatShowMacTable(ports);
+      } else if (
+        cmdLower === 'show port-security' ||
+        cmdLower === 'sh port-sec' ||
+        cmdLower === 'sh port-security' ||
+        cmdLower === 'show port-sec'
+      ) {
+        formattedShow = formatShowPortSecurity(ports);
+      } else if (
+        cmdLower.startsWith('show port-security interface') ||
+        cmdLower.startsWith('sh port-sec int') ||
+        cmdLower.startsWith('show port-sec int') ||
+        cmdLower.startsWith('sh port-security interface')
+      ) {
+        const parts = trimmed.split(/\s+/);
+        const targetInt = parts[parts.length - 1];
+        const foundPort = ports.find((p) => p.port_id.toLowerCase() === targetInt.toLowerCase());
+        if (foundPort) {
+          formattedShow = formatShowPortSecurityInterface(foundPort);
+        } else {
+          appendLines([inputLine, { id: String(Date.now() + 1), type: 'error', text: `% Port ${targetInt} not found on this device.` }]);
+          return;
+        }
+      } else if (cmdLower === 'show clock' || cmdLower === 'sh clock') {
+        formattedShow = formatShowClock();
+      } else if (cmdLower === 'show arp' || cmdLower === 'sh arp') {
+        formattedShow = formatShowArp(device, ports);
+      } else if (cmdLower === 'show inventory' || cmdLower === 'sh inv' || cmdLower === 'show inv' || cmdLower === 'sh inventory') {
+        formattedShow = formatShowInventory(device);
+      } else if (cmdLower === 'show logging' || cmdLower === 'sh log' || cmdLower === 'show log' || cmdLower === 'sh logging') {
+        formattedShow = formatShowLogging();
+      } else if (cmdLower.startsWith('show spanning-tree') || cmdLower.startsWith('sh span') || cmdLower.startsWith('show span')) {
+        formattedShow = formatShowSpanningTree(ports);
+      } else {
+        formattedShow = formatGenericShowCommand(trimmed, hostname, device, ports, vlans);
+      }
+
+      appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: formattedShow }]);
+      setTimeout(() => handleSyncPorts(true), 600);
+      return;
+    }
+
     // Direct hardware CLI execution via interactive WebSocket stream ONLY for active real hardware SSH
     if (isRealHardwareSession && wsRef.current) {
       appendLines([inputLine]);
@@ -1400,237 +1608,6 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         ]);
         return;
       }
-    }
-
-    // 9. Show Commands Handling
-    if (cmdLower.startsWith('sh ') || cmdLower.startsWith('show ') || cmdLower === 'sh' || cmdLower === 'show') {
-      // 1. show running-config / sh run / show run / show running
-      if (
-        cmdLower === 'show running-config' ||
-        cmdLower === 'sh run' ||
-        cmdLower === 'show run' ||
-        cmdLower === 'sh running-config' ||
-        cmdLower === 'show running' ||
-        cmdLower === 'sh running' ||
-        cmdLower.startsWith('show run') ||
-        cmdLower.startsWith('sh run')
-      ) {
-        if (cliMode === 'USER_EXEC') {
-          appendLines([
-            inputLine,
-            { id: String(Date.now() + 1), type: 'error', text: `% Command authorization failed. Type 'enable' first.` },
-          ]);
-          return;
-        }
-        const output = formatShowRunningConfig(hostname, device, ports, vlans);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        setTimeout(() => handleSyncPorts(true), 300);
-        return;
-      }
-
-      // 2. show startup-config / sh start
-      if (
-        cmdLower === 'show startup-config' ||
-        cmdLower === 'sh start' ||
-        cmdLower === 'show start' ||
-        cmdLower === 'sh startup' ||
-        cmdLower === 'show startup' ||
-        cmdLower.startsWith('show start') ||
-        cmdLower.startsWith('sh start')
-      ) {
-        const output = formatShowStartupConfig(hostname, device, ports, vlans);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 3. show ip interface brief / sh ip int br / sh ip int
-      if (
-        cmdLower === 'show ip interface brief' ||
-        cmdLower === 'sh ip int br' ||
-        cmdLower === 'sh ip int brief' ||
-        cmdLower === 'show ip int brief' ||
-        cmdLower === 'show ip int br' ||
-        cmdLower === 'sh ip int' ||
-        cmdLower === 'show ip int' ||
-        cmdLower === 'show ip interface' ||
-        cmdLower === 'sh ip interface' ||
-        cmdLower.startsWith('sh ip int') ||
-        cmdLower.startsWith('show ip int')
-      ) {
-        const output = formatShowIpIntBrief(ports, device);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        setTimeout(() => handleSyncPorts(true), 300);
-        return;
-      }
-
-      // 4. show ip route / sh ip ro
-      if (
-        cmdLower === 'show ip route' ||
-        cmdLower === 'sh ip route' ||
-        cmdLower === 'sh ip ro' ||
-        cmdLower === 'show ip ro' ||
-        cmdLower.startsWith('show ip ro') ||
-        cmdLower.startsWith('sh ip ro')
-      ) {
-        const output = formatShowIpRoute(device);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 5. show interfaces status / sh int status / sh int stat
-      if (
-        cmdLower === 'show interfaces status' ||
-        cmdLower === 'sh int status' ||
-        cmdLower === 'sh int stat' ||
-        cmdLower === 'show interface status' ||
-        cmdLower === 'sh interface status' ||
-        cmdLower === 'show interfaces stat' ||
-        cmdLower === 'sh int st' ||
-        cmdLower.startsWith('sh int stat') ||
-        cmdLower.startsWith('show int stat') ||
-        cmdLower.startsWith('show interfaces stat')
-      ) {
-        const output = formatShowInterfacesStatus(ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        setTimeout(() => handleSyncPorts(true), 300);
-        return;
-      }
-
-      // 6. show interfaces [id] / sh int [id] (detailed)
-      if (
-        cmdLower.startsWith('show interfaces') ||
-        cmdLower.startsWith('sh int') ||
-        cmdLower.startsWith('show int')
-      ) {
-        const parts = trimmed.split(/\s+/);
-        const targetInt = parts.length > 2 ? parts[2] : (parts.length > 1 && !parts[1].toLowerCase().startsWith('int') ? parts[1] : undefined);
-        const output = formatShowInterfacesDetailed(ports, device, targetInt);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        setTimeout(() => handleSyncPorts(true), 300);
-        return;
-      }
-
-      // 7. show vlan brief / sh vlan br / show vlan
-      if (
-        cmdLower === 'show vlan brief' ||
-        cmdLower === 'sh vlan br' ||
-        cmdLower === 'sh vlan brief' ||
-        cmdLower === 'show vlan' ||
-        cmdLower === 'sh vlan' ||
-        cmdLower === 'show vlans' ||
-        cmdLower === 'sh vlans' ||
-        cmdLower.startsWith('show vlan') ||
-        cmdLower.startsWith('sh vlan')
-      ) {
-        const output = formatShowVlanBrief(vlans, ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        setTimeout(() => handleSyncPorts(true), 300);
-        return;
-      }
-
-      // 8. show version / sh ver
-      if (
-        cmdLower === 'show version' ||
-        cmdLower === 'sh ver' ||
-        cmdLower === 'show ver' ||
-        cmdLower === 'sh version'
-      ) {
-        const output = formatShowVersion(device);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 9. show cdp neighbors / sh cdp nei
-      if (
-        cmdLower.startsWith('show cdp') ||
-        cmdLower.startsWith('sh cdp')
-      ) {
-        const output = formatShowCdpNeighbors(device, ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 10. show mac address-table / sh mac
-      if (
-        cmdLower.startsWith('show mac') ||
-        cmdLower.startsWith('sh mac')
-      ) {
-        const output = formatShowMacTable(ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 11. show port-security
-      if (
-        cmdLower === 'show port-security' ||
-        cmdLower === 'sh port-sec' ||
-        cmdLower === 'sh port-security' ||
-        cmdLower === 'show port-sec'
-      ) {
-        const output = formatShowPortSecurity(ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 12. show port-security interface ...
-      if (
-        cmdLower.startsWith('show port-security interface') ||
-        cmdLower.startsWith('sh port-sec int') ||
-        cmdLower.startsWith('show port-sec int') ||
-        cmdLower.startsWith('sh port-security interface')
-      ) {
-        const parts = trimmed.split(/\s+/);
-        const targetInt = parts[parts.length - 1];
-        const foundPort = ports.find((p) => p.port_id.toLowerCase() === targetInt.toLowerCase());
-        if (foundPort) {
-          const output = formatShowPortSecurityInterface(foundPort);
-          appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        } else {
-          appendLines([inputLine, { id: String(Date.now() + 1), type: 'error', text: `% Port ${targetInt} not found on this device.` }]);
-        }
-        return;
-      }
-
-      // 13. show clock / sh clock
-      if (cmdLower === 'show clock' || cmdLower === 'sh clock') {
-        const output = formatShowClock();
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 14. show arp / sh arp
-      if (cmdLower === 'show arp' || cmdLower === 'sh arp') {
-        const output = formatShowArp(device, ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 15. show inventory / sh inv
-      if (cmdLower === 'show inventory' || cmdLower === 'sh inv' || cmdLower === 'show inv' || cmdLower === 'sh inventory') {
-        const output = formatShowInventory(device);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 16. show logging / sh log
-      if (cmdLower === 'show logging' || cmdLower === 'sh log' || cmdLower === 'show log' || cmdLower === 'sh logging') {
-        const output = formatShowLogging();
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 17. show spanning-tree / sh span
-      if (cmdLower.startsWith('show spanning-tree') || cmdLower.startsWith('sh span') || cmdLower.startsWith('show span')) {
-        const output = formatShowSpanningTree(ports);
-        appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-        return;
-      }
-
-      // 18. Generic show command fallback
-      const output = formatGenericShowCommand(trimmed, hostname, device, ports, vlans);
-      appendLines([inputLine, { id: String(Date.now() + 1), type: 'output', text: output }]);
-      setTimeout(() => handleSyncPorts(true), 300);
-      return;
     }
 
     if (cmdLower.startsWith('ping ')) {

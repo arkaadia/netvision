@@ -253,6 +253,33 @@ class SSHConnectionManager:
                     else:
                         chan = session.shell_channel
 
+                    cmd_lower = command.strip().lower()
+                    # If privileged mode is required for show run/start/config, elevate with enable if secret exists
+                    if (cmd_lower.startswith("show run") or cmd_lower.startswith("sh run") or 
+                        cmd_lower.startswith("show start") or cmd_lower.startswith("sh start") or
+                        cmd_lower.startswith("conf")):
+                        enable_secret = decrypt_credential(
+                            device.get("enable_password") or 
+                            (device.get("connection", {}) or {}).get("enable_password") or ""
+                        )
+                        try:
+                            chan.send("enable\r\n".encode("utf-8"))
+                            time.sleep(0.15)
+                            buf = ""
+                            while chan.recv_ready():
+                                buf += chan.recv(4096).decode("utf-8", errors="replace")
+                            if "Password:" in buf or "password:" in buf:
+                                chan.send(f"{enable_secret}\r\n".encode("utf-8"))
+                                time.sleep(0.2)
+                                while chan.recv_ready():
+                                    chan.recv(4096)
+                            chan.send("terminal length 0\r\n".encode("utf-8"))
+                            time.sleep(0.1)
+                            while chan.recv_ready():
+                                chan.recv(4096)
+                        except Exception as e:
+                            print(f"[SSHManager] Elevation attempt note: {e}")
+
                     # Send the exact command to hardware
                     chan.send((command + "\r\n").encode("utf-8"))
                     time.sleep(0.15)
@@ -264,6 +291,11 @@ class SSHConnectionManager:
                             if chunk:
                                 output_parts.append(chunk.decode("utf-8", errors="replace"))
                                 text_so_far = "".join(output_parts)
+                                if "--More--" in text_so_far or "-- More --" in text_so_far:
+                                    try:
+                                        chan.send(" ")
+                                    except Exception:
+                                        pass
                                 if re.search(r'[\r\n][A-Za-z0-9_\.\-]+(?:\([^\)]+\))?[#>]', text_so_far):
                                     time.sleep(0.05)
                                     while chan.recv_ready():
