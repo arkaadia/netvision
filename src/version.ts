@@ -10,9 +10,24 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.81.0';
+export const APP_VERSION = '1.81.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.81.1',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'حذف پیام اضافی و تکراری «New release is ready to install!» از انتهای منوی پروفایل کاربر',
+    title_en: 'Removed Redundant "New release is ready to install!" Status Toast from User Profile Menu',
+    changes: [
+      'حذف باکس اعلان تکراری وضعیت آپدیت از انتهای منوی پروفایل (قبل از دکمه خروج) به دلیل وجود بنر کامل، تعاملی و پررنگ آپدیت در بالای کارت پروفایل.',
+      'بهبود تجربه کاربری و جلوگیری از تراکم و شلوغی بصری انتهای منوی پروفایل هنگام انتشار نگارش‌های جدید.'
+    ],
+    changes_en: [
+      'Removed redundant "New release is ready to install!" status toast from the bottom section of the user profile dropdown menu, preventing visual clutter above the logout button.',
+      'Streamlined profile update UX as prominent interactive update banner is already displayed at the top of the profile card.'
+    ]
+  },
   {
     version: '1.81.0',
     releaseDate: '2026-09-18',

@@ -387,13 +387,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
 
                   {/* Live Status / Toast Feedback */}
-                  {checkFeedback && (
+                  {checkFeedback && checkFeedback.type !== 'update_available' && (
                     <div
                       className={`text-[11px] p-2 rounded-xl border transition-all flex items-center justify-between gap-2 ${
                         checkFeedback.type === 'checking'
                           ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
-                          : checkFeedback.type === 'update_available'
-                          ? 'bg-rose-500/15 border-rose-500/35 text-rose-200'
                           : checkFeedback.type === 'latest'
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
                           : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
@@ -406,23 +404,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                         {checkFeedback.type === 'latest' && (
                           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                         )}
-                        {checkFeedback.type === 'update_available' && (
-                          <ArrowUpCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                        )}
                         <span>{isEn ? checkFeedback.message_en : checkFeedback.message}</span>
                       </div>
-
-                      {checkFeedback.type === 'update_available' && (
-                        <button
-                          onClick={() => {
-                            setProfileOpen(false);
-                            if (onOpenReleaseNotes) onOpenReleaseNotes();
-                          }}
-                          className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] shrink-0 transition cursor-pointer"
-                        >
-                          {isEn ? 'View' : 'مشاهده'}
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>

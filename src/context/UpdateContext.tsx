@@ -104,12 +104,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       if (data.hasUpdate) {
-        setCheckFeedback({
-          type: 'update_available',
-          message: `نگارش جدید v${data.latestVersion} آماده نصب است!`,
-          message_en: `New release v${data.latestVersion} is ready to install!`,
-          timestamp: Date.now()
-        });
+        setCheckFeedback(null);
       } else {
         setCheckFeedback({
           type: 'latest',
