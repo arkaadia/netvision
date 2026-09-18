@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.73.2';
+export const APP_VERSION = '1.73.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.73.3',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'نمایش و فیلتر اختصاصی ویلن‌های تعریف‌شده روی دستگاه در مودال تخصیص ویلن دسترسی (Device Configured VLANs)',
+    title_en: 'Device-Specific VLAN Listing & Backend Query in Assign Access VLAN Modal',
+    changes: [
+      'نمایش اختصاصی لیست ویلن‌های تعریف‌شده و فعال روی خود دستگاه جاری در بخش Device Configured VLANs در مودال تخصیص ویلن دسترسی.',
+      'افزودن اندپوینت اختصاصی بک‌اند GET /api/devices/:id/vlans برای استخراج هوشمند ویلن‌های تعریف‌شده و شمارش پورت‌ها، به‌همراه پارس خروجی show vlan brief سیسکو و جدول ویلن میکروتیک.',
+      'پشتیبانی از استخراج محلی ویلن‌های پورت‌های دستگاه (Access و Trunk Allowed) به‌عنوان فالبک بلادرنگ جهت اطمینان از عملکرد پایدار آفلاین و شبیه‌ساز.',
+      'حفظ کامل و دقیق ساختار ظاهری، استایل، فیلتر جستجو، پیش‌نمایش دستورات و دکمه‌های مودال مطابق درخواست کاربر.'
+    ],
+    changes_en: [
+      'Display device-specific configured and active VLANs in the "Device Configured VLANs" section of the Assign Access VLAN modal for the selected device.',
+      'Added dedicated backend endpoint GET /api/devices/:id/vlans to extract device-specific VLANs, port counts, and parse Cisco show vlan brief / MikroTik vlan table.',
+      'Real-time client fallback to extract VLANs directly from device ports (both Access VLAN and Trunk allowed VLANs) ensuring seamless offline and simulator support.',
+      'Preserved exact existing modal layout, styling, search filter, CLI command preview, and buttons.'
+    ]
+  },
   {
     version: '1.73.2',
     releaseDate: '2026-09-18',

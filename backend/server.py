@@ -1486,6 +1486,85 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if path.startswith("/api/devices/") and path.endswith("/vlans"):
+            # GET /api/devices/:id/vlans
+            parts = path.split("/")
+            dev_id = parts[3]
+            device = next((d for d in data["devices"] if d["id"] == dev_id), None)
+            if not device:
+                self._send_json(404, {"error": "Device not found"})
+                return
+
+            platform = device.get("platform", "cisco_ios_xe")
+            conn_mode = device.get("connection_mode", "ssh")
+            driver = get_driver(platform, conn_mode)
+            existing_ports = data.get("ports", {}).get(dev_id, [])
+
+            # Real device query if online and connected
+            live_vlans = []
+            if conn_mode != "simulator":
+                sess = connection_manager.get_or_create_session(device, require_real=True)
+                if sess.status == "connected" and sess.is_real and sess.paramiko_client:
+                    try:
+                        if hasattr(driver, "parse_vlans"):
+                            cmd = "show vlan brief" if "cisco" in platform.lower() else "/interface vlan print"
+                            r = connection_manager.execute_command(device, cmd, require_real=True)
+                            if r.get("success") and r.get("output"):
+                                live_vlans = driver.parse_vlans(r["output"])
+                    except Exception as e:
+                        print(f"[Device VLANs live query note] {e}")
+
+            # Map of global catalog
+            global_vlans = {v["id"]: v for v in data.get("vlans", [])}
+
+            vlan_port_counts = {}
+            for p in existing_ports:
+                v = p.get("vlan")
+                if v is not None:
+                    try:
+                        vid = int(v)
+                        vlan_port_counts[vid] = vlan_port_counts.get(vid, 0) + 1
+                    except Exception:
+                        pass
+                av = p.get("allowed_vlans")
+                if av:
+                    for part in str(av).split(","):
+                        part = part.strip()
+                        if part.isdigit():
+                            vid = int(part)
+                            if vid not in vlan_port_counts:
+                                vlan_port_counts[vid] = 0
+
+            # Merge live vlans if any
+            for lv in live_vlans:
+                vid = lv.get("id")
+                if vid and vid not in vlan_port_counts:
+                    vlan_port_counts[vid] = lv.get("ports_count", 0)
+
+            # Ensure at least VLAN 1 is included if ports exist or default
+            if 1 not in vlan_port_counts:
+                vlan_port_counts[1] = 0
+
+            device_vlans = []
+            for vid in sorted(vlan_port_counts.keys()):
+                live_item = next((x for x in live_vlans if x.get("id") == vid), None)
+                g_item = global_vlans.get(vid, {})
+                vname = (live_item and live_item.get("name")) or g_item.get("name") or (f"Default / Management" if vid == 1 else f"VLAN {vid}")
+                device_vlans.append({
+                    "id": vid,
+                    "name": vname,
+                    "status": "active",
+                    "ports_count": vlan_port_counts[vid]
+                })
+
+            self._send_json(200, {
+                "device_id": dev_id,
+                "device_name": device.get("name"),
+                "vlans": device_vlans,
+                "total": len(device_vlans)
+            })
+            return
+
         if path.startswith("/api/devices/") and "/ports" in path:
             # /api/devices/:id/ports
             parts = path.split("/")

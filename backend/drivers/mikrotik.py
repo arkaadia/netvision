@@ -128,6 +128,28 @@ class MikroTikDriver(NetworkDeviceDriver):
 
         return ports
 
+    def parse_vlans(self, output: str) -> List[Dict[str, Any]]:
+        vlans = []
+        seen = set()
+        for line in output.splitlines():
+            line_str = line.strip()
+            # Match e.g.: 0  R  name="vlan10" mtu=1500 l2mtu=1580 vlan-id=10 interface=ether1
+            m = re.search(r'vlan-id=(\d+)', line_str, re.IGNORECASE)
+            name_m = re.search(r'name=["\']?([A-Za-z0-9_.-]+)["\']?', line_str, re.IGNORECASE)
+            if m:
+                vid = int(m.group(1))
+                if vid in seen or vid > 4094:
+                    continue
+                seen.add(vid)
+                name = name_m.group(1) if name_m else f"VLAN {vid}"
+                vlans.append({
+                    "id": vid,
+                    "name": name,
+                    "status": "active",
+                    "ports_count": 1
+                })
+        return vlans
+
     def get_default_ports(self, count: int = 16) -> List[Dict[str, Any]]:
         generated = []
         # Standard MikroTik CCR / CRS layout: ether1 to ether(count-2), plus 2 SFP+ ports

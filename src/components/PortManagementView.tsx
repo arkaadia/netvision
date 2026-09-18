@@ -1283,6 +1283,7 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
           onAssign={handleConfirmAssignVlan}
           port={vlanAssignModalPort}
           device={currentDevice}
+          devicePorts={ports}
           isLoading={isAssigningVlan}
         />
       )}

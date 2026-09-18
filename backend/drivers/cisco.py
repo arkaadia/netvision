@@ -225,6 +225,30 @@ class CiscoDriver(NetworkDeviceDriver):
 
         return ports
 
+    def parse_vlans(self, output: str) -> List[Dict[str, Any]]:
+        vlans = []
+        seen = set()
+        for line in output.splitlines():
+            line_str = line.strip()
+            # Matching: 10   Servers_NOC   active   Gi1/0/1, Gi1/0/2
+            m = re.match(r'^(\d+)\s+([A-Za-z0-9_.-]+)\s+(active|act/unsup|suspended)\s*(.*)$', line_str, re.IGNORECASE)
+            if m:
+                vid = int(m.group(1))
+                if vid in seen or vid > 4094:
+                    continue
+                seen.add(vid)
+                name = m.group(2)
+                status = m.group(3).lower()
+                ports_part = m.group(4)
+                ports_list = [p.strip() for p in ports_part.split(",") if p.strip()] if ports_part else []
+                vlans.append({
+                    "id": vid,
+                    "name": name,
+                    "status": "active" if "act" in status else "inactive",
+                    "ports_count": len(ports_list)
+                })
+        return vlans
+
     def get_default_ports(self, count: int = 24) -> List[Dict[str, Any]]:
         generated = []
         for i in range(1, count + 1):

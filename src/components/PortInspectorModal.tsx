@@ -1806,6 +1806,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
             onAssign={handleConfirmAssignVlan}
             port={vlanAssignModalPort}
             device={device}
+            devicePorts={ports}
             isLoading={isAssigningVlan}
           />
         )}

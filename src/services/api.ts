@@ -418,6 +418,12 @@ export async function fetchVlans(): Promise<{ vlans: VlanInfo[] }> {
   return res.json();
 }
 
+export async function fetchDeviceVlans(deviceId: string): Promise<{ vlans: VlanInfo[]; device_id?: string; device_name?: string }> {
+  const res = await fetch(`${API_BASE}/devices/${deviceId}/vlans`);
+  if (!res.ok) throw new Error('Failed to fetch device VLANs');
+  return res.json();
+}
+
 export async function resetDemoData(): Promise<any> {
   const res = await fetch(`${API_BASE}/reset-demo`, {
     method: 'POST',

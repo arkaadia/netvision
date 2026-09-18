@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Device, SwitchPort, VlanInfo } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
-import { fetchVlans } from '../services/api';
+import { fetchVlans, fetchDeviceVlans } from '../services/api';
 
 export interface AssignVlanModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ export interface AssignVlanModalProps {
   onAssign: (vlanId: number) => Promise<void> | void;
   port: SwitchPort | null;
   device: Device;
+  devicePorts?: SwitchPort[];
   availableVlans?: VlanInfo[];
   isLoading?: boolean;
 }
@@ -34,6 +35,7 @@ export const AssignVlanModal: React.FC<AssignVlanModalProps> = ({
   onAssign,
   port,
   device,
+  devicePorts,
   availableVlans = [],
   isLoading = false,
 }) => {
@@ -49,42 +51,108 @@ export const AssignVlanModal: React.FC<AssignVlanModalProps> = ({
     }
   }, [port]);
 
-  useEffect(() => {
-    if (isOpen && vlansList.length === 0) {
-      loadVlans();
-    }
-  }, [isOpen]);
+  // Helper to extract device-specific VLANs from port configurations
+  const extractFromPorts = (ports: SwitchPort[], globalCatalog: VlanInfo[] = []): VlanInfo[] => {
+    const vlanMap = new Map<number, { id: number; name?: string; count: number }>();
 
-  const loadVlans = async () => {
+    ports.forEach((p) => {
+      // Access VLAN
+      if (p.vlan !== undefined && p.vlan !== null) {
+        const vid = Number(p.vlan);
+        if (!isNaN(vid) && vid > 0) {
+          const current = vlanMap.get(vid) || { id: vid, count: 0 };
+          current.count += 1;
+          vlanMap.set(vid, current);
+        }
+      }
+      // Trunk Allowed VLANs
+      if (p.allowed_vlans) {
+        String(p.allowed_vlans)
+          .split(',')
+          .forEach((part) => {
+            const vid = Number(part.trim());
+            if (!isNaN(vid) && vid > 0) {
+              if (!vlanMap.has(vid)) {
+                vlanMap.set(vid, { id: vid, count: 0 });
+              }
+            }
+          });
+      }
+    });
+
+    if (!vlanMap.has(1)) {
+      vlanMap.set(1, { id: 1, count: 0 });
+    }
+
+    return Array.from(vlanMap.keys())
+      .sort((a, b) => a - b)
+      .map((vid) => {
+        const matchCatalog = globalCatalog.find((gv) => gv.id === vid);
+        const name = matchCatalog?.name || (vid === 1 ? 'Default / Management' : `VLAN ${vid}`);
+        return {
+          id: vid,
+          name,
+          status: 'active',
+          ports_count: vlanMap.get(vid)?.count || 0,
+        };
+      });
+  };
+
+  const loadDeviceVlans = async () => {
+    if (!device?.id) return;
     try {
       setLoadingVlans(true);
-      const res = await fetchVlans();
-      if (res && res.vlans && res.vlans.length > 0) {
-        setVlansList(res.vlans);
-      } else {
-        // Fallback standard enterprise VLAN seed
-        setVlansList([
-          { id: 1, name: 'Default / Management', status: 'active', ports_count: 12 },
-          { id: 10, name: 'Servers & DMZ', status: 'active', ports_count: 4 },
-          { id: 20, name: 'Staff & Office', status: 'active', ports_count: 8 },
-          { id: 30, name: 'Dev & Engineering', status: 'active', ports_count: 16 },
-          { id: 50, name: 'Wireless Guest & Corp APs', status: 'active', ports_count: 4 },
-          { id: 99, name: 'Out-of-Band Network Mgmt', status: 'active', ports_count: 2 },
-        ]);
+
+      // 1. First try the device-specific VLAN endpoint (parses real device or device ports)
+      let loaded = false;
+      try {
+        const res = await fetchDeviceVlans(device.id);
+        if (res && res.vlans && res.vlans.length > 0) {
+          setVlansList(res.vlans);
+          loaded = true;
+        }
+      } catch (err) {
+        // Continue to fallback
+      }
+
+      // 2. Fallback: extract from devicePorts if available
+      if (!loaded) {
+        let globalCatalog: VlanInfo[] = availableVlans;
+        if (globalCatalog.length === 0) {
+          try {
+            const gRes = await fetchVlans();
+            if (gRes?.vlans) globalCatalog = gRes.vlans;
+          } catch {
+            // ignore
+          }
+        }
+
+        if (devicePorts && devicePorts.length > 0) {
+          const fromPorts = extractFromPorts(devicePorts, globalCatalog);
+          setVlansList(fromPorts);
+        } else if (globalCatalog.length > 0) {
+          setVlansList(globalCatalog);
+        } else {
+          setVlansList([
+            { id: 1, name: 'Default / Management', status: 'active', ports_count: 1 },
+            { id: 10, name: 'Servers & DMZ', status: 'active', ports_count: 0 },
+            { id: 20, name: 'Staff & Office', status: 'active', ports_count: 0 },
+            { id: 30, name: 'Dev & Engineering', status: 'active', ports_count: 0 },
+          ]);
+        }
       }
     } catch {
-      setVlansList([
-        { id: 1, name: 'Default / Management', status: 'active', ports_count: 12 },
-        { id: 10, name: 'Servers & DMZ', status: 'active', ports_count: 4 },
-        { id: 20, name: 'Staff & Office', status: 'active', ports_count: 8 },
-        { id: 30, name: 'Dev & Engineering', status: 'active', ports_count: 16 },
-        { id: 50, name: 'Wireless Guest & Corp APs', status: 'active', ports_count: 4 },
-        { id: 99, name: 'Out-of-Band Network Mgmt', status: 'active', ports_count: 2 },
-      ]);
+      // Safe fallback
     } finally {
       setLoadingVlans(false);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && device?.id) {
+      loadDeviceVlans();
+    }
+  }, [isOpen, device?.id]);
 
   if (!isOpen || !port) return null;
 
@@ -234,41 +302,47 @@ export const AssignVlanModal: React.FC<AssignVlanModalProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto p-2 rounded-xl border border-slate-800 bg-slate-950/60 custom-scrollbar">
-                {filteredVlans.map((v) => {
-                  const isSelected = targetVlan === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      id={`vlan-pill-${v.id}`}
-                      onClick={() => setTargetVlan(v.id)}
-                      className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-mono transition text-left rtl:text-right cursor-pointer border ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400 shadow-md shadow-cyan-950/60 ring-1 ring-cyan-400/50'
-                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:bg-slate-850 hover:text-white'
-                      }`}
-                    >
-                      <div className="truncate min-w-0 pr-1 rtl:pr-0 rtl:pl-1">
-                        <div className="font-bold flex items-center gap-1.5">
-                          <span>VLAN {v.id}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-white" />}
-                        </div>
-                        <div className={`text-[10px] truncate ${isSelected ? 'text-cyan-100' : 'text-slate-400'}`}>
-                          {v.name}
-                        </div>
-                      </div>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-sans font-bold shrink-0 ${
+                {filteredVlans.length === 0 ? (
+                  <div className="col-span-full py-4 px-2 text-center text-xs text-slate-400">
+                    {isEn ? 'No configured VLANs found on this device.' : 'هیچ ویلنی منطبق بر جستجو روی این دستگاه یافت نشد.'}
+                  </div>
+                ) : (
+                  filteredVlans.map((v) => {
+                    const isSelected = targetVlan === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        id={`vlan-pill-${v.id}`}
+                        onClick={() => setTargetVlan(v.id)}
+                        className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-mono transition text-left rtl:text-right cursor-pointer border ${
                           isSelected
-                            ? 'bg-cyan-700/70 text-white border border-cyan-400/40'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700/60'
+                            ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400 shadow-md shadow-cyan-950/60 ring-1 ring-cyan-400/50'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:bg-slate-850 hover:text-white'
                         }`}
                       >
-                        #{v.id}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <div className="truncate min-w-0 pr-1 rtl:pr-0 rtl:pl-1">
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>VLAN {v.id}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-white" />}
+                          </div>
+                          <div className={`text-[10px] truncate ${isSelected ? 'text-cyan-100' : 'text-slate-400'}`}>
+                            {v.name}
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-sans font-bold shrink-0 ${
+                            isSelected
+                              ? 'bg-cyan-700/70 text-white border border-cyan-400/40'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700/60'
+                          }`}
+                        >
+                          #{v.id}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
