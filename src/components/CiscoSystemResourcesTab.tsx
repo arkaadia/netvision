@@ -12,6 +12,7 @@ import {
   Copy,
   Check,
   Server,
+  ServerOff,
   Layers,
   Clock,
   ShieldCheck,
@@ -241,18 +242,6 @@ export const CiscoSystemResourcesTab: React.FC<CiscoSystemResourcesTabProps> = (
         </div>
 
         <div className="flex items-center gap-2">
-          {onConnectTerminal && (
-            <button
-              type="button"
-              onClick={() => onConnectTerminal(device)}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold transition flex items-center gap-1.5 border border-slate-700 cursor-pointer"
-              title={isEn ? 'Open Interactive Terminal' : 'باز کردن ترمینال زنده'}
-            >
-              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{isEn ? 'CLI Terminal' : 'ترمینال CLI'}</span>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={handleRefresh}
@@ -266,27 +255,59 @@ export const CiscoSystemResourcesTab: React.FC<CiscoSystemResourcesTabProps> = (
         </div>
       </div>
 
-      {/* Offline / Connectivity Warning Banner if device could not be reached */}
-      {!isLive && !isBusy && (
-        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <div className="font-bold flex items-center gap-1.5">
-              <span>{isEn ? 'Live Hardware Probe Status:' : 'وضعیت اتصال تله‌متری سخت‌افزار:'}</span>
-              <span className="font-mono text-amber-300 font-normal">
-                {fetchError || (isEn ? 'Could not establish real SSH connection with device.' : 'برقراری ارتباط زنده SSH با تجهیز میسر نشد.')}
-              </span>
+      {!isLive && !isBusy ? (
+        /* Dedicated Offline State - Do NOT display resource metrics when device is unreachable */
+        <div className="p-8 rounded-2xl border border-slate-800 bg-slate-900/70 text-center space-y-4 shadow-sm">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 flex items-center justify-center">
+            <ServerOff className="w-7 h-7" />
+          </div>
+
+          <div className="space-y-1.5 max-w-md mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span>{isEn ? 'DEVICE OFFLINE / UNREACHABLE' : 'تجهیز آفلاین / عدم دسترسی به SSH'}</span>
             </div>
-            <p className="text-[11px] text-amber-300/80 leading-relaxed">
+            <h4 className="text-sm font-bold text-white font-mono">
+              {isEn ? 'Real-Time Hardware Telemetry Unavailable' : 'اطلاعات منابع سخت‌افزاری در دسترس نیست'}
+            </h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
               {isEn
-                ? `To fetch real-time data from this switch, ensure IP (${device.ip || 'none'}), SSH port (${device.ssh_port || 22}), and credentials are reachable from this server. Currently displaying model baseline telemetry.`
-                : `برای دریافت دیتای بلادرنگ از سوئیچ، از صحت آدرس آی‌پی (${device.ip || 'نامشخص'})، پورت SSH (${device.ssh_port || 22}) و دسترسی شبکه مطمئن شوید. اکنون مقادیر پیش‌فرض مدل نمایش داده می‌شوند.`}
+                ? `System resource metrics cannot be displayed because an active SSH connection could not be established with ${device.name || 'this Cisco switch'}. Metric data is hidden to prevent displaying unverified or simulated values.`
+                : `امکان نمایش اطلاعات مصرف منابع وجود ندارد زیرا ارتباط زنده SSH با ${device.name || 'این سوئیچ سیسکو'} برقرار نشد. جهت اطمینان از صحت اطلاعات، از نمایش مقادیر شبیه‌سازی‌شده یا پیش‌فرض خودداری شده است.`}
             </p>
           </div>
-        </div>
-      )}
 
-      {/* Main Resource Cards Grid */}
+          <div className="max-w-md mx-auto p-3.5 rounded-xl border border-slate-800 bg-black/50 font-mono text-xs text-left space-y-2">
+            <div className="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-800/80">
+              <span className="text-slate-400">{isEn ? 'Target IP:' : 'آدرس آی‌پی:'}</span>
+              <span className="font-bold text-cyan-400">{device.ip || '192.168.1.1'}</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-800/80">
+              <span className="text-slate-400">{isEn ? 'SSH Port:' : 'پورت SSH:'}</span>
+              <span className="text-slate-300">{device.ssh_port || 22}</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">{isEn ? 'Probe Status:' : 'وضعیت اتصال:'}</span>
+              <span className="text-amber-400 text-[11px] truncate max-w-[240px]">
+                {fetchError || (isEn ? 'Connection refused or timed out' : 'تجهیز به درخواست SSH پاسخ نداد')}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="px-4 py-2 rounded-xl text-xs font-bold font-mono bg-cyan-600 hover:bg-cyan-500 text-white transition-all inline-flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>{isEn ? 'Retry Telemetry Probe' : 'استعلام مجدد تله‌متری'}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Main Resource Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {/* 1. CPU Architecture & Load */}
         <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
@@ -779,6 +800,8 @@ export const CiscoSystemResourcesTab: React.FC<CiscoSystemResourcesTabProps> = (
           {cliOutputs[selectedCliCommand]?.output || (isEn ? 'No output received.' : 'خروجی دریافت نشد.')}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

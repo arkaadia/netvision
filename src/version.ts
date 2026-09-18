@@ -10,9 +10,24 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.83.0';
+export const APP_VERSION = '1.83.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.83.1',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'حذف دکمه اضافی CLI Terminal و عدم نمایش دیتای منابع در صورت آفلاین بودن تجهیز',
+    title_en: 'Remove Redundant CLI Terminal Button and Hide Resource Metrics on Offline Devices',
+    changes: [
+      'حذف دکمه ترمینال (CLI Terminal) از کنار دکمه بروزرسانی در تب منابع سیستم (System Resources) در مودال‌های پورت سیسکو و میکروتیک جهت جلوگیری از تکرار و ساده‌سازی نوار ابزار.',
+      'عدم نمایش اطلاعات و کارت‌های مصرف منابع (CPU، RAM، Storage و...) در تب منابع سیستم در صورت عدم دسترسی به تجهیز یا آفلاین بودن SSH، و جایگزینی آن با کارت جامع وضعیت آفلاین و دکمه استعلام مجدد، جهت جلوگیری از نمایش داده‌های شبیه‌سازی‌شده یا غیرواقعی.'
+    ],
+    changes_en: [
+      'Removed redundant "CLI Terminal" button adjacent to the Refresh button in the System Resources tab of both Cisco and MikroTik port modals for a cleaner, unified toolbar.',
+      'Hidden hardware resource metrics (CPU, RAM, Storage, etc.) when the device cannot be reached over SSH, replacing them with an informative offline status card and retry button to prevent displaying unverified or simulated data.'
+    ]
+  },
   {
     version: '1.83.0',
     releaseDate: '2026-09-18',
