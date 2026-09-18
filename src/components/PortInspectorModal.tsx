@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
-import { fetchDevicePorts, updateSwitchPort, writeMemory, batchUpdateSwitchPorts } from '../services/api';
+import { fetchDevicePorts, updateSwitchPort, writeMemory, batchUpdateSwitchPorts, executeDeviceOperation } from '../services/api';
 import { NetworkPortSvg } from './NetworkPortSvg';
 import { CiscoPortContextMenu } from './CiscoPortContextMenu';
 import { CiscoCommandConfirmModal } from './CiscoCommandConfirmModal';
@@ -225,24 +225,60 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   const handleConfirmSetDescription = async (newDescription: string) => {
     if (!descriptionModalPort || !device) return;
     const targetPort = descriptionModalPort;
-    const updates: Partial<SwitchPort> = {
-      description: newDescription,
-    };
+    const cleanDesc = newDescription.trim();
 
     try {
       setIsSavingDescription(true);
-      await updateSwitchPort(device.id, targetPort.port_id, updates);
-      setPorts((prev) =>
-        prev.map((p) => (p.port_id === targetPort.port_id ? { ...p, description: newDescription } : p))
-      );
-      if (selectedPort?.port_id === targetPort.port_id) {
-        setSelectedPort((prev) => (prev ? { ...prev, description: newDescription } : null));
-        setEditDesc(newDescription);
+      // 1. Execute the configuration command on the device via the operations API (real SSH or simulator)
+      let opRes: any = null;
+      try {
+        opRes = await executeDeviceOperation(
+          device.id,
+          'set_description',
+          targetPort.port_id,
+          { description: cleanDesc }
+        );
+      } catch (opErr) {
+        console.warn('executeDeviceOperation note:', opErr);
       }
+
+      // 2. Also persist via updateSwitchPort (which updates DB and applies CLI command)
+      try {
+        await updateSwitchPort(device.id, targetPort.port_id, {
+          description: cleanDesc,
+        });
+      } catch (putErr) {
+        if (!opRes?.success) {
+          throw putErr;
+        }
+      }
+
+      // 3. Update local ports state and selected port view
+      setPorts((prev) =>
+        prev.map((p) =>
+          p.port_id === targetPort.port_id || p.name === targetPort.port_id
+            ? { ...p, description: cleanDesc }
+            : p
+        )
+      );
+      if (
+        selectedPort &&
+        (selectedPort.port_id === targetPort.port_id || selectedPort.name === targetPort.port_id)
+      ) {
+        setSelectedPort((prev) => (prev ? { ...prev, description: cleanDesc } : null));
+        setEditDesc(cleanDesc);
+      }
+
+      device.has_unsaved_changes = true;
       setDescriptionModalPort(null);
       if (onPortUpdated) onPortUpdated();
     } catch (err: any) {
       console.error('Failed to set port description:', err);
+      alert(
+        (isEn
+          ? 'Failed to set port description: '
+          : 'خطا در اعمال توضیحات پورت: ') + (err.message || err)
+      );
     } finally {
       setIsSavingDescription(false);
     }
@@ -1741,6 +1777,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
           <PortDescriptionModal
             isOpen={!!descriptionModalPort}
             onClose={() => setDescriptionModalPort(null)}
+            onMinimize={() => setDescriptionModalPort(null)}
             onConfirm={handleConfirmSetDescription}
             port={descriptionModalPort}
             device={device}

@@ -203,13 +203,16 @@ export async function updateSwitchPort(
   deviceId: string,
   portId: string,
   updates: Partial<SwitchPort>
-): Promise<{ port: SwitchPort; message: string }> {
+): Promise<{ port: SwitchPort; message: string; success?: boolean; cli_output?: string }> {
   const res = await fetch(`${API_BASE}/devices/${deviceId}/ports/${encodeURIComponent(portId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
-  if (!res.ok) throw new Error('Failed to update port');
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || errData.message || 'Failed to update port');
+  }
   return res.json();
 }
 

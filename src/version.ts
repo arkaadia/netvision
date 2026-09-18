@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.73.0';
+export const APP_VERSION = '1.73.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.73.1',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'اتصال کامل بک‌اند و اعمال واقعی توضیحات پورت (Port Description) روی سوئیچ‌های سیسکو و میکروتیک',
+    title_en: 'Backend Integration & Real Device CLI Execution for Port Description on Cisco & MikroTik',
+    changes: [
+      'اتصال کامل مودال تنظیم توضیحات پورت (Set Port Description) به اندپوینت عملیات سخت‌افزاری (/api/devices/:id/operations) و اعمال مستقیم دستورات CLI روی سوئیچ.',
+      'تولید هوشمند دستورات پیکربندی Cisco IOS (دستور interface X / description ... یا no description) و MikroTik RouterOS (/interface set comment=...).',
+      'بهبود اندپوینت /api/devices/:dev_id/ports/:port_id برای رمزگشایی صحیح نام پورت‌های دارای اسلش (/ یا %2F) و اعمال خودکار دستورات روی سخت‌افزار واقعی یا شبیه‌ساز.',
+      'افزودن دکمه مینیمایز (Universal Modal Minimization) و پشتیبانی از دو زبان انگلیسی و فارسی در مودال تنظیم دیسکریپشن پورت.'
+    ],
+    changes_en: [
+      'Connected Set Port Description modal to the hardware operations backend endpoint (/api/devices/:id/operations) for physical device CLI execution.',
+      'Smart CLI command generation for both Cisco IOS (interface X / description ... or no description) and MikroTik RouterOS (/interface set comment=...).',
+      'Enhanced /api/devices/:dev_id/ports/:port_id endpoint to properly decode slash-containing interface names and execute CLI commands directly.',
+      'Added Universal Modal Minimization button and full bilingual English/Persian localization to Port Description modal.'
+    ]
+  },
   {
     version: '1.73.0',
     releaseDate: '2026-09-17',

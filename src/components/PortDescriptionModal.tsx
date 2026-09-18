@@ -3,6 +3,7 @@ import {
   FileText,
   Tag,
   X,
+  Minus,
   CheckCircle2,
   Loader2,
   Copy,
@@ -18,6 +19,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 export interface PortDescriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onMinimize?: () => void;
   onConfirm: (description: string) => Promise<void> | void;
   port: SwitchPort | null;
   device: Device;
@@ -27,6 +29,7 @@ export interface PortDescriptionModalProps {
 export const PortDescriptionModal: React.FC<PortDescriptionModalProps> = ({
   isOpen,
   onClose,
+  onMinimize,
   onConfirm,
   port,
   device,
@@ -71,9 +74,31 @@ export const PortDescriptionModal: React.FC<PortDescriptionModalProps> = ({
     { labelEn: 'WAN Gateway', labelFa: 'مسیریاب اینترنت / WAN', val: 'WAN Gateway Link' },
   ];
 
-  // Generate Cisco CLI syntax for preview
+  const isMikroTik = device?.platform?.toLowerCase().includes('mikrotik') || false;
+
+  // Generate Cisco / MikroTik CLI syntax for preview
   const generateCommand = () => {
     const cleanDesc = description.trim();
+    if (isMikroTik) {
+      if (cleanDesc) {
+        return [
+          `[admin@${devName}] > /interface set [find name="${portId}"] comment="${cleanDesc}"`,
+          `[admin@${devName}] > /interface print where name="${portId}"`,
+          `Flags: D - dynamic, X - disabled, R - running`,
+          ` #    NAME               TYPE      ACTUAL-MTU  COMMENT`,
+          ` 0  R ${portId}         ether     1500        ${cleanDesc}`
+        ].join('\n');
+      } else {
+        return [
+          `[admin@${devName}] > /interface set [find name="${portId}"] comment=""`,
+          `[admin@${devName}] > /interface print where name="${portId}"`,
+          `Flags: D - dynamic, X - disabled, R - running`,
+          ` #    NAME               TYPE      ACTUAL-MTU  COMMENT`,
+          ` 0  R ${portId}         ether     1500        `
+        ].join('\n');
+      }
+    }
+
     if (cleanDesc) {
       return [
         `${devName}# configure terminal`,
@@ -150,14 +175,31 @@ export const PortDescriptionModal: React.FC<PortDescriptionModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer disabled:opacity-50"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onMinimize && (
+              <button
+                id="port-description-modal-minimize-btn"
+                type="button"
+                onClick={onMinimize}
+                disabled={isLoading}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition cursor-pointer disabled:opacity-50"
+                title={isEn ? 'Minimize' : 'کوچک‌سازی (مینیمایز)'}
+                aria-label="Minimize"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              id="port-description-modal-close-btn"
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer disabled:opacity-50"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -251,12 +293,14 @@ export const PortDescriptionModal: React.FC<PortDescriptionModalProps> = ({
             </div>
           </div>
 
-          {/* Cisco CLI Command Syntax Preview Box */}
+          {/* CLI Command Syntax Preview Box */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-300 flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-                {isEn ? 'Cisco IOS Command Preview:' : 'پیش‌نمایش دستورات سیسکو (Cisco IOS CLI):'}
+                {isMikroTik
+                  ? (isEn ? 'MikroTik RouterOS Command Preview:' : 'پیش‌نمایش دستورات میکروتیک (RouterOS CLI):')
+                  : (isEn ? 'Cisco IOS Command Preview:' : 'پیش‌نمایش دستورات سیسکو (Cisco IOS CLI):')}
               </span>
               <button
                 type="button"

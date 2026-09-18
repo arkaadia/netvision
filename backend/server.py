@@ -8,7 +8,7 @@ import random
 import uuid
 from typing import Dict, Any, List, Optional
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 
 # Ensure current and parent directories are in sys.path before any relative or package imports
 _current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1989,7 +1989,28 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
 
             # Reflect state update on internal port object only if device succeeded
             ports = data.get("ports", {}).get(dev_id, [])
-            target_port = next((p for p in ports if p.get("port_id") == interface), None)
+
+            def match_port_flexible(p, target_id):
+                if not p or not target_id:
+                    return False
+                t_raw = str(target_id).strip()
+                t_norm = t_raw.lower().replace(" ", "")
+                p_id = str(p.get("port_id", "")).lower().replace(" ", "")
+                p_name = str(p.get("name", "")).lower().replace(" ", "")
+                if p_id == t_norm or p_name == t_norm or p_id == t_raw.lower() or p_name == t_raw.lower():
+                    return True
+                for full, short in [("gigabitethernet", "gi"), ("tengigabitethernet", "te"), ("fastethernet", "fa"), ("ethernet", "eth")]:
+                    t_f = t_norm.replace(short, full)
+                    p_f = p_id.replace(short, full)
+                    if t_f == p_f:
+                        return True
+                    t_s = t_norm.replace(full, short)
+                    p_s = p_id.replace(full, short)
+                    if t_s == p_s:
+                        return True
+                return False
+
+            target_port = next((p for p in ports if match_port_flexible(p, interface)), None)
             if target_port:
                 if operation in ("disable_interface", "shutdown"):
                     target_port["admin_status"] = "disabled"
@@ -2009,8 +2030,11 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 elif operation == "port_sec_disable":
                     target_port["port_security_enabled"] = False
                 elif operation == "set_description":
-                    target_port["description"] = params.get("description", "")
-                save_data(data)
+                    target_port["description"] = (params.get("description") or "").strip()
+
+            device["has_unsaved_changes"] = True
+            device["last_modified_time"] = time.strftime("%H:%M:%S")
+            save_data(data)
 
             self._send_json(200, {
                 "success": True,
@@ -3037,16 +3061,40 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/devices/") and "/ports/" in path:
             # /api/devices/:dev_id/ports/:port_id
-            parts = path.split("/")
-            dev_id = parts[3]
-            port_id = parts[5]
+            after_dev = path[len("/api/devices/"):]
+            dev_id = after_dev.split("/ports/")[0].strip()
+            raw_port_id = after_dev.split("/ports/")[1].strip()
+            port_id = unquote(raw_port_id).strip()
 
             ports = data.get("ports", {}).get(dev_id, [])
-            port = next((p for p in ports if p["port_id"] == port_id or p["name"] == port_id), None)
+            device = next((d for d in data["devices"] if d["id"] == dev_id), None)
+
+            def match_port_flexible(p, target_id):
+                if not p or not target_id:
+                    return False
+                t_raw = str(target_id).strip()
+                t_norm = t_raw.lower().replace(" ", "")
+                p_id = str(p.get("port_id", "")).lower().replace(" ", "")
+                p_name = str(p.get("name", "")).lower().replace(" ", "")
+                if p_id == t_norm or p_name == t_norm or p_id == t_raw.lower() or p_name == t_raw.lower():
+                    return True
+                for full, short in [("gigabitethernet", "gi"), ("tengigabitethernet", "te"), ("fastethernet", "fa"), ("ethernet", "eth")]:
+                    t_f = t_norm.replace(short, full)
+                    p_f = p_id.replace(short, full)
+                    if t_f == p_f:
+                        return True
+                    t_s = t_norm.replace(full, short)
+                    p_s = p_id.replace(full, short)
+                    if t_s == p_s:
+                        return True
+                return False
+
+            port = next((p for p in ports if match_port_flexible(p, port_id) or match_port_flexible(p, raw_port_id)), None)
             if not port:
-                self._send_json(404, {"error": "Port not found"})
+                self._send_json(404, {"error": f"Port '{port_id}' not found on device '{dev_id}'"})
                 return
 
+            cli_output = ""
             # Update port properties (admin_status, status, mode, vlan, allowed_vlans, speed, description)
             if "admin_status" in body:
                 port["admin_status"] = body["admin_status"]
@@ -3064,8 +3112,23 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 port["speed"] = body["speed"]
             if "connected_device" in body:
                 port["connected_device"] = body["connected_device"]
+
+            # If description is provided, update state and execute CLI command on physical/simulated device
             if "description" in body:
-                port["description"] = body["description"]
+                clean_desc = str(body["description"]).strip()
+                port["description"] = clean_desc
+                if device:
+                    try:
+                        platform = device.get("platform", "cisco_ios_xe")
+                        driver = get_driver(platform, device.get("connection_mode", "simulator"))
+                        target_iface = port.get("port_id") or port.get("name") or port_id
+                        cli_cmd = driver.generate_action_cli("set_description", target_iface, {"description": clean_desc})
+                        require_real = device.get("connection_mode") != "simulator"
+                        exec_res = connection_manager.execute_command(device, cli_cmd, require_real=require_real)
+                        cli_output = exec_res.get("output", "")
+                    except Exception as e:
+                        print(f"[SetPortDescription Direct CLI Note] {e}")
+
             if "port_security_enabled" in body:
                 port["port_security_enabled"] = bool(body["port_security_enabled"])
             if "port_security_max_mac" in body:
@@ -3095,13 +3158,17 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 port["port_security_learned_macs"] = []
 
             # Mark device as having unsaved running-config changes (needs write memory)
-            device = next((d for d in data["devices"] if d["id"] == dev_id), None)
             if device:
                 device["has_unsaved_changes"] = True
                 device["last_modified_time"] = time.strftime("%H:%M:%S")
 
             save_data(data)
-            self._send_json(200, {"port": port, "message": f"پیکربندی پورت {port_id} با موفقیت به‌روزرسانی شد."})
+            self._send_json(200, {
+                "success": True,
+                "port": port,
+                "cli_output": cli_output,
+                "message": f"پیکربندی پورت {port_id} با موفقیت به‌روزرسانی شد."
+            })
             return
 
         if path.startswith("/api/devices/"):

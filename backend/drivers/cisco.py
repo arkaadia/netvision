@@ -81,8 +81,11 @@ class CiscoDriver(NetworkDeviceDriver):
         elif action == "port_sec_disable":
             return f"configure terminal\ninterface {interface}\n no switchport port-security\nexit\nexit"
         elif action == "set_description":
-            desc = params.get("description", "")
-            return f"configure terminal\ninterface {interface}\n description {desc}\nexit\nexit"
+            desc = (params.get("description") or "").strip()
+            if desc:
+                return f"configure terminal\ninterface {interface}\n description {desc}\nexit\nexit"
+            else:
+                return f"configure terminal\ninterface {interface}\n no description\nexit\nexit"
         elif action == "save_config":
             return "copy running-config startup-config"
         return f"# Cisco command for {action} on {interface}"
