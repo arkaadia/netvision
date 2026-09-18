@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
 import { fetchDevicePorts, updateSwitchPort, writeMemory, batchUpdateSwitchPorts, executeDeviceOperation } from '../services/api';
@@ -60,6 +60,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   const [editPortSecConfiguredMac, setEditPortSecConfiguredMac] = useState('');
   const [editPortSecViolation, setEditPortSecViolation] = useState<'shutdown' | 'restrict' | 'protect'>('shutdown');
   const [isSaving, setIsSaving] = useState(false);
+  const editSectionRef = useRef<HTMLDivElement>(null);
 
   // Cisco Port Config / Batch Apply Confirmation Modal state
   const [portConfigConfirmModal, setPortConfigConfirmModal] = useState<{
@@ -611,6 +612,12 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
     setEditPortSecConfiguredMac(port.port_security_configured_mac || '');
     setEditPortSecViolation(port.port_security_violation || 'shutdown');
     setIsEditing(true);
+
+    setTimeout(() => {
+      if (editSectionRef.current) {
+        editSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 60);
   };
 
   // Called when user clicks "ذخیره در سوئیچ" -> opens Cisco confirmation modal first
@@ -897,8 +904,8 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
             ) : ports.length === 0 ? (
               <div className="py-6 text-center text-slate-500 text-xs">{isEn ? 'No active ports recorded.' : 'پورت فعالی ثبت نشده است.'}</div>
             ) : (
-              <div className="switch-faceplate-chassis rounded-xl p-3 border border-slate-800 shadow-inner">
-                <div className="switch-faceplate-grid rounded-lg px-2.5 pb-2.5 pt-7 overflow-x-auto border border-slate-850">
+              <div className="switch-faceplate-chassis rounded-xl p-3 border border-slate-800 shadow-inner relative z-10">
+                <div className="switch-faceplate-grid rounded-lg px-3 pb-3 pt-[88px] overflow-x-auto border border-slate-850 relative">
                   <div className="flex flex-wrap gap-2 justify-start min-w-[500px]">
                     {ports.map((port, pIdx) => {
                       const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
@@ -1096,7 +1103,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
 
           {/* Detailed Inspector & Editor Card */}
           {activeSelectedPort && (
-            <div className="port-sub-card bg-white/5 border border-white/10 rounded-xl p-3.5 shadow-sm">
+            <div ref={editSectionRef} id="port-inspector-editor-section" className="port-sub-card bg-white/5 border border-white/10 rounded-xl p-3.5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">

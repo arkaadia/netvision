@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Server, Cable, Zap, Shield, ShieldCheck, Search, Filter, Edit3, Save, CheckCircle2, AlertCircle, AlertTriangle, Layers } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
 import { fetchDevicePorts, updateSwitchPort, batchUpdateSwitchPorts, executeDeviceOperation } from '../services/api';
@@ -52,7 +52,14 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
   const [editAllowedVlans, setEditAllowedVlans] = useState('');
   const [editConnected, setEditConnected] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  // Cisco Port Security Single Port Edit state
+  const [editPortSecEnabled, setEditPortSecEnabled] = useState(false);
+  const [editPortSecMaxMac, setEditPortSecMaxMac] = useState(1);
+  const [editPortSecMode, setEditPortSecMode] = useState<'sticky' | 'configured' | 'dynamic'>('sticky');
+  const [editPortSecConfiguredMac, setEditPortSecConfiguredMac] = useState('');
+  const [editPortSecViolation, setEditPortSecViolation] = useState<'shutdown' | 'restrict' | 'protect'>('shutdown');
   const [isSaving, setIsSaving] = useState(false);
+  const editSectionRef = useRef<HTMLDivElement>(null);
 
   // Cisco Port Config / Batch Apply Confirmation Modal state
   const [portConfigConfirmModal, setPortConfigConfirmModal] = useState<{
@@ -62,7 +69,7 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
   } | null>(null);
   const [isExecutingPortConfig, setIsExecutingPortConfig] = useState(false);
 
-  const [filterMode, setFilterMode] = useState<'all' | 'up' | 'down' | 'trunk' | 'access'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'up' | 'down' | 'trunk' | 'access' | 'port_sec'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [portLoadError, setPortLoadError] = useState<string | null>(null);
   const [isLivePorts, setIsLivePorts] = useState<boolean>(false);
@@ -197,6 +204,11 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
       allowed_vlans: editAllowedVlans,
       connected_device: editConnected,
       description: editDesc,
+      port_security_enabled: editPortSecEnabled,
+      port_security_max_mac: editPortSecMaxMac,
+      port_security_mode: editPortSecMode,
+      port_security_configured_mac: editPortSecConfiguredMac,
+      port_security_violation: editPortSecViolation,
     };
 
     setPortConfigConfirmModal({
@@ -267,6 +279,11 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
           allowed_vlans: updates.allowed_vlans,
           connected_device: updates.connected_device,
           description: updates.description,
+          port_security_enabled: updates.port_security_enabled === true || updates.port_security_enabled === 'enabled',
+          port_security_max_mac: updates.port_security_max_mac,
+          port_security_mode: updates.port_security_mode,
+          port_security_configured_mac: updates.port_security_configured_mac,
+          port_security_violation: updates.port_security_violation,
         });
 
         setPorts((prev) =>
@@ -475,10 +492,21 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
     setEditAdminStatus(port.admin_status);
     setEditMode(port.mode);
     setEditVlan(port.vlan);
-    setEditAllowedVlans(port.allowed_vlans);
-    setEditConnected(port.connected_device);
+    setEditAllowedVlans(port.allowed_vlans || '');
+    setEditConnected(port.connected_device || '');
     setEditDesc(port.description || '');
+    setEditPortSecEnabled(!!port.port_security_enabled);
+    setEditPortSecMaxMac(port.port_security_max_mac || 1);
+    setEditPortSecMode(port.port_security_mode || 'sticky');
+    setEditPortSecConfiguredMac(port.port_security_configured_mac || '');
+    setEditPortSecViolation(port.port_security_violation || 'shutdown');
     setIsEditing(true);
+
+    setTimeout(() => {
+      if (editSectionRef.current) {
+        editSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 60);
   };
 
   const filteredPorts = ports.filter((p) => {
@@ -486,13 +514,15 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
     if (filterMode === 'down' && p.status !== 'down') return false;
     if (filterMode === 'trunk' && p.mode !== 'trunk') return false;
     if (filterMode === 'access' && p.mode !== 'access') return false;
+    if (filterMode === 'port_sec' && !p.port_security_enabled) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
         p.port_id.toLowerCase().includes(q) ||
         p.connected_device.toLowerCase().includes(q) ||
         String(p.vlan).includes(q) ||
-        p.mode.toLowerCase().includes(q)
+        p.mode.toLowerCase().includes(q) ||
+        (p.port_security_configured_mac && p.port_security_configured_mac.toLowerCase().includes(q))
       );
     }
     return true;
@@ -654,8 +684,8 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
             )}
           </div>
         ) : (
-          <div className="switch-faceplate-chassis rounded-xl p-3 border border-slate-800 shadow-inner">
-            <div className="switch-faceplate-grid rounded-lg p-2.5 overflow-x-auto border border-slate-850">
+          <div className="switch-faceplate-chassis rounded-xl p-3 border border-slate-800 shadow-inner relative z-10">
+            <div className="switch-faceplate-grid rounded-lg px-3 pb-3 pt-[88px] overflow-x-auto border border-slate-850 relative">
               <div className="flex flex-wrap gap-2 justify-start min-w-[500px]">
                 {ports.map((port, pIdx) => {
                   const pId = port.port_id || (port as any).port || port.name || `port-${pIdx + 1}`;
@@ -860,7 +890,7 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
 
       {/* Selected Port Detailed Card */}
       {selectedPort && (
-        <div className="port-sub-card bg-white/5 border border-white/10 rounded-xl p-3.5 shadow-sm space-y-3">
+        <div ref={editSectionRef} id="port-management-editor-section" className="port-sub-card bg-white/5 border border-white/10 rounded-xl p-3.5 shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white shadow-md">
@@ -1024,7 +1054,8 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
             </div>
           ) : (
             /* Edit Mode */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
               <div>
                 <label className="block text-slate-300 mb-1 text-[11px] font-medium">{isEn ? 'Port Mode:' : 'حالت پورت (Port Mode):'}</label>
                 <select
@@ -1094,6 +1125,231 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
                 />
               </div>
             </div>
+
+            {/* Cisco Layer 2 Port Security Configuration Suite */}
+            <div className="mt-3.5 border border-white/10 rounded-xl overflow-hidden bg-white/5">
+              <div className="p-3 bg-gradient-to-r from-emerald-950/40 via-slate-900/40 to-black/30 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">
+                        {isEn ? 'Cisco Layer 2 Port Security Suite' : 'تنظیمات امنیت پورت لایه ۲ سیسکو (Port Security)'}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                        802.1X / MAC Guard
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {isEn ? 'Control and restrict MAC addresses on access ports to prevent MAC Flooding and unauthorized access' : 'محدودسازی و کنترل دسترسی مک آدرس‌های متصل به پورت به منظور جلوگیری از حملات MAC Flooding و نفوذ غیرمجاز'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  id="port-mgmt-security-toggle-btn"
+                  onClick={() => {
+                    const nextState = !editPortSecEnabled;
+                    setEditPortSecEnabled(nextState);
+                    if (nextState && editMode === 'trunk') {
+                      setEditMode('access');
+                    }
+                  }}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs border cursor-pointer ${
+                    editPortSecEnabled
+                      ? 'port-sec-btn-active bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                  }`}
+                  title={isEn ? 'Toggle Cisco Layer 2 Port Security' : 'فعال یا غیرفعال‌سازی سکیوریتی پورت لایه ۲ سیسکو'}
+                >
+                  {editPortSecEnabled ? (
+                    <ShieldCheck className="w-4 h-4 text-white shrink-0" />
+                  ) : (
+                    <Shield className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                  <span className={editPortSecEnabled ? 'text-white' : 'text-slate-300'}>
+                    {editPortSecEnabled ? (isEn ? 'Enabled (switchport port-security)' : 'فعال (switchport port-security)') : (isEn ? 'Enable Port Security' : 'فعال‌سازی Port Security')}
+                  </span>
+                </button>
+              </div>
+
+              {editPortSecEnabled && (
+                <div className="p-3.5 bg-black/20 space-y-3.5">
+                  {editMode === 'trunk' && (
+                    <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/40 text-amber-200 text-[11px] flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        <b>{isEn ? 'Cisco Best Practice Warning:' : 'هشدار استاندارد سیسکو:'}</b> {isEn ? 'Port Security can only be configured on Access ports. Mode will be switched to Access automatically.' : 'Port Security معمولاً روی پورت‌های اکسس (Access) اعمال می‌شود. پورت به طور خودکار به مود Access منتقل خواهد شد.'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                    {/* 1. Definition Mode Dropdown */}
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                        {isEn ? 'MAC Definition Mode:' : 'تعریف مود یادگیری مک (MAC Definition Mode):'}
+                      </label>
+                      <select
+                        value={editPortSecMode}
+                        onChange={(e) => setEditPortSecMode(e.target.value as 'sticky' | 'configured' | 'dynamic')}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/15 text-white text-xs font-mono font-medium focus:border-indigo-400"
+                      >
+                        <option value="sticky" className="bg-slate-900 text-white">{isEn ? 'Sticky (Auto Learn & Save to Running-Config)' : 'استیکی (Sticky - چسبنده خودکار در Running-Config)'}</option>
+                        <option value="configured" className="bg-slate-900 text-white">{isEn ? 'Configured (Manual Static Definition)' : 'کانفیگور (Configured - تعریف دستی و استاتیک مک)'}</option>
+                        <option value="dynamic" className="bg-slate-900 text-white">{isEn ? 'Dynamic (Learn in CAM Memory)' : 'داینامیک (Dynamic - یادگیری در CAM بدون ذخیره دائم)'}</option>
+                      </select>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                        {editPortSecMode === 'sticky' && (isEn ? 'MACs are learned dynamically upon connection and saved into running-config.' : 'مک‌ها با اتصال اولین کلاینت‌ها خودکار فراگرفته شده و در Running-Config درج می‌شوند.')}
+                        {editPortSecMode === 'configured' && (isEn ? 'Administrator explicitly specifies permitted hardware MAC address.' : 'ادمین مک آدرس مجاز سخت‌افزاری را به صورت صریح تعریف می‌کند.')}
+                        {editPortSecMode === 'dynamic' && (isEn ? 'MACs are learned dynamically in CAM memory and reset upon reload.' : 'مک‌ها به طور موقت در جدول حافظه CAM ثبت شده و پس از ریبوت بازنشانی می‌شوند.')}
+                      </p>
+                    </div>
+
+                    {/* 2. Maximum MACs */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-300 font-semibold text-[11px]">
+                          {isEn ? 'Maximum MACs:' : 'حداکثر مک آدرس‌های مجاز (Maximum MACs):'}
+                        </label>
+                        <span className="text-[11px] font-mono font-bold text-indigo-300 bg-indigo-500/20 border border-indigo-500/30 px-1.5 py-0.5 rounded">
+                          {editPortSecMaxMac} {isEn ? 'MAC(s)' : 'آدرس'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={1024}
+                          value={editPortSecMaxMac}
+                          onChange={(e) => setEditPortSecMaxMac(Math.max(1, Math.min(1024, Number(e.target.value) || 1)))}
+                          className="w-20 px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/15 text-white text-xs font-mono text-center font-bold focus:border-indigo-400"
+                          dir="ltr"
+                        />
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setEditPortSecMaxMac(1)}
+                            className={`px-2 py-1 rounded-lg border transition cursor-pointer ${
+                              editPortSecMaxMac === 1
+                                ? 'bg-indigo-600 text-white border-indigo-500 font-bold'
+                                : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                            }`}
+                            title={isEn ? 'Single host standard' : 'استاندارد سیسکو برای پورت تک کاربر'}
+                          >
+                            {isEn ? '1 MAC' : '۱ مک'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditPortSecMaxMac(2)}
+                            className={`px-2 py-1 rounded-lg border transition cursor-pointer ${
+                              editPortSecMaxMac === 2
+                                ? 'bg-indigo-600 text-white border-indigo-500 font-bold'
+                                : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                            }`}
+                            title={isEn ? 'Ideal for PC + IP Phone' : 'مناسب برای PC به همراه IP Phone سیسکو'}
+                          >
+                            {isEn ? '2 MACs' : '۲ مک'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditPortSecMaxMac(5)}
+                            className={`px-2 py-1 rounded-lg border transition cursor-pointer ${
+                              editPortSecMaxMac === 5
+                                ? 'bg-indigo-600 text-white border-indigo-500 font-bold'
+                                : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                            }`}
+                          >
+                            {isEn ? '5 MACs' : '۵ مک'}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {isEn ? 'CLI equivalent:' : 'دستور معادل:'} <code className="font-mono text-indigo-300 bg-indigo-500/20 px-1 rounded border border-indigo-500/30" dir="ltr">switchport port-security maximum {editPortSecMaxMac}</code>
+                      </p>
+                    </div>
+
+                    {/* 3. Violation Action */}
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                        {isEn ? 'Violation Action:' : 'سیاست برخورد با تخلف (Violation Action):'}
+                      </label>
+                      <select
+                        value={editPortSecViolation}
+                        onChange={(e) => setEditPortSecViolation(e.target.value as 'shutdown' | 'restrict' | 'protect')}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-black/30 border border-white/15 text-white text-xs font-mono font-medium focus:border-indigo-400"
+                      >
+                        <option value="shutdown" className="bg-slate-900 text-white">{isEn ? 'Shutdown (Err-Disable - Cisco Default)' : 'Shutdown (خاموشی خودکار و Err-Disable - پیش‌فرض سیسکو)'}</option>
+                        <option value="restrict" className="bg-slate-900 text-white">{isEn ? 'Restrict (Drop packet + Log & SNMP Trap)' : 'Restrict (مسدودسازی بسته متخلف + ارسال لاگ و SNMP Trap)'}</option>
+                        <option value="protect" className="bg-slate-900 text-white">{isEn ? 'Protect (Silent drop without logging)' : 'Protect (مسدودسازی بی‌صدا بدون ثبت در لاگ)'}</option>
+                      </select>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                        {editPortSecViolation === 'shutdown' && (isEn ? 'If threshold exceeded, interface enters err-disabled state immediately.' : 'در صورت عبور از سقف مک، پورت فورا خاموش شده و نیاز به shut / no shut دارد.')}
+                        {editPortSecViolation === 'restrict' && (isEn ? 'Port stays up, unauthorized packets dropped, violation counter increments with syslog.' : 'پورت روشن می‌ماند اما فریم‌های مک غیرمجاز دور ریخته شده و کانتر تخلف افزایش می‌یابد.')}
+                        {editPortSecViolation === 'protect' && (isEn ? 'Unauthorized traffic dropped silently without counter increment or trap.' : 'ترافیک غیرمجاز دور ریخته می‌شود بدون ارسال اعلان یا افزایش کانتر.')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {editPortSecMode === 'configured' && (
+                    <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-[260px]">
+                        <label className="block text-white font-bold mb-1 text-[11px]">
+                          {isEn ? 'Configured Static MAC:' : 'مک آدرس مجاز استاتیک (Configured Static MAC):'}
+                        </label>
+                        <input
+                          type="text"
+                          value={editPortSecConfiguredMac}
+                          onChange={(e) => setEditPortSecConfiguredMac(e.target.value)}
+                          placeholder={isEn ? 'e.g. 0050.56a1.2b3c or 00:50:56:A1:2B:3C' : 'مثال: 0050.56a1.2b3c یا 00:50:56:A1:2B:3C'}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs font-mono text-left font-semibold focus:border-indigo-400"
+                          dir="ltr"
+                        />
+                      </div>
+                      <div className="pt-4 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditPortSecConfiguredMac('0050.56a1.2b3c')}
+                          className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[11px] font-mono transition cursor-pointer"
+                        >
+                          {isEn ? 'Sample MAC' : 'مک نمونه'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditPortSecConfiguredMac('')}
+                          className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-rose-300 border border-white/10 text-[11px] transition cursor-pointer"
+                        >
+                          {isEn ? 'Clear' : 'پاک کردن'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Real-time Cisco IOS CLI Preview */}
+                  <div className="p-3 rounded-xl bg-slate-950/90 text-emerald-400 font-mono text-[11px] text-left overflow-x-auto shadow-inner border border-white/10" dir="ltr">
+                    <div className="text-slate-400 text-[10px] mb-1 flex items-center justify-between border-b border-white/10 pb-1">
+                      <span># Cisco IOS-XE Port Security Running-Config Preview:</span>
+                      <span className="text-indigo-300 font-sans">{isEn ? 'Auto-generated CLI' : 'تولید خودکار دستورات سیسکو'}</span>
+                    </div>
+                    <div className="text-slate-300">{currentDevice?.name || 'Switch'}(config-if)# switchport mode access</div>
+                    <div>{currentDevice?.name || 'Switch'}(config-if)# switchport port-security</div>
+                    <div>{currentDevice?.name || 'Switch'}(config-if)# switchport port-security maximum {editPortSecMaxMac}</div>
+                    {editPortSecMode === 'sticky' ? (
+                      <div className="text-amber-300">{currentDevice?.name || 'Switch'}(config-if)# switchport port-security mac-address sticky</div>
+                    ) : editPortSecMode === 'configured' ? (
+                      <div className="text-cyan-300">
+                        {currentDevice?.name || 'Switch'}(config-if)# switchport port-security mac-address {editPortSecConfiguredMac || '0050.56a1.2b3c'}
+                      </div>
+                    ) : null}
+                    <div>{currentDevice?.name || 'Switch'}(config-if)# switchport port-security violation {editPortSecViolation}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+            </div>
           )}
         </div>
       )}
@@ -1155,6 +1411,15 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
               >
                 {t('ports_filter_access')}
               </button>
+              <button
+                onClick={() => setFilterMode('port_sec')}
+                className={`px-2.5 py-1 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${
+                  filterMode === 'port_sec' ? 'bg-emerald-600/40 text-emerald-300 font-bold border border-emerald-500/40 shadow-xs' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Shield className="w-3 h-3" />
+                <span>{isEn ? 'Port Security' : 'امنیت پورت'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1195,6 +1460,7 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
                 <th className="p-3.5">{t('ports_col_mode')}</th>
                 <th className="p-3.5">{t('ports_col_vlan')}</th>
                 <th className="p-3.5">{t('ports_col_connected')}</th>
+                <th className="p-3.5">{isEn ? 'Port Security' : 'امنیت پورت'}</th>
                 <th className="p-3.5">{t('ports_col_speed')}</th>
                 <th className="p-3.5">{t('ports_col_poe')}</th>
                 <th className="p-3.5 text-center">{t('ports_col_actions')}</th>
@@ -1271,6 +1537,22 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
                   <td className="p-3.5 text-slate-300 font-sans text-xs">
                     {port.connected_device || '-'}
                   </td>
+                  <td className="p-3.5">
+                    {port.port_security_enabled ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span>
+                          {port.port_security_mode === 'sticky'
+                            ? (isEn ? 'Sticky' : 'Sticky')
+                            : port.port_security_mode === 'configured'
+                            ? (isEn ? 'Static' : 'Static')
+                            : (isEn ? 'Dynamic' : 'Dynamic')}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 text-[10px] font-mono">{isEn ? 'Disabled' : 'غیرفعال'}</span>
+                    )}
+                  </td>
                   <td className="p-3.5 text-slate-300">{port.speed}</td>
                   <td className="p-3.5 text-slate-300">{port.poe_power ? `${port.poe_power}W` : 'Off'}</td>
                   <td className="p-3.5 text-center">
@@ -1279,9 +1561,11 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
                         e.stopPropagation();
                         startEdit(port);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 hover:text-cyan-300 text-slate-200 text-xs font-sans transition border border-white/10 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 hover:text-white text-xs font-sans transition border border-indigo-500/30 cursor-pointer flex items-center gap-1 mx-auto"
+                      title={isEn ? 'Edit port and scroll to editor' : 'ویرایش پورت و اسکرول به بخش تنظیمات'}
                     >
-                      {t('ports_btn_edit')}
+                      <Edit3 className="w-3 h-3" />
+                      <span>{t('ports_btn_edit')}</span>
                     </button>
                   </td>
                 </tr>

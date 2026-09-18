@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.76.1';
+export const APP_VERSION = '1.77.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.77.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'افزودن سوئیت کامل امنیت پورت لایه ۲ سیسکو به صفحه مدیریت پورت‌ها، اسکرول خودکار به ادیتور و رفع تداخل تولتیپ فیس‌پلیت سوئیچ (Cisco Port Security Suite & Faceplate Tooltip Refinement)',
+    title_en: 'Cisco Layer 2 Port Security Suite in Port Management View, Auto-Scroll to Port Editor, and Switch Faceplate Tooltip Clipping Fix',
+    changes: [
+      'پیاده‌سازی اسکرول نرم و خودکار به بخش تنظیمات پورت (Scroll to Edit Area) با کلیک روی دکمه ادیت پورت از لیست All Switch Ports در مودال پورت سیسکو (PortInspectorModal).',
+      'رفع مشکل رفتن تولتیپ پورت‌های فیس‌پلیت زیر کادر بالایی با افزایش فضای بالای گرید فیس‌پلیت، تصحیح z-index و بهینه‌سازی موقعیت و اندازه پاپ‌آپ وضعیت پورت در NetworkPortSvg.',
+      'افزودن کامل قابلیت اسکرول خودکار به بخش ادیتور با کلیک روی ویرایش پورت در صفحه مدیریت جامع پورت‌ها (PortManagementView).',
+      'تجهیز صفحه مدیریت پورت‌ها (Ports, Trunk/Access & VLAN Monitoring) به سوئیت کامل امنیت پورت لایه ۲ سیسکو (Cisco Layer 2 Port Security Suite) شامل فعال‌سازی/غیرفعال‌سازی، مودهای یادگیری Sticky و Configured و Dynamic، تعیین حداکثر مک مجاز (با پریست‌های ۱، ۲ و ۵ مک)، سیاست‌های برخورد با تخلف (Shutdown و Restrict و Protect)، پیش‌نمایش بلادرنگ فرامین سیسکو IOS-XE، تب فیلتر اختصاصی Port Security و ستون نمایش وضعیت امنیت در جدول پورت‌ها.'
+    ],
+    changes_en: [
+      'Implemented smooth auto-scroll to the port editor section when clicking the edit button for any port in the All Switch Ports list in PortInspectorModal.',
+      'Fixed faceplate port tooltip clipping under the upper border by expanding top clearance of the faceplate grid, optimizing z-index layering, and refining tooltip dimensions in NetworkPortSvg.',
+      'Enabled seamless scroll-to-edit behavior when editing ports from the table in the full Port Management view (PortManagementView).',
+      'Integrated the complete Cisco Layer 2 Port Security Suite into PortManagementView, featuring toggle controls, Sticky/Configured/Dynamic MAC definition modes, maximum MAC threshold presets (1, 2, 5 MACs), violation actions (Shutdown, Restrict, Protect), real-time Cisco IOS-XE CLI preview, dedicated Port Security filter tab, and security status column in the ports table.'
+    ]
+  },
   {
     version: '1.76.1',
     releaseDate: '2026-09-18',

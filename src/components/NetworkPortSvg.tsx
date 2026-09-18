@@ -92,30 +92,30 @@ export const NetworkPortSvg: React.FC<NetworkPortSvgProps> = ({
           onContextMenu(e);
         }
       }}
-      className={`group relative flex flex-col items-center p-1 rounded-lg transition-all select-none ${statusClasses}`}
+      className={`group relative flex flex-col items-center p-1 rounded-lg transition-all select-none hover:z-[80] ${statusClasses}`}
       title={`${port.name || rawPortId} (${rawPortId}) - ${statusDisplay} - Speed: ${speedDisplay} - Mode: ${modeDisplay} - VLAN ${vlanDisplay}${port.connected_device ? ` - ${port.connected_device}` : ''}${port.description ? ` [Description: ${port.description}]` : ''}`}
       style={{ width: '56px' }}
     >
       {/* Interactive Hover Tooltip Popup with Speed and Specs */}
-      <div className="opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-150 transform group-hover:-translate-y-1 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 px-2.5 py-1.5 bg-slate-900/95 text-slate-100 border border-slate-700/90 rounded-lg shadow-2xl whitespace-nowrap flex flex-col items-center gap-0.5 backdrop-blur-md text-[10px]">
+      <div className="opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-150 transform group-hover:-translate-y-0.5 absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-[100] px-2 py-1 bg-slate-950 text-slate-100 border border-slate-700 rounded-lg shadow-2xl whitespace-nowrap flex flex-col items-center gap-0.5 backdrop-blur-md text-[9.5px]">
         <div className="flex items-center gap-1.5 font-bold font-mono">
           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ledColor, filter: ledGlow }} />
           <span>{port.name || rawPortId}</span>
-          <span className={`text-[8.5px] px-1 py-0.2 rounded font-semibold ${isUp ? 'bg-emerald-500/20 text-emerald-300' : isDisabled ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
+          <span className={`text-[8px] px-1 py-0.2 rounded font-semibold ${isUp ? 'bg-emerald-500/20 text-emerald-300' : isDisabled ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
             {statusDisplay}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] text-slate-300">
+        <div className="flex items-center gap-1.5 text-[8.5px] text-slate-300">
           <span className="text-cyan-300 font-bold font-mono">{speedDisplay}</span>
           <span className="text-slate-500">•</span>
           <span className="text-slate-300">{isTrunk ? 'Trunk' : `VLAN ${vlanDisplay}`}</span>
         </div>
         {port.connected_device && port.connected_device !== 'Disconnected' && (
-          <div className="text-[8.5px] text-slate-400 max-w-[150px] truncate">
+          <div className="text-[8px] text-slate-400 max-w-[150px] truncate">
             {port.connected_device}
           </div>
         )}
-        <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700/90 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
+        <div className="w-2 h-2 bg-slate-950 border-r border-b border-slate-700 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
       </div>
       {/* Top Header: Link Status LED & Mode Indicator */}
       <div className="flex items-center justify-between w-full px-1 mb-0.5">
