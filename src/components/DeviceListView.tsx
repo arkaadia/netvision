@@ -31,6 +31,7 @@ import { syncDeviceNotesFromDatabase } from '../services/settingsStorage';
 import { EditDeviceModal } from './EditDeviceModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { DeviceStickyNoteModal } from './DeviceStickyNoteModal';
+import { CiscoWriteConfirmModal } from './CiscoWriteConfirmModal';
 
 interface DeviceListViewProps {
   devices: Device[];
@@ -69,6 +70,7 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
   const [pingingId, setPingingId] = useState<string | null>(null);
   const [writingId, setWritingId] = useState<string | null>(null);
+  const [confirmWriteDevice, setConfirmWriteDevice] = useState<Device | null>(null);
   const [internalEditingDevice, setInternalEditingDevice] = useState<Device | null>(null);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
   const [deviceNotes, setDeviceNotes] = useState<Record<string, CustomTopologyStickyNote>>({});
@@ -689,10 +691,13 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
 
                               {dev.has_unsaved_changes && onWriteMemory && (
                                 <button
-                                  onClick={() => handleWriteMem(dev.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmWriteDevice(dev);
+                                  }}
                                   disabled={writingId === dev.id}
                                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-500/50 font-bold text-[10px] transition shadow-sm cursor-pointer"
-                                  title={isEn ? 'Execute "write memory" to commit running-config to NVRAM' : 'اجرای دستور write memory و ذخیره دائم در NVRAM'}
+                                  title={isEn ? 'Review changes & write running-config to NVRAM' : 'مشاهده تغییرات و ذخیره دائم در NVRAM'}
                                 >
                                   <Save className="w-2.5 h-2.5" />
                                   <span>{writingId === dev.id ? (isEn ? 'Writing...' : 'در حال رایت...') : 'Write Memory'}</span>
@@ -1001,9 +1006,9 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                 {menuAnchor.device.has_unsaved_changes && onWriteMemory && (
                   <button
                     onClick={() => {
-                      const devId = menuAnchor.device.id;
+                      const dev = menuAnchor.device;
                       setMenuAnchor(null);
-                      handleWriteMem(devId);
+                      setConfirmWriteDevice(dev);
                     }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 hover:bg-amber-500/15 transition ${
                       isRtl ? 'text-right' : 'text-left'
@@ -1110,6 +1115,21 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
             setIsNoteModalOpen(false);
             setSelectedNoteDevice(null);
           }}
+        />
+      )}
+
+      {/* Cisco Write Memory Confirmation Modal */}
+      {confirmWriteDevice && (
+        <CiscoWriteConfirmModal
+          isOpen={!!confirmWriteDevice}
+          onClose={() => setConfirmWriteDevice(null)}
+          onConfirm={async () => {
+            const devId = confirmWriteDevice.id;
+            await handleWriteMem(devId);
+            setConfirmWriteDevice(null);
+          }}
+          device={confirmWriteDevice}
+          isWriting={writingId === confirmWriteDevice.id}
         />
       )}
     </div>

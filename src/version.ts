@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.74.0';
+export const APP_VERSION = '1.74.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.74.1',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'یکپارچه‌سازی مودال تایید رایت در لیست مدیریت تجهیزات شبکه (Inventory Write Confirmation Modal)',
+    title_en: 'Write Memory Confirmation Modal Integration in Network Equipment Inventory',
+    changes: [
+      'یکپارچه‌سازی کامل مودال تایید رایت حافظه دائم (Confirm Save Configuration to NVRAM) در لیست تجهیزات شبکه (Network Equipment Inventory & Management).',
+      'با کلیک روی دکمه Write Memory در سطر تجهیز یا از طریق منوی عملیات سه‌نقطه (Context Menu)، مودال تایید اختصاصی باز شده و تغییرات ذخیره‌نشده، پورت‌های تغییریافته و پیش‌نمایش دستورات خط فرمان سیسکو نمایش داده می‌شود.',
+      'جلوگیری از رایت ناخواسته و افزایش ایمنی پیکربندی در سرتاسر بخش‌های پرتال.'
+    ],
+    changes_en: [
+      'Fully integrated the "Confirm Save Configuration to NVRAM" modal into the Network Equipment Inventory & Management view.',
+      'Clicking the "Write Memory" button on any device row or via the 3-dots action menu now opens the confirmation modal with detailed pending changes, modified interfaces, and CLI script preview.',
+      'Prevents accidental configuration overwrites and ensures comprehensive configuration safety across all portal views.'
+    ]
+  },
   {
     version: '1.74.0',
     releaseDate: '2026-09-18',
