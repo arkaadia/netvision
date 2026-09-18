@@ -1,108 +1,126 @@
-# Modal Development Guidelines & Universal Minimization Pattern
-# دستورالعمل و استانداردهای طراحی مودال و قابلیت مینیمایز سراسری
+# Modal Development Guidelines & Universal Standards
+# دستورالعمل و استانداردهای جامع و اجباری طراحی مودال‌ها
 
 > **مخاطب**: تمامی توسعه‌دهندگان، معماران سیستم و هوش مصنوعی‌های فعال در پروژه NetTopology.
-> **هدف**: تضمین یکپارچگی، عدم تداخل پنجره‌ها، پشتیبانی همیشگی از مینیمایز شدن به نوار داک (Dock)، دسته‌بندی تب‌ها در صورت تراکم پنجره‌ها، و پشتیبانی ۱۰۰٪ دو زبانه (فارسی و انگلیسی).
+> **هدف**: تضمین یکپارچگی کامل، پشتیبانی همیشگی از مینیمایز شدن به نوار داک (Dock)، پشتیبانی از فول‌اسکرین با حفظ حریم فوتر، انطباق کامل با تم‌های روشن و تیره، چندزبانگی صددرصدی و تولتیپ‌های راهنمای سه‌بخشی بدون سرریز از کادر صفحه.
 
 ---
 
-## ۱. معماری کلی سیستم مودال‌ها (Architecture Overview)
+## ۱. قوانین پنج‌گانه اجباری برای هر مودال (Mandatory Universal 5 Rules)
 
-در این پروژه، مودال‌ها به دو دسته کلی تقسیم می‌شوند:
-1. **مودال‌های ابزاری (Network Tools Suite)**: مانند IP Subnetting, Password Generator, Port Scanner, Host Checker و...
-2. **مودال‌های عملیاتی و سیستمی (Standard/System Modals)**: مانند Add Device, Edit Device, Port Inspector, Terminal Workspace, Apply Template, Release Notes و هر مودال جدیدی که در آینده اضافه می‌شود.
+هر مودالی که در سیستم ساخته می‌شود باید بلااستثنا قواعد پنج‌گانه زیر را برآورده کند:
 
-هر دو گروه به صورت متحد در **نوار ابزار هوشمند پایین صفحه (`ToolsDock.tsx`)** قرار می‌گیرند و ویژگی‌های زیر را دارند:
-- تب‌ها به صورت افقی کنار هم چیده می‌شوند و هرگز روی هم نمی‌افتند.
-- امکان بستن یا بازگرداندن پنجره از روی نوار داک وجود دارد.
-- در صورتی که تعداد تب‌ها افزایش یابد یا عرض صفحه پر شود، دکمه دسته‌بندی هوشمند (Categorized Dropdown Pill) فعال می‌شود تا کاربر بتواند تب‌ها را بر اساس نوع (`tools`, `device`, `terminal`, `system`, `config`) فیلتر کند یا همه را یکجا ببندد یا بازیابی نماید.
+### ۱. دکمه‌های سه‌گانه کنترلی هدر (بستن، مینیمایز، تمام‌صفحه)
+در بخش بالای هدر هر مودال (بخش کنترلی)، باید ۳ دکمه تعبیه شده باشد:
+- **دکمه بستن (`Close` - آیکون `X` از `lucide-react`)**: جهت بستن قطعی پنجره و ریست وضعیت در صورت نیاز.
+- **دکمه مینیمایز (`Minimize` - آیکون `Minus` از `lucide-react`)**: جهت کوچک‌سازی پنجره به نوار ابزار پایین (`ToolsDock`) با حفظ کامل مقادیر و وضعیت.
+- **دکمه تمام‌صفحه و بازگشت (`Fullscreen / Restore` - آیکون‌های `Maximize2` و `Minimize2` از `lucide-react`)**: جهت تغییر وضعیت بین اندازه استاندارد و تمام‌صفحه (`isMaximized`).
+> **توصیه معماری**: برای راحتی و استانداردسازی، از کامپوننت آماده `<ModalHeaderControls />` یا `<ModalHeader />` از مسیر `src/components/common/` استفاده کنید.
+
+### ۲. رفتار دقیق حالت تمام‌صفحه و حفظ مرز فوتر (Footer Clearance)
+هنگامی که مودال در حالت تمام‌صفحه (`isMaximized === true`) قرار می‌گیرد:
+- لبه پایینی مودال باید **دقیقاً تا لبه بالایی فوتر (فاصله `bottom-8` از پایین صفحه)** امتداد یابد.
+- مودال به هیچ وجه نباید زیر فوتر برود یا روی نوار داک ابزارها بیفتد و نباید از کادر دید خارج شود.
+- استایل‌های پیشنهادی برای کانتینر اصلی مودال در حالت تمام‌صفحه:
+  ```tsx
+  // کانتینر بیرونی overlay / wrapper:
+  className={`fixed z-50 transition-all duration-200 ${
+    isMaximized
+      ? 'top-0 left-0 right-0 bottom-8 p-0'
+      : 'inset-0 p-3 sm:p-6 flex items-center justify-center bg-black/60 backdrop-blur-sm'
+  }`}
+
+  // پنجره مودال داخلی:
+  className={`flex flex-col transition-all duration-200 ${
+    isMaximized
+      ? 'w-full h-full max-w-none max-h-full rounded-none border-none'
+      : 'w-full max-w-4xl max-h-[88vh] rounded-2xl border shadow-2xl'
+  }`}
+  ```
+
+### ۳. انطباق کامل با تم‌های تیره و روشن (Dark / Light Theme Adaptability)
+- ظاهر مودال، هدر، بدنه، کارت‌ها، فیلدهای ورودی و فوتر آن باید با تم فعال سیستم (`isLightMode`) ۱۰۰٪ سازگار و منطبق باشد.
+- **تم تیره (Dark Mode)**:
+  - پس‌زمینه: `bg-slate-950` یا `bg-slate-900/95`
+  - کادرها: `border-slate-800` یا `border-cyan-500/30`
+  - متون: `text-slate-100`، `text-white` و عناوین `text-cyan-400`
+- **تم روشن (Light Mode)**:
+  - پس‌زمینه: `bg-white` یا `bg-slate-50` با تفکیک بصری عالی
+  - کادرها: `border-slate-200` یا `border-slate-300`
+  - متون: `text-slate-800`، `text-slate-900` با کنتراست ارگونومیک (بدون استفاده از خاکستری محو روی پس‌زمینه روشن)
+
+### ۴. رعایت کامل زبان انتخابی پنل (Strict i18n & Zero Persian in English Mode)
+- تمام عناوین، راهنماها، دکمه‌ها، برچسب فیلدها، پیام‌های اعتبارسنجی و تولتیپ‌ها باید دقیقاً متناسب با `language` / `isEn` نمایش داده شوند.
+- هنگامی که زبان روی انگلیسی است (`isEn === true`)، نمایش هرگونه کاراکتر یا متن فارسی اکیداً ممنوع است.
+- جهت نوشتاری (`dir="ltr"` برای انگلیسی و `dir="rtl"` برای فارسی) باید رعایت شود.
+
+### ۵. تجهیز آیتم‌ها به راهنمای سه‌بخشی Info و جلوگیری قطعی از خروج از ۴ جهت صفحه
+در کنار آیتم‌ها، فیلدها و گزینه‌های مهم مودال، باید آیکون راهنما (`<FieldInfoTooltip />`) تعبیه شود. این راهنما باید دقیقاً شامل ۳ بخش شفاف باشد:
+1. **این چیست؟ (What is it?)**: تعریف ماهیت مفهوم یا پارامتر.
+2. **چرا لازم است؟ (Why is it needed?)**: توضیح علت استفاده و اهمیت مهندسی آن در شبکه.
+3. **مثال کاربردی (Practical Example / Recommended Value)**: ارائه نمونه مقدار یا سناریوی واقعی.
+
+**قانون جلوگیری از خروج از کادر صفحه (4-Way Boundary Clamping)**:
+- پاپ‌آپ راهنما باید با `createPortal` در `document.body` رندر شود تا در اسکرول داخلی مودال یا کانتینرهای والد بریده (clip) نشود.
+- با الگوریتم سنجش هوشمند ویوپورت (Auto-Flip):
+  - در صورت نبود فضای کافی در پایین، به بالای دکمه سوییچ کند.
+  - از هر چهار جهت (بالا، پایین، چپ و راست) حداقل ۱۲ پیکسل فاصله ایمن با لبه مانیتور حفظ شود تا هرگز از صفحه خارج نگردد.
 
 ---
 
-## ۲. قوانین ساخت یک مودال جدید (Step-by-Step Implementation Rules)
+## ۲. استفاده از کامپوننت‌های آماده (Reusable Components)
 
-هنگام طراحی یا ایجاد هر مودال جدید در سیستم، مراحل زیر را **دقیقاً** رعایت کنید:
+برای حفظ بالاترین سرعت توسعه و یکنواختی، از کامپوننت‌های استاندارد موجود در `/src/components/common/` استفاده کنید:
 
-### مرحله ۱: تعریف اینترفیس Props مودال
-کامپوننت مودال شما باید حتماً پراپ‌های `onMinimize` و `onClose` و وضعیت دوزبانه یا تم را بپذیرد:
-
-```typescript
-export interface MyNewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onMinimize?: () => void; // حتماً اختیاری برای پشتیبانی از داک
-  isLightMode?: boolean;
-  // سایر پراپ‌های داده‌ای
-}
-```
-
-### مرحله ۲: قراردادن دکمه مینیمایز در هدر مودال
-در هدر مودال، از کامپوننت آماده `ModalHeaderControls` یا ساختار هدر استاندارد استفاده کنید:
-
+### ۱. دکمه‌های کنترل هدر مودال (`ModalHeaderControls` یا `ModalHeader`):
 ```tsx
-import { ModalHeaderControls } from './common/ModalHeaderControls';
-// یا با دکمه مستقیم:
-import { X, Minus } from 'lucide-react';
+import { ModalHeaderControls } from '../common/ModalHeaderControls';
 
-<div className="flex items-center gap-1.5">
-  {onMinimize && (
-    <button
-      type="button"
-      onClick={onMinimize}
-      className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 transition cursor-pointer"
-      title={isEn ? 'Minimize to bottom dock' : 'مینیمایز به نوار پایین'}
-      aria-label={isEn ? 'Minimize' : 'مینیمایز'}
-    >
-      <Minus className="w-4 h-4" />
-    </button>
-  )}
-  <button
-    type="button"
-    onClick={onClose}
-    className="p-1.5 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
-    aria-label="Close"
-  >
-    <X className="w-4 h-4" />
-  </button>
-</div>
+<ModalHeaderControls
+  onClose={onClose}
+  onMinimize={onMinimize}
+  onMaximizeToggle={() => setIsMaximized(!isMaximized)}
+  isMaximized={isMaximized}
+  isLightMode={isLightMode}
+  isEn={isEn}
+/>
 ```
 
-### مرحله ۳: ثبت آیدی و متادیتا در `ToolsDock.tsx`
-در فایل `/src/components/tools/ToolsDock.tsx`:
-1. شناسه مودال را به تایپ `StandardModalId` اضافه کنید:
-   ```typescript
-   export type StandardModalId =
-     | 'add_device'
-     | 'edit_device'
-     | 'my_new_modal'; // آیدی جدید شما
-   ```
-2. آیکون مربوطه را در آبجکت `STANDARD_MODAL_ICONS` ثبت کنید.
+### ۲. پاپ‌آپ راهنمای سه‌بخشی آیتم‌ها (`FieldInfoTooltip`):
+```tsx
+import { FieldInfoTooltip } from '../common/FieldInfoTooltip';
 
-### مرحله ۴: اتصال در `App.tsx`
-در فایل ریشه `/src/App.tsx`:
-1. شرایط نمایش را با بررسی وضعیت مینیمایز تنظیم کنید:
-   ```tsx
-   <MyNewModal
-     isOpen={isMyNewModalOpen && !isModalMinimized('my_new_modal')}
-     onClose={() => handleCloseStandardModal('my_new_modal')}
-     onMinimize={() =>
-       handleMinimizeStandardModal({
-         id: 'my_new_modal',
-         labelEn: 'My New Modal',
-         labelFa: 'عنوان فارسی مودال',
-         badge: 'Info',
-         category: 'system', // یکی از دسته‌های: 'tools' | 'device' | 'terminal' | 'system' | 'config'
-       })
-     }
-   />
-   ```
-2. در تابع `handleRestoreStandardModal` و `handleCloseStandardModal` متغیرهای استیت مربوطه را مدیریت کنید.
+<label className="flex items-center text-xs font-semibold">
+  <span>{isEn ? 'Keepalive Interval' : 'فاصله ارسال Keepalive'}</span>
+  <FieldInfoTooltip
+    title={isEn ? 'Keepalive Interval' : 'فاصله ارسال Keepalive'}
+    whatIsIt={isEn ? 'Time interval between heartbeat packets.' : 'فاصله زمانی بین ارسال بسته‌های اعلام زنده بودن اتصال.'}
+    whyNeeded={isEn ? 'Detects dead peers promptly and maintains NAT state.' : 'برای تشخیص به موقع قطعی ارتباط و باز نگه‌داشتن جدول NAT روتر.'}
+    example={isEn ? '10s (default for WireGuard / IPsec)' : '10s (پیش‌فرض برای وایرگارد و آی‌پی‌سک)'}
+    isLightMode={isLightMode}
+    isEn={isEn}
+  />
+</label>
+```
 
 ---
 
-## ۳. چک‌لیست اعتبارسنجی کیفی (Quality Checklist)
-- [ ] دکمه خط فاصله / تفریق (`Minus` از `lucide-react`) کنار دکمه بستن (`X`) قرار گرفته است.
-- [ ] با کلیک روی مینیمایز، پنجره بسته شده و تب آن در داک پایین صفحه ظاهر می‌شود.
-- [ ] کلیک روی تب در داک، مودال را مجدداً با حفظ تمامی ورودی‌ها و فرم‌ها باز می‌کند.
-- [ ] دکمه بستن در تب داک، پنجره را به صورت کامل می‌بندد.
-- [ ] هیچ متن فارسی هاردکدشده‌ای در حالت انگلیسی نمایش داده نمی‌شود (`isEn` رعایت شده است).
+## ۳. ثبت مودال در نوار ابزار پایین (`ToolsDock.tsx`) و `App.tsx`
+
+1. **در `src/components/tools/ToolsDock.tsx`**:
+   - شناسه مودال را به تایپ `StandardModalId` اضافه کنید.
+   - آیکون مربوطه را در `STANDARD_MODAL_ICONS` ثبت کنید.
+
+2. **در `src/App.tsx`**:
+   - پراپ‌های `onClose`، `onMinimize` و وضعیت فعال بودن را تنظیم کنید.
+
+---
+
+## ۴. چک‌لیست اعتبارسنجی کیفیت مودال (Modal Quality Checklist)
+- [ ] دکمه‌های بستن (`X`)، مینیمایز (`Minus`) و تمام‌صفحه (`Maximize2` / `Minimize2`) هر سه در هدر وجود دارند.
+- [ ] در حالت تمام‌صفحه، لبه پایینی مودال دقیقاً مماس بر لبه بالایی فوتر (`bottom-8`) است و زیر فوتر نمی‌رود.
+- [ ] رنگ‌بندی و پس‌زمینه مودال در هر دو تم تیره و روشن خوانا و ارگونومیک است.
+- [ ] در حالت زبان انگلیسی، حتی یک کلمه فارسی نمایش داده نمی‌شود.
+- [ ] فیلدها دارای راهنمای Info با سه بخش (چیست، چرا لازم است، مثال کاربردی) هستند.
+- [ ] کادر Info در هیچ اندازه‌ای از صفحه نمایش از ۴ جهت کادر خارج نمی‌شود.
+

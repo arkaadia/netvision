@@ -10,9 +10,32 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.80.2';
+export const APP_VERSION = '1.81.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.81.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'تصویب و استقرار قوانین پنج‌گانه اجباری طراحی و معماری سراسری مودال‌ها و کامپوننت راهنمای سه‌بخشی',
+    title_en: 'Mandatory 5-Pillar Universal Modal Architectural Standards and 3-Part Field Info Tooltip Suite',
+    changes: [
+      'تصویب قانون قطعی حضور دکمه‌های سه‌گانه بستن (Close)، مینیمایز (Minimize) و تمام‌صفحه (Fullscreen) در هدر تمامی مودال‌ها.',
+      'الزام رفتار تمام‌صفحه به گونه‌ای که لبه پایینی مودال دقیقاً مماس بر لبه بالایی فوتر (bottom-8) باشد و به زیر فوتر یا خارج از صفحه نرود.',
+      'تضمین انطباق کامل و کنتراست ارگونومیک استایل مودال‌ها با هر دو تم تاریک و روشن (Dark / Light mode adaptive).',
+      'تضمین چندزبانگی صددرصدی و ممنوعیت قطعی نمایش متن فارسی در حالت انگلیسی در تمامی بخش‌های مودال.',
+      'تجهیز آیتم‌ها به راهنمای سه‌بخشی Info (شامل: این چیست، چرا لازم است، و مثال کاربردی) با محافظت ضدسرریز از ۴ جهت صفحه و رندر پورتال در body.',
+      'افزودن قوانین جامع به AGENTS.md، GEMINI.md و MODAL_GUIDELINES.md و ایجاد کامپوننت اشتراکی FieldInfoTooltip.'
+    ],
+    changes_en: [
+      'Codified mandatory rule requiring tri-button header controls (Close, Minimize, and Fullscreen) on all modal windows.',
+      'Enforced strict fullscreen boundary constraint where modal bottom edge extends exactly to the top boundary of the footer (bottom-8) without overlapping the footer dock or slipping offscreen.',
+      'Guaranteed 100% theme compatibility and high ergonomic contrast across both Dark and Light modes for all modal components.',
+      'Enforced strict bidirectional localization prohibiting any Persian characters in English mode and providing fluent Persian in Persian mode.',
+      'Equipped items and fields with structured 3-part Info Tooltips (What is it, Why needed, and Practical Example) featuring 4-way viewport boundary clamping via React Portal.',
+      'Documented universal standards across AGENTS.md, GEMINI.md, and MODAL_GUIDELINES.md, and deployed the reusable common FieldInfoTooltip component.'
+    ]
+  },
   {
     version: '1.80.2',
     releaseDate: '2026-09-18',
