@@ -2856,7 +2856,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 "enable_password": enable_pass,
                 "ssh_status": "authenticated",
                 "serial_number": body.get("serial_number", ""),
-                "master_session_id": body.get("master_session_id", "")
+                "master_session_id": body.get("master_session_id", ""),
+                "web_configs": body.get("web_configs", [])
             }
 
             master_sid = body.get("master_session_id")
@@ -3497,7 +3498,7 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 self._send_json(404, {"error": "Device not found"})
                 return
 
-            for k in ["name", "ip", "ssh_host", "connection_protocol", "connection", "platform", "connection_mode", "type", "role", "model", "building", "floor", "unit", "rack", "cdp_enabled", "lldp_enabled", "snmp_community", "is_online", "ssh_port", "ssh_username", "ssh_password", "enable_password", "ssh_status", "total_ports"]:
+            for k in ["name", "ip", "ssh_host", "connection_protocol", "connection", "platform", "connection_mode", "type", "role", "model", "building", "floor", "unit", "rack", "cdp_enabled", "lldp_enabled", "snmp_community", "is_online", "ssh_port", "ssh_username", "ssh_password", "enable_password", "ssh_status", "total_ports", "web_configs"]:
                 if k in body:
                     device[k] = body[k]
             if "ssh_password" in body and body["ssh_password"]:

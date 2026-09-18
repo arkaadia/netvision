@@ -120,6 +120,13 @@ export interface Device {
   vendor?: string;
   master_session_id?: string;
   detected_ports?: SwitchPort[];
+  web_configs?: DeviceWebConfig[];
+}
+
+export interface DeviceWebConfig {
+  id?: string;
+  title: string;
+  url: string;
 }
 
 export interface SwitchPort {

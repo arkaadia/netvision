@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.78.0';
+export const APP_VERSION = '1.79.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.79.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'افزودن امکان تعریف لیست آدرس‌های وب و کنسول‌های مدیریتی تجهیزات (Web Config / iLO / ESXi) و دسترسی سریع در منوی عملیات تجهیزات',
+    title_en: 'Custom Web Config & Management Consoles Suite (iLO / ESXi / Web GUI) with Quick Access in Equipment Actions Menu',
+    changes: [
+      'افزودن بخش مدیریت و تعریف آدرس‌های وب (Web Config / Management Consoles) به صورت لیستی پویا در مودال ثبت تجهیز جدید (AddDeviceModal) و مودال ویرایش تجهیز (EditDeviceModal).',
+      'پشتیبانی از تعریف بی‌شمار آدرس کنسول وب با عنوان و URL مجزا (مانند HP iLO، Dell iDRAC، VMware ESXi، RouterOS WebFig و پنل وب سوییچ‌ها) همراه با دکمه تست باز کردن مستقیم URL.',
+      'افزودن دسترسی سریع به کلیه کنسول‌های وب تعریف‌شده تجهیز در منوی ۳ نقطه عملیات (Action Menu) صفحه مدیریت موجودی تجهیزات شبکه (DeviceListView) با کلیک و هدایت در تب جدید.',
+      'نمایش نشان‌ها و لینک‌های سریع دسترسی به وب‌کانفیگ در ستون آدرس IP جدول تجهیزات شبکه برای تسریع دسترسی مدیران سیستم.',
+      'به‌روزرسانی ساختار مدل داده‌ای Device در فرانت‌اند و بک‌اند پایتون (server.py) برای ثبت و ذخیره‌سازی پایدار فیلد web_configs در دیتابیس تجهیزات.'
+    ],
+    changes_en: [
+      'Added dynamic list management for Web Config and management console URLs in both AddDeviceModal and EditDeviceModal.',
+      'Support defining multiple web console endpoints per device with custom labels and target URLs (e.g. HP iLO, Dell iDRAC, VMware ESXi, RouterOS WebFig, switch Web GUI) along with direct URL preview verification.',
+      'Integrated dedicated Web Config & Consoles section in the 3-dots action menu of Network Equipment Inventory (DeviceListView) for instant one-click opening in a new browser tab.',
+      'Added interactive quick-link badges for configured web consoles directly under the IP address column in the inventory table.',
+      'Updated Device data model in TypeScript types and Python backend (server.py) for persistent storage and retrieval of web_configs in device database.'
+    ]
+  },
   {
     version: '1.78.0',
     releaseDate: '2026-09-18',

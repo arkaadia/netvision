@@ -27,9 +27,13 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
-  Info
+  Info,
+  Globe,
+  ExternalLink,
+  Plus,
+  Trash2,
 } from 'lucide-react';
-import { Device, DeviceType, DevicePlatform, ConnectionMode, SwitchPort } from '../types';
+import { Device, DeviceType, DevicePlatform, ConnectionMode, SwitchPort, DeviceWebConfig } from '../types';
 import { testDeviceConnection, pingDevice, fetchDevicePorts } from '../services/api';
 import { useLanguage } from '../i18n';
 import { getDevicePortComment } from '../data/portSpecs';
@@ -76,6 +80,32 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
   const [cdpEnabled, setCdpEnabled] = useState(true);
   const [lldpEnabled, setLldpEnabled] = useState(true);
   const [snmpCommunity, setSnmpCommunity] = useState('public');
+
+  // Web Config URLs (e.g. iLO, ESXi, RouterOS WebFig, Web GUI)
+  const [webConfigs, setWebConfigs] = useState<DeviceWebConfig[]>([]);
+
+  const handleAddWebConfig = () => {
+    setWebConfigs((prev) => [
+      ...prev,
+      {
+        id: `wc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        title: '',
+        url: '',
+      },
+    ]);
+  };
+
+  const handleUpdateWebConfig = (index: number, field: 'title' | 'url', value: string) => {
+    setWebConfigs((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleRemoveWebConfig = (index: number) => {
+    setWebConfigs((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // SSH / Telnet Credentials
   const [connectionProtocol, setConnectionProtocol] = useState<'ssh' | 'telnet'>('ssh');
@@ -134,6 +164,7 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
     setSshUsername(device.ssh_username || 'admin');
     setSshPassword(device.ssh_password || '');
     setEnablePassword(device.enable_password || '');
+    setWebConfigs(Array.isArray(device.web_configs) ? device.web_configs.map((w) => ({ ...w })) : []);
 
     setSshTestResult(null);
     setPingTestResult(null);
@@ -332,6 +363,12 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
         enable_password: enablePassword,
         ssh_status: sshTestResult?.success ? 'authenticated' : (device.ssh_status || 'configured'),
         ports: discoveredPorts.length > 0 ? discoveredPorts : undefined,
+        web_configs: webConfigs
+          .map((wc) => ({
+            title: wc.title.trim(),
+            url: wc.url.trim(),
+          }))
+          .filter((wc) => wc.url.length > 0),
       } as any);
       onClose();
     } catch (err: any) {
@@ -1506,6 +1543,118 @@ export const EditDeviceModal: React.FC<EditDeviceModalProps> = ({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Web Management & Console URLs (Web Config, iLO, ESXi, RouterOS WebFig, etc.) */}
+            <div className={`p-3.5 rounded-xl border space-y-2.5 transition ${
+              isLightMode ? 'bg-slate-50/90 border-slate-200' : 'bg-slate-800/80 border-slate-700'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                  isLightMode ? 'text-indigo-600' : 'text-indigo-400'
+                }`}>
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>{isEn ? 'Web Management & Console URLs (Web Config):' : 'آدرس‌های وب و کنسول مدیریتی (Web Config):'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddWebConfig}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    isLightMode
+                      ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                      : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30'
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isEn ? 'Add Web URL' : 'افزودن آدرس وب'}</span>
+                </button>
+              </div>
+
+              <p className={`text-[11px] leading-relaxed ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                {isEn
+                  ? 'Define web console links (e.g. HP iLO, Dell iDRAC, VMware ESXi, RouterOS WebFig, Switch Web GUI). These will be directly accessible from the 3-dots action menu in Network Equipment Inventory.'
+                  : 'تعریف لینک‌های کنسول وب تجهیزات (مانند iLO سرور، VMware ESXi، پنل وب روتر/سوییچ، WebFig میکروتیک و...). این آدرس‌ها در منوی ۳ نقطه تجهیزات در دسترس خواهند بود.'}
+              </p>
+
+              {webConfigs.length === 0 ? (
+                <div className={`p-3 rounded-lg border border-dashed text-center text-xs ${
+                  isLightMode ? 'border-slate-300 text-slate-500 bg-white/60' : 'border-slate-700 text-slate-400 bg-slate-900/40'
+                }`}>
+                  <span className="opacity-80">
+                    {isEn ? 'No web configs added yet. Click "Add Web URL" to add iLO, ESXi, or Web GUI links.' : 'هنوز هیچ آدرس وبی افزوده نشده است. برای افزودن آدرس کنسول یا وب تجهیز روی «افزودن آدرس وب» کلیک کنید.'}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {webConfigs.map((wc, idx) => (
+                    <div
+                      key={wc.id || idx}
+                      className={`p-2.5 rounded-lg border flex flex-col sm:flex-row items-stretch sm:items-center gap-2 transition ${
+                        isLightMode ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900/70 border-slate-700'
+                      }`}
+                    >
+                      <div className="w-full sm:w-1/3">
+                        <label className={`block text-[10px] font-medium mb-0.5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                          {isEn ? 'Title / Label:' : 'عنوان (مثال: iLO / ESXi):'}
+                        </label>
+                        <input
+                          type="text"
+                          value={wc.title}
+                          onChange={(e) => handleUpdateWebConfig(idx, 'title', e.target.value)}
+                          placeholder={isEn ? 'e.g. iLO 5 / ESXi Host' : 'مثال: iLO / سرور ESXi / پنل وب'}
+                          className={`w-full px-2.5 py-1 rounded border text-xs focus:outline-none transition ${
+                            isLightMode
+                              ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
+                              : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                          }`}
+                        />
+                      </div>
+
+                      <div className="w-full sm:flex-1">
+                        <label className={`block text-[10px] font-medium mb-0.5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                          {isEn ? 'Web URL / Address:' : 'آدرس اینترنتی وب (URL):'}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={wc.url}
+                            onChange={(e) => handleUpdateWebConfig(idx, 'url', e.target.value)}
+                            placeholder="https://192.168.1.100 یا http://10.0.0.5:8080"
+                            className={`w-full pl-2.5 pr-8 py-1 rounded border text-xs font-mono text-left focus:outline-none transition ${
+                              isLightMode
+                                ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-indigo-600'
+                                : 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500'
+                            }`}
+                            dir="ltr"
+                          />
+                          {wc.url.trim() && (
+                            <a
+                              href={wc.url.startsWith('http://') || wc.url.startsWith('https://') ? wc.url : `https://${wc.url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition`}
+                              title={isEn ? 'Test Open URL' : 'تست باز کردن آدرس'}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end sm:pt-4">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWebConfig(idx)}
+                          className={`p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/15 transition cursor-pointer`}
+                          title={isEn ? 'Remove' : 'حذف'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Discovery Protocols & SNMP */}

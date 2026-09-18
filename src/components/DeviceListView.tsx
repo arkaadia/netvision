@@ -26,6 +26,8 @@ import {
   HardDrive,
   Maximize2,
   X,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 import { Device, DeviceType, CustomTopologyStickyNote } from '../types';
 import { useLanguage } from '../i18n';
@@ -727,6 +729,28 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                             SSH: {dev.ssh_host}:{dev.ssh_port || 22}
                           </div>
                         )}
+                        {Array.isArray(dev.web_configs) && dev.web_configs.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1 font-sans font-normal">
+                            {dev.web_configs.map((wc, wIdx) => {
+                              const fullUrl = wc.url.startsWith('http://') || wc.url.startsWith('https://') ? wc.url : `https://${wc.url}`;
+                              return (
+                                <a
+                                  key={wc.id || wIdx}
+                                  href={fullUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/35 text-sky-300 border border-sky-500/40 text-[10px] transition cursor-pointer"
+                                  title={`${wc.title || 'Web Interface'}: ${wc.url}`}
+                                >
+                                  <Globe className="w-2.5 h-2.5 text-sky-400 shrink-0" />
+                                  <span className="max-w-[85px] truncate">{wc.title || 'Web'}</span>
+                                  <ExternalLink className="w-2 h-2 text-sky-400 shrink-0 opacity-70" />
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
 
                       {/* Location (Building, Floor, Unit, Rack) */}
@@ -881,6 +905,44 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
               </div>
 
               <div className="py-1 space-y-0.5">
+                {/* Web Configs (e.g. iLO, ESXi, RouterOS WebFig, Web GUI) */}
+                {Array.isArray(menuAnchor.device.web_configs) && menuAnchor.device.web_configs.length > 0 && (
+                  <div className="mb-1 border-b border-white/10 pb-1">
+                    <div className="px-3 py-1 text-[10px] font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Globe className="w-3 h-3 text-sky-400" />
+                      <span>{isEn ? 'Web Config & Consoles' : 'کنسول‌های وب و مدیریت'}</span>
+                    </div>
+                    {menuAnchor.device.web_configs.map((wc, idx) => {
+                      const fullUrl = wc.url.startsWith('http://') || wc.url.startsWith('https://') ? wc.url : `https://${wc.url}`;
+                      return (
+                        <a
+                          key={wc.id || idx}
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setMenuAnchor(null)}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium text-sky-200 hover:bg-sky-500/20 hover:text-white transition ${
+                            isRtl ? 'text-right' : 'text-left'
+                          } group/webitem cursor-pointer`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Globe className="w-3.5 h-3.5 text-sky-400 group-hover/webitem:scale-110 transition shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-semibold truncate">
+                                {wc.title.trim() || (isEn ? `Web Interface ${idx + 1}` : `کنسول وب ${idx + 1}`)}
+                              </span>
+                              <span className="text-[10px] text-sky-300/70 font-mono truncate max-w-[170px]" dir="ltr">
+                                {wc.url}
+                              </span>
+                            </div>
+                          </div>
+                          <ExternalLink className="w-3.5 h-3.5 text-sky-400 opacity-60 group-hover/webitem:opacity-100 shrink-0 ml-1.5 rtl:mr-1.5 rtl:ml-0" />
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Cisco CLI Connect */}
                 {(menuAnchor.device.type === 'switch' || menuAnchor.device.type === 'router') && onConnectTerminal && (
                   <button
