@@ -69,6 +69,9 @@ class MikroTikDriver(NetworkDeviceDriver):
             vlan = params.get("vlan", 1)
             # Standard RouterOS VLAN assignment on bridge or sub-interface
             return f"/interface bridge port set [find interface=\"{clean_iface}\"] pvid={vlan}\n/interface vlan add name=\"vlan{vlan}-{clean_iface}\" vlan-id={vlan} interface=\"{clean_iface}\" disabled=no"
+        elif action == "mode_trunk":
+            # Set port to admit-only-vlan-tagged and configure 802.1Q tagged bridge VLAN
+            return f"/interface bridge port set [find interface=\"{clean_iface}\"] frame-types=admit-only-vlan-tagged\n/interface bridge vlan add bridge=bridge tagged=\"{clean_iface}\" vlan-ids=1-4094 comment=\"Trunk mode on {clean_iface}\""
         elif action == "save_config":
             return "# [RouterOS Info] Configurations in MikroTik RouterOS are committed automatically to persistent storage."
         elif action in ("port_sec_enable", "port_sec_disable"):

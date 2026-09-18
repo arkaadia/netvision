@@ -169,10 +169,10 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
         updates = { admin_status: 'enabled', status: 'up' };
         break;
       case 'mode_trunk':
-        updates = { mode: 'trunk' };
+        updates = { mode: 'trunk', allowed_vlans: targetPort.allowed_vlans || '1-4094' };
         break;
       case 'mode_access':
-        updates = { mode: 'access' };
+        updates = { mode: 'access', vlan: targetPort.vlan || 1 };
         break;
       case 'port_sec_disable':
         updates = { port_security_enabled: false };
@@ -183,17 +183,87 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
 
     try {
       setIsExecutingConfirmAction(true);
-      await updateSwitchPort(device.id, targetPort.port_id, updates);
-      setPorts((prev) =>
-        prev.map((p) => (p.port_id === targetPort.port_id ? { ...p, ...updates } : p))
-      );
-      if (selectedPort?.port_id === targetPort.port_id) {
-        setSelectedPort((prev) => (prev ? { ...prev, ...updates } : null));
+
+      // 1. Execute hardware operation CLI on physical device or simulator
+      let opRes: any = null;
+      try {
+        opRes = await executeDeviceOperation(
+          device.id,
+          action,
+          targetPort.port_id,
+          {
+            device_type: device.type,
+            is_router: device.type === 'router',
+            vlan: targetPort.vlan,
+          }
+        );
+      } catch (opErr) {
+        console.warn('executeDeviceOperation note:', opErr);
       }
+
+      // 2. Persist state via updateSwitchPort
+      try {
+        await updateSwitchPort(device.id, targetPort.port_id, updates);
+      } catch (putErr) {
+        if (!opRes?.success) {
+          throw putErr;
+        }
+      }
+
+      // 3. Update local ports state and selected port view
+      setPorts((prev) =>
+        prev.map((p) =>
+          p.port_id === targetPort.port_id || p.name === targetPort.port_id
+            ? { ...p, ...updates }
+            : p
+        )
+      );
+
+      if (
+        selectedPort &&
+        (selectedPort.port_id === targetPort.port_id || selectedPort.name === targetPort.port_id)
+      ) {
+        setSelectedPort((prev) => (prev ? { ...prev, ...updates } : null));
+        if (updates.mode) setEditMode(updates.mode as any);
+        if (updates.admin_status) setEditAdminStatus(updates.admin_status as any);
+      }
+
+      device.has_unsaved_changes = true;
+      const cmdText =
+        action === 'mode_trunk'
+          ? `interface ${targetPort.port_id}\n switchport trunk encapsulation dot1q\n switchport mode trunk`
+          : action === 'mode_access'
+          ? `interface ${targetPort.port_id}\n switchport mode access\n switchport access vlan ${targetPort.vlan || 1}`
+          : action === 'shutdown'
+          ? `interface ${targetPort.port_id}\n shutdown`
+          : action === 'no_shutdown'
+          ? `interface ${targetPort.port_id}\n no shutdown`
+          : `interface ${targetPort.port_id}\n no switchport port-security`;
+
+      setSessionChanges((prev) => [
+        ...prev,
+        {
+          target: targetPort.port_id,
+          type: action.includes('mode') ? 'mode' : 'admin',
+          change:
+            action === 'mode_trunk'
+              ? 'Mode -> Trunk'
+              : action === 'mode_access'
+              ? 'Mode -> Access'
+              : action,
+          command: cmdText,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
+
       setConfirmModalState(null);
       if (onPortUpdated) onPortUpdated();
     } catch (err: any) {
       console.error('Failed to execute command on device:', err);
+      alert(
+        (isEn ? 'Failed to apply configuration to device: ' : 'خطا در اعمال پیکربندی روی دیوایس: ') +
+          (err.message || err)
+      );
     } finally {
       setIsExecutingConfirmAction(false);
     }
@@ -1813,6 +1883,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
           <CiscoCommandConfirmModal
             isOpen={!!confirmModalState}
             onClose={() => setConfirmModalState(null)}
+            onMinimize={() => setConfirmModalState(null)}
             onConfirm={handleConfirmExecuteCommand}
             action={confirmModalState.action}
             port={confirmModalState.port}

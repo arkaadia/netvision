@@ -2251,24 +2251,25 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
 
             if "pending_changes" not in device or not isinstance(device["pending_changes"], list):
                 device["pending_changes"] = []
-            desc_text = f"Interface {port_id}: {operation.replace('_', ' ').title()}"
+            target_port_id = interface or (target_port.get("port_id") if target_port else "interface")
+            desc_text = f"Interface {target_port_id}: {operation.replace('_', ' ').title()}"
             if operation == "set_description":
-                desc_text = f"Interface {port_id}: description \"{params.get('description', '')}\""
+                desc_text = f"Interface {target_port_id}: description \"{params.get('description', '')}\""
             elif operation == "mode_access":
-                desc_text = f"Interface {port_id}: switchport mode access"
+                desc_text = f"Interface {target_port_id}: switchport mode access"
             elif operation == "mode_trunk":
-                desc_text = f"Interface {port_id}: switchport mode trunk"
+                desc_text = f"Interface {target_port_id}: switchport mode trunk"
             elif operation == "shutdown":
-                desc_text = f"Interface {port_id}: shutdown"
+                desc_text = f"Interface {target_port_id}: shutdown"
             elif operation == "no_shutdown":
-                desc_text = f"Interface {port_id}: no shutdown"
+                desc_text = f"Interface {target_port_id}: no shutdown"
             elif operation == "port_sec_enable":
-                desc_text = f"Interface {port_id}: port-security enable"
+                desc_text = f"Interface {target_port_id}: port-security enable"
             elif operation == "port_sec_disable":
-                desc_text = f"Interface {port_id}: port-security disable"
+                desc_text = f"Interface {target_port_id}: port-security disable"
 
             device["pending_changes"].append({
-                "port_id": port_id,
+                "port_id": target_port_id,
                 "type": operation,
                 "description": desc_text,
                 "command": cli_cmd,
@@ -3352,10 +3353,47 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 port["admin_status"] = body["admin_status"]
                 if body["admin_status"] == "disabled":
                     port["status"] = "down"
+                if device:
+                    try:
+                        platform = device.get("platform", "cisco_ios_xe")
+                        driver = get_driver(platform, device.get("connection_mode", "simulator"))
+                        target_iface = port.get("port_id") or port.get("name") or port_id
+                        action_name = "shutdown" if body["admin_status"] == "disabled" else "no_shutdown"
+                        cli_cmd = driver.generate_action_cli(action_name, target_iface, {
+                            "device_type": device.get("type", "switch"),
+                            "is_router": device.get("type") == "router"
+                        })
+                        require_real = device.get("connection_mode") != "simulator"
+                        exec_res = connection_manager.execute_command(device, cli_cmd, require_real=require_real)
+                        cli_output = (cli_output + "\n" + exec_res.get("output", "")).strip()
+                    except Exception as e:
+                        print(f"[SetPortAdminStatus Direct CLI Note] {e}")
+
             if "status" in body and port.get("admin_status") != "disabled":
                 port["status"] = body["status"]
+
             if "mode" in body:
-                port["mode"] = body["mode"]  # "trunk" or "access"
+                new_mode = str(body["mode"]).lower().strip()
+                port["mode"] = new_mode  # "trunk" or "access"
+                if new_mode == "trunk" and not port.get("allowed_vlans"):
+                    port["allowed_vlans"] = "1-4094"
+                if device:
+                    try:
+                        platform = device.get("platform", "cisco_ios_xe")
+                        driver = get_driver(platform, device.get("connection_mode", "simulator"))
+                        target_iface = port.get("port_id") or port.get("name") or port_id
+                        action_name = "mode_trunk" if new_mode == "trunk" else "mode_access"
+                        cli_cmd = driver.generate_action_cli(action_name, target_iface, {
+                            "device_type": device.get("type", "switch"),
+                            "is_router": device.get("type") == "router",
+                            "vlan": port.get("vlan", 1)
+                        })
+                        require_real = device.get("connection_mode") != "simulator"
+                        exec_res = connection_manager.execute_command(device, cli_cmd, require_real=require_real)
+                        cli_output = (cli_output + "\n" + exec_res.get("output", "")).strip()
+                    except Exception as e:
+                        print(f"[SetPortMode Direct CLI Note] {e}")
+
             if "vlan" in body:
                 new_vlan = int(body["vlan"])
                 port["vlan"] = new_vlan

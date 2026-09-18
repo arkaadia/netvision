@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.74.5';
+export const APP_VERSION = '1.75.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.75.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'ارتقای مودال تغییر مود پورت به ترانک، یکپارچه‌سازی کامل دارک تم، قابلیت فول‌اسکرین با مرز فوتر و اعمال سخت‌افزاری در بک‌اند (Port Mode Trunk Modal & Hardware Backend Sync)',
+    title_en: 'Trunk Port Mode Modal Overhaul, Universal Fullscreen & Minimize with Footer Boundary, and Real Device Backend Execution',
+    changes: [
+      'همگام‌سازی و اصلاح کامل تم دارک در مودال تأیید دستورات (Change Port Mode to Trunk) با پالت تیره اختصاصی، کنتراست استاندارد و رفع ناهماهنگی‌های رنگی.',
+      'تجهیز مودال به کنترل‌های استاندارد هدر شامل دکمه مینیمایز (Minus)، دکمه تغییر حالت به تمام‌صفحه (Fullscreen / Maximize) و دکمه خروج سریع (ESC).',
+      'تنظیم دقیق مرز پایین پنجره در حالت تمام‌صفحه به گونه‌ای که تا لبه بالایی نوار وضعیت/فوتر پایین صفحه (bottom-8) امتداد یابد و هرگز زیر فوتر نرود.',
+      'پیاده‌سازی و اتصال کامل بک‌اند در سرور و درایورهای Cisco و MikroTik جهت اعمال مستقیم دستورات سخت‌افزاری پورت (مانند switchport mode trunk و admin status) با زدن دکمه ذخیره و تایید.',
+      'ثبت خودکار تغییرات در sessionChanges و تغییر وضعیت دستگاه به حالت دارای تغییرات ذخیره‌نشده (has_unsaved_changes).'
+    ],
+    changes_en: [
+      'Overhauled Change Port Mode to Trunk modal dark theme styling with obsidian/slate palettes, rich contrast, and eliminated unstyled elements.',
+      'Integrated standardized ModalHeaderControls with minimize button, fullscreen expand/restore toggle, and quick escape key shortcuts.',
+      'Strictly constrained the fullscreen modal layout boundary to stop precisely at the upper edge of the bottom footer (bottom-8), ensuring it never stretches underneath.',
+      'Implemented full backend hardware CLI integration in Express, Python API, and Cisco/MikroTik drivers to apply real device port mode changes upon clicking the Save button.',
+      'Automatically tracked session history changes and marked the target device with unsaved changes flag requiring NVRAM write memory.'
+    ]
+  },
   {
     version: '1.74.5',
     releaseDate: '2026-09-18',

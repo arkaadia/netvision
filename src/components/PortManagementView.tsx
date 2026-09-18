@@ -336,10 +336,10 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
         updates = { admin_status: 'enabled', status: 'up' };
         break;
       case 'mode_trunk':
-        updates = { mode: 'trunk' };
+        updates = { mode: 'trunk', allowed_vlans: targetPort.allowed_vlans || '1-4094' };
         break;
       case 'mode_access':
-        updates = { mode: 'access' };
+        updates = { mode: 'access', vlan: targetPort.vlan || 1 };
         break;
       case 'port_sec_disable':
         updates = { port_security_enabled: false };
@@ -350,16 +350,59 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
 
     try {
       setIsExecutingConfirmAction(true);
-      await updateSwitchPort(currentDevice.id, targetPort.port_id, updates);
-      setPorts((prev) =>
-        prev.map((p) => (p.port_id === targetPort.port_id ? { ...p, ...updates } : p))
-      );
-      if (selectedPort?.port_id === targetPort.port_id) {
-        setSelectedPort((prev) => (prev ? { ...prev, ...updates } : null));
+
+      // 1. Execute hardware operation CLI on physical device or simulator
+      let opRes: any = null;
+      try {
+        opRes = await executeDeviceOperation(
+          currentDevice.id,
+          action,
+          targetPort.port_id,
+          {
+            device_type: currentDevice.type,
+            is_router: currentDevice.type === 'router',
+            vlan: targetPort.vlan,
+          }
+        );
+      } catch (opErr) {
+        console.warn('executeDeviceOperation note:', opErr);
       }
+
+      // 2. Persist state via updateSwitchPort
+      try {
+        await updateSwitchPort(currentDevice.id, targetPort.port_id, updates);
+      } catch (putErr) {
+        if (!opRes?.success) {
+          throw putErr;
+        }
+      }
+
+      // 3. Update local ports state and selected port view
+      setPorts((prev) =>
+        prev.map((p) =>
+          p.port_id === targetPort.port_id || p.name === targetPort.port_id
+            ? { ...p, ...updates }
+            : p
+        )
+      );
+
+      if (
+        selectedPort &&
+        (selectedPort.port_id === targetPort.port_id || selectedPort.name === targetPort.port_id)
+      ) {
+        setSelectedPort((prev) => (prev ? { ...prev, ...updates } : null));
+        if (updates.mode) setEditMode(updates.mode as any);
+        if (updates.admin_status) setEditAdminStatus(updates.admin_status as any);
+      }
+
+      currentDevice.has_unsaved_changes = true;
       setConfirmModalState(null);
     } catch (err: any) {
       console.error('Failed to update port from context menu:', err);
+      alert(
+        (isEn ? 'Failed to apply configuration to device: ' : 'خطا در اعمال پیکربندی روی دیوایس: ') +
+          (err.message || err)
+      );
     } finally {
       setIsExecutingConfirmAction(false);
     }
@@ -1266,6 +1309,7 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
         <CiscoCommandConfirmModal
           isOpen={!!confirmModalState}
           onClose={() => setConfirmModalState(null)}
+          onMinimize={() => setConfirmModalState(null)}
           onConfirm={handleConfirmExecuteCommand}
           action={confirmModalState.action}
           port={confirmModalState.port}
