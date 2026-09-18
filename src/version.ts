@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.74.2';
+export const APP_VERSION = '1.74.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.74.3',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'فعال‌سازی دکمه مینیمایز در لیست تجهیزات و تراز لبه فوتر در حالت فول‌اسکرین (Modal Minimize & Footer Alignment)',
+    title_en: 'Modal Minimize in Device Inventory & Fullscreen Footer Edge Alignment',
+    changes: [
+      'فعال‌سازی دکمه مینیمایز در مودال تایید رایت حافظه دائم (Confirm Save Configuration to NVRAM) در صفحه مدیریت تجهیزات شبکه، و ایجاد تب اختصاصی داک در پایین صفحه جهت بازگردانی سریع پنجره تایید رایت.',
+      'تضمین همیشگی وجود دکمه مینیمایز بر روی هدر مودال تحت تمامی شرایط با فالبک ایمن داخلی.',
+      'اصلاح تراز حالت تمام‌صفحه (Fullscreen): تنظیم کانتینر مودال بر روی bottom-8 تا لبه پایینی مودال دقیقاً مماس بر لبه بالایی فوتر برنامه قرار گیرد و هرگز به زیر فوتر نرود.'
+    ],
+    changes_en: [
+      'Activated the Minimize button on the "Confirm Save Configuration to NVRAM" modal when triggered from the Device Inventory list, adding a dedicated bottom dock chip for quick restoration.',
+      'Guaranteed continuous presence of the minimize control in modal headers under all invocations via a robust internal fallback.',
+      'Corrected fullscreen modal alignment: configured container to bottom-8 so that fullscreen mode aligns flush with the application footer top edge and never overflows underneath it.'
+    ]
+  },
   {
     version: '1.74.2',
     releaseDate: '2026-09-18',

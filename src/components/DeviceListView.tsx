@@ -23,6 +23,9 @@ import {
   Edit3,
   StickyNote,
   Sliders,
+  HardDrive,
+  Maximize2,
+  X,
 } from 'lucide-react';
 import { Device, DeviceType, CustomTopologyStickyNote } from '../types';
 import { useLanguage } from '../i18n';
@@ -71,6 +74,7 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
   const [pingingId, setPingingId] = useState<string | null>(null);
   const [writingId, setWritingId] = useState<string | null>(null);
   const [confirmWriteDevice, setConfirmWriteDevice] = useState<Device | null>(null);
+  const [minimizedWriteDevice, setMinimizedWriteDevice] = useState<Device | null>(null);
   const [internalEditingDevice, setInternalEditingDevice] = useState<Device | null>(null);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
   const [deviceNotes, setDeviceNotes] = useState<Record<string, CustomTopologyStickyNote>>({});
@@ -1123,14 +1127,70 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
         <CiscoWriteConfirmModal
           isOpen={!!confirmWriteDevice}
           onClose={() => setConfirmWriteDevice(null)}
+          onMinimize={() => {
+            setMinimizedWriteDevice(confirmWriteDevice);
+            setConfirmWriteDevice(null);
+          }}
           onConfirm={async () => {
             const devId = confirmWriteDevice.id;
             await handleWriteMem(devId);
             setConfirmWriteDevice(null);
+            setMinimizedWriteDevice(null);
           }}
           device={confirmWriteDevice}
           isWriting={writingId === confirmWriteDevice.id}
         />
+      )}
+
+      {/* Minimized Write Confirmation Dock Tab (Rule 5 Compliance) */}
+      {minimizedWriteDevice && (
+        <div
+          dir={isEn ? 'ltr' : 'rtl'}
+          className={`fixed bottom-10 z-[1100] ${
+            isRtl ? 'right-6' : 'left-6'
+          } flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/95 border border-amber-500/60 shadow-2xl shadow-amber-500/20 text-xs backdrop-blur-xl animate-in slide-in-from-bottom-2 text-slate-100`}
+        >
+          <div className="p-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 shrink-0">
+            <HardDrive className="w-4 h-4 animate-pulse" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-amber-300 text-xs">
+                {isEn ? 'Pending NVRAM Write:' : 'در انتظار رایت در NVRAM:'}
+              </span>
+              <span className="font-mono text-slate-100 text-xs font-bold truncate max-w-[140px]">
+                {minimizedWriteDevice.name}
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {minimizedWriteDevice.ip}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 ml-2 rtl:mr-2 rtl:ml-0 border-l rtl:border-r rtl:border-l-0 border-slate-700/80 pl-2 rtl:pr-2 rtl:pl-0 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmWriteDevice(minimizedWriteDevice);
+                setMinimizedWriteDevice(null);
+              }}
+              className="p-1.5 rounded-lg hover:bg-amber-500/25 text-amber-300 hover:text-white transition cursor-pointer"
+              title={isEn ? 'Restore Confirmation Modal' : 'بازگردانی پنجره تایید رایت'}
+              aria-label={isEn ? 'Restore' : 'بازگردانی'}
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMinimizedWriteDevice(null)}
+              className="p-1.5 rounded-lg hover:bg-red-500/25 text-slate-400 hover:text-red-300 transition cursor-pointer"
+              title={isEn ? 'Dismiss' : 'بستن'}
+              aria-label={isEn ? 'Close' : 'بستن'}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

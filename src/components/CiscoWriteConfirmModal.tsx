@@ -180,7 +180,7 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm transition-all duration-150 ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-[1150] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm transition-all duration-150 ${
         isFullscreen ? 'p-0 overflow-hidden' : 'p-3 sm:p-4 overflow-y-auto'
       }`}
       data-modal-backdrop="true"
@@ -233,7 +233,7 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
 
           <ModalHeaderControls
             onClose={onClose}
-            onMinimize={onMinimize}
+            onMinimize={onMinimize || onClose}
             onMaximizeToggle={() => setIsFullscreen((prev) => !prev)}
             isMaximized={isFullscreen}
             isLightMode={isLight}
