@@ -10,9 +10,24 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.80.1';
+export const APP_VERSION = '1.80.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.80.2',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'حذف تگ‌های تکراری و اضافی بررسی آپدیت (تگ آبی) و اعلان نسخه جدید (تگ قرمز) از هدر بالای مودال تاریخچه نسخه‌ها (ReleaseNotesModal)',
+    title_en: 'Removed Redundant Update Check Tag (Blue) and New Version Tag (Red) from Version History Modal Header',
+    changes: [
+      'حذف تگ دکمه‌ای آبی‌رنگ «بررسی آپدیت» از هدر بالای مودال تاریخچه نسخه‌ها به دلیل وجود دکمه کامل و اختصاصی بررسی آپدیت در فوتر مودال.',
+      'حذف تگ قرمز رنگ نسخه جدید از عنوان بالای مودال به دلیل نمایش بنر جامع و کامل آپدیت در بدنه مودال با تمامی جزئیات تغییرات و امکان نصب.'
+    ],
+    changes_en: [
+      'Removed redundant blue "Check Updates" button tag from the Version History & Release Notes modal top header, as an update check action is already persistently present in the footer.',
+      'Removed duplicate red new-version available badge from the modal top header, as the modal body already displays the complete update ready banner with detailed changelog and installation controls.'
+    ]
+  },
   {
     version: '1.80.1',
     releaseDate: '2026-09-18',

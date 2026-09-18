@@ -129,20 +129,6 @@ export const ReleaseNotesModal: React.FC<ReleaseNotesModalProps> = ({
                 >
                   v{APP_VERSION}
                 </span>
-
-                {hasUpdate && (
-                  <span
-                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-mono font-bold border animate-pulse ${
-                      isLight
-                        ? 'bg-slate-200 text-black border-slate-300 font-extrabold'
-                        : 'bg-rose-500/25 text-rose-300 border-rose-500/40'
-                    }`}
-                    style={{ color: isLight ? '#000000' : undefined }}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                    <span>v{updateInfo?.latestVersion} {t('update_available_badge')}</span>
-                  </span>
-                )}
               </div>
               <p
                 className={`text-xs mt-0.5 ${
@@ -155,25 +141,6 @@ export const ReleaseNotesModal: React.FC<ReleaseNotesModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={async () => {
-                await checkUpdate(false, true);
-              }}
-              disabled={checking}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer border ${
-                isLight
-                  ? 'bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border-cyan-300'
-                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border-cyan-500/30'
-              } disabled:opacity-50`}
-              title={isEn ? 'Check GitHub repository for updates now' : 'بررسی آنی مخزن گیت‌هاب برای نسخه‌های جدید'}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">
-                {checking ? (isEn ? 'Checking...' : 'در حال بررسی...') : (isEn ? 'Check Updates' : 'بررسی آپدیت')}
-              </span>
-            </button>
-
             {onMinimize && (
               <button
                 type="button"
