@@ -1,6 +1,7 @@
 import React from 'react';
 import { Shield, RefreshCw, X, Minus, Lock, Network, Users, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { MikroTikVPNItem, VPNVerificationDetails } from '../../types';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export interface VPNInspectModalProps {
   isOpen: boolean;
@@ -20,9 +21,12 @@ export const VPNInspectModal: React.FC<VPNInspectModalProps> = ({
   isInspectLoading,
   onClose,
   onMinimize,
-  isEn = false,
+  isEn: propIsEn,
   isLightMode = false,
 }) => {
+  const { isEn: contextIsEn } = useLanguage();
+  const isEn = propIsEn !== undefined ? propIsEn : contextIsEn;
+
   if (!isOpen || !vpn) return null;
 
   return (

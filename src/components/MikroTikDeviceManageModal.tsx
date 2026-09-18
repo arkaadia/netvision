@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Minus,
+  Maximize2,
+  Minimize2,
   Cpu,
   Server,
   Layers,
@@ -67,6 +69,7 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
   const [selectedPort, setSelectedPort] = useState<SwitchPort | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'running' | 'disabled' | 'sfp'>('all');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Right-click Context Menu
   const [contextMenu, setContextMenu] = useState<{
@@ -277,9 +280,17 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
   });
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs animate-in fade-in duration-200 ${
+        isMaximized ? 'p-0' : 'p-2 sm:p-4'
+      }`}
+    >
       <div
-        className={`relative w-full max-w-5xl rounded-2xl border shadow-2xl flex flex-col overflow-hidden max-h-[94vh] ${
+        className={`relative flex flex-col overflow-hidden transition-all duration-200 ${
+          isMaximized
+            ? 'w-full h-full max-w-none rounded-none border-none max-h-full'
+            : 'w-full max-w-5xl rounded-2xl border shadow-2xl max-h-[94vh]'
+        } ${
           isLightMode
             ? 'bg-slate-50 border-cyan-500/40 shadow-cyan-900/20 text-slate-800'
             : 'bg-slate-950 border-cyan-500/30 shadow-cyan-950/60 text-slate-100'
@@ -397,6 +408,29 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
             >
               <Terminal className={`w-4 h-4 ${isLightMode ? 'text-cyan-600' : 'text-cyan-400'}`} />
               <span>{isEn ? 'CLI Terminal' : 'کنسول ترمینال'}</span>
+            </button>
+
+            {/* Fullscreen / Exit Fullscreen Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsMaximized(!isMaximized)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                isLightMode
+                  ? 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800'
+              }`}
+              title={
+                isMaximized
+                  ? (isEn ? 'Exit Fullscreen' : 'خروج از حالت تمام صفحه')
+                  : (isEn ? 'Fullscreen' : 'تمام صفحه')
+              }
+              aria-label={
+                isMaximized
+                  ? (isEn ? 'Exit Fullscreen' : 'خروج از حالت تمام صفحه')
+                  : (isEn ? 'Fullscreen' : 'تمام صفحه')
+              }
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
 
             {/* Minimize Button */}
@@ -1032,6 +1066,7 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
               userRole={userRole}
               onMinimize={onMinimize}
               isLightMode={isLightMode}
+              isEn={isEn}
             />
           )}
 

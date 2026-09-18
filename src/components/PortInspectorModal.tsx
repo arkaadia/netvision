@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge, Activity } from 'lucide-react';
+import { X, Minus, Maximize2, Minimize2, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge, Activity } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
 import { fetchDevicePorts, updateSwitchPort, writeMemory, batchUpdateSwitchPorts, executeDeviceOperation } from '../services/api';
 import { NetworkPortSvg } from './NetworkPortSvg';
@@ -39,6 +39,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   const [activeTab, setActiveTab] = useState<'ports' | 'resources'>('ports');
   const [filterMode, setFilterMode] = useState<'all' | 'up' | 'down' | 'trunk' | 'access' | 'port-sec'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Right-click Cisco Context Menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -779,10 +780,21 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   const portSecCount = ports.filter((p) => p.port_security_enabled).length;
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center p-2 sm:p-4 modal-backdrop-blur overflow-y-auto" data-modal-backdrop="true">
+    <div
+      className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center modal-backdrop-blur overflow-y-auto ${
+        isMaximized ? 'p-0' : 'p-2 sm:p-4'
+      }`}
+      data-modal-backdrop="true"
+    >
       <div 
         dir={isEn ? 'ltr' : 'rtl'}
-        className={`port-inspector-modal spatial-glass border border-white/15 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] sm:max-h-[88vh] text-slate-100 ${isEn ? 'text-left' : 'text-right'}`}
+        className={`port-inspector-modal spatial-glass border border-white/15 shadow-2xl overflow-hidden flex flex-col transition-all duration-200 text-slate-100 ${
+          isEn ? 'text-left' : 'text-right'
+        } ${
+          isMaximized
+            ? 'w-full h-full max-w-none rounded-none border-none max-h-full my-0'
+            : 'w-full max-w-5xl rounded-2xl my-auto max-h-[92vh] sm:max-h-[88vh]'
+        }`}
       >
         {/* Header */}
         <div className="px-5 py-3 border-b border-white/10 bg-slate-900/80 flex items-center justify-between shrink-0">
@@ -841,6 +853,25 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                 <span className="font-sans font-bold">{isEn ? 'Cisco Terminal' : 'ترمینال سیسکو'}</span>
               </button>
             )}
+
+            {/* Fullscreen / Exit Fullscreen Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="text-slate-400 hover:text-cyan-300 p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              title={
+                isMaximized
+                  ? (isEn ? 'Exit Fullscreen' : 'خروج از حالت تمام صفحه')
+                  : (isEn ? 'Fullscreen' : 'تمام صفحه')
+              }
+              aria-label={
+                isMaximized
+                  ? (isEn ? 'Exit Fullscreen' : 'خروج از حالت تمام صفحه')
+                  : (isEn ? 'Fullscreen' : 'تمام صفحه')
+              }
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
 
             {onMinimize && (
               <button

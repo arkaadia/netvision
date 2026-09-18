@@ -50,6 +50,7 @@ import {
 import { VPNProtocolForms } from './VPNProtocolForms';
 import { VPNInspectModal } from './VPNInspectModal';
 import { FieldInfoTooltip } from './FieldInfoTooltip';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface MikroTikVPNSuiteProps {
   device: Device;
@@ -65,12 +66,15 @@ type WizardScenario = 'remote_access' | 'site_to_site' | 'tunnel';
 
 export const MikroTikVPNSuite: React.FC<MikroTikVPNSuiteProps> = ({
   device,
-  isEn = false,
+  isEn: propIsEn,
   isLightMode = false,
   userRole = 'admin',
   onMinimize,
   onClose,
 }) => {
+  const { isEn: contextIsEn } = useLanguage();
+  const isEn = propIsEn !== undefined ? propIsEn : contextIsEn;
+
   // Navigation & View Mode
   const [viewMode, setViewMode] = useState<'list' | 'wizard'>('list');
   const [scenario, setScenario] = useState<WizardScenario>('remote_access');

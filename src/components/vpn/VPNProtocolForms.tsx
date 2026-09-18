@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { FieldInfoTooltip } from './FieldInfoTooltip';
 import { VPNType } from '../../types';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export interface VPNProtocolFormsProps {
   selectedVpnType: VPNType;
@@ -187,10 +188,12 @@ export interface VPNProtocolFormsProps {
 }
 
 export const VPNProtocolForms: React.FC<VPNProtocolFormsProps> = (props) => {
+  const { isEn: contextIsEn } = useLanguage();
+  const isEn = props.isEn !== undefined ? props.isEn : contextIsEn;
+
   const {
     selectedVpnType,
     scenario,
-    isEn,
     isLightMode,
 
     l2tpName,

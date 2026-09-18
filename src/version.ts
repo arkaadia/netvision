@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.79.0';
+export const APP_VERSION = '1.80.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.80.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'پشتیبانی کامل از چندزبانگی در تب VPN Suite میکروتیک، رفع خروج پاپ‌آپ‌های Info از کادر صفحه و افزودن قابلیت تمام‌صفحه (Fullscreen) به مودال‌های پورت میکروتیک و سیسکو',
+    title_en: 'Strict Multilingual Support for MikroTik VPN Suite, Boundary-Safe Non-Overflowing Info Tooltips, and Fullscreen Suite for MikroTik & Cisco Port Modals',
+    changes: [
+      'همگام‌سازی کامل زبان در زبانه VPN Suite میکروتیک (MikroTikVPNSuite) با زبان پنل و رفع کامل نمایش متن فارسی در حالت انگلیسی با اتصال به کانتکست زبان.',
+      'بازطراحی کامل ساختار کادرهای راهنما (FieldInfoTooltip) با استفاده از React Portal، محاسبه هوشمند مختصات ویوپورت و قفل دقیق حاشیه‌ها (Viewport Clamping) به گونه‌ای که پنجره توضیحات تحت هیچ شرایطی از هیچ‌یک از جهات صفحه خارج یا بریده نمی‌شود.',
+      'افزودن دکمه سوئیچ به حالت تمام‌صفحه و خروج از آن (Fullscreen / Exit Fullscreen) به هدر مودال پورت میکروتیک (MikroTikDeviceManageModal) و مودال پورت سیسکو (PortInspectorModal).',
+      'تنظیم دقیق لبه پایینی مودال در حالت تمام‌صفحه به گونه‌ای که لبه پایینی روی فوتر و نوار پایین صفحه نیفتد و دقیقاً تا لبه بالایی فوتر امتداد یابد.'
+    ],
+    changes_en: [
+      'Implemented full multi-language localization in MikroTik VPN Suite (MikroTikVPNSuite) synchronizing with panel language and eliminating Persian text in English mode.',
+      'Completely re-engineered FieldInfoTooltip using React Portal with dynamic viewport boundary clamping and auto-flip detection so info popovers never overflow or get clipped from any edge.',
+      'Added dedicated Fullscreen / Exit Fullscreen toggle controls to the headers of both MikroTik Device Manage Modal and Cisco Port Inspector Modal.',
+      'Constrained modal container bounds in maximized/fullscreen mode to strictly align with the top edge of the footer dock without overlapping or overflowing the footer.'
+    ]
+  },
   {
     version: '1.79.0',
     releaseDate: '2026-09-18',

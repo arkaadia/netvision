@@ -69,7 +69,13 @@ export const MikroTikVPNManager: React.FC<MikroTikVPNManagerProps> = ({
           </div>
         </div>
 
-        <MikroTikVPNSuite device={device} userRole={userRole} onMinimize={onMinimize} />
+        <MikroTikVPNSuite
+          device={device}
+          userRole={userRole}
+          onMinimize={onMinimize}
+          isEn={isEn}
+          isLightMode={isLightMode}
+        />
       </div>
     </div>
   );
