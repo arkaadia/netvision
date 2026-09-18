@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Save,
   AlertTriangle,
@@ -178,16 +179,36 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isFullscreen) {
+          setIsFullscreen(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isFullscreen, onClose]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
     <div
-      className={`fixed top-0 left-0 right-0 bottom-8 z-[1150] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm transition-all duration-150 ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-all duration-150 ${
         isFullscreen ? 'p-0 overflow-hidden' : 'p-3 sm:p-4 overflow-y-auto'
       }`}
       data-modal-backdrop="true"
     >
       <div
         dir={isEn ? 'ltr' : 'rtl'}
-        className={`border shadow-2xl flex flex-col transition-all duration-200 ${
+        className={`border shadow-2xl flex flex-col transition-all duration-200 overflow-hidden ${
           isFullscreen
             ? 'w-full h-full max-w-none rounded-none border-0'
             : 'w-full max-w-2xl rounded-2xl my-auto max-h-[90vh] animate-in fade-in zoom-in-95'
@@ -197,50 +218,52 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
             : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black/80'
         }`}
       >
-        {/* Header */}
+        {/* Header (Pinned with high z-index) */}
         <div
-          className={`px-5 py-4 border-b flex items-center justify-between shrink-0 ${
+          className={`px-4 sm:px-5 py-3.5 sm:py-4 border-b flex items-center justify-between gap-3 shrink-0 select-none sticky top-0 z-30 ${
             isLight
-              ? 'bg-slate-50/90 border-slate-200'
-              : 'bg-slate-900/90 border-slate-800'
+              ? 'bg-slate-50/95 border-slate-200'
+              : 'bg-slate-900/95 border-slate-800'
           }`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 shrink-0">
               <HardDrive className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <h3 className={`text-sm font-bold truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {isEn
                     ? 'Confirm Save Configuration to NVRAM'
                     : 'تایید ذخیره پیکربندی در حافظه دائم (Write Memory)'}
                 </h3>
-                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 shrink-0">
                   write memory
                 </span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-mono">
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-mono truncate">
                 <Server className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span className="font-bold text-slate-700 dark:text-slate-200">{device.name}</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{device.name}</span>
                 <span>•</span>
-                <span className="text-cyan-600 dark:text-cyan-400 font-bold">{device.ip}</span>
+                <span className="text-cyan-600 dark:text-cyan-400 font-bold shrink-0">{device.ip}</span>
                 <span>•</span>
-                <span>{device.model || device.role || 'Cisco Switch'}</span>
+                <span className="truncate">{device.model || device.role || 'Cisco Switch'}</span>
               </div>
             </div>
           </div>
 
-          <ModalHeaderControls
-            onClose={onClose}
-            onMinimize={onMinimize || onClose}
-            onMaximizeToggle={() => setIsFullscreen((prev) => !prev)}
-            isMaximized={isFullscreen}
-            isLightMode={isLight}
-            isEn={isEn}
-            minimizeTooltip={isEn ? 'Minimize confirmation' : 'مینیمایز پنجره'}
-            closeTooltip={isEn ? 'Cancel and close' : 'انصراف و بستن'}
-          />
+          <div className="shrink-0 flex items-center">
+            <ModalHeaderControls
+              onClose={onClose}
+              onMinimize={onMinimize || onClose}
+              onMaximizeToggle={() => setIsFullscreen((prev) => !prev)}
+              isMaximized={isFullscreen}
+              isLightMode={isLight}
+              isEn={isEn}
+              minimizeTooltip={isEn ? 'Minimize confirmation' : 'مینیمایز پنجره'}
+              closeTooltip={isEn ? 'Cancel and close' : 'انصراف و بستن'}
+            />
+          </div>
         </div>
 
         {/* Content Body */}
@@ -532,6 +555,7 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

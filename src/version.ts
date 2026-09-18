@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.74.3';
+export const APP_VERSION = '1.74.4';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.74.4',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'رفع مشکل دسترسی به دکمه‌های کنترل هدر مودال در حالت تمام‌صفحه (Modal Portal & Fullscreen Controls Fix)',
+    title_en: 'Header Controls Persistence & React Portal Integration in Write Memory Fullscreen Modal',
+    changes: [
+      'انتقال رندرینگ مودال تایید رایت (Confirm Save Configuration to NVRAM) به React Portal بر روی ریشه document.body با z-index فوق‌العاده بالا (9999).',
+      'رفع کامل هم‌پوشانی نوار ناوبری اصلی (Navbar) روی هدر مودال در حالت تمام‌صفحه و تضمین نمایش دائمی دکمه‌های خروج از تمام‌صفحه، مینیمایز و بستن.',
+      'تجهیز پنجره به کلید میانبر هوشمند Escape جهت خروج سریع از حالت تمام‌صفحه و انصراف، همراه با Pinned شدن ثابت هدر و فوتر اقدامات.'
+    ],
+    changes_en: [
+      'Migrated "Confirm Save Configuration to NVRAM" modal rendering to React Portal attached directly to document.body with top-tier z-index (9999).',
+      'Completely resolved stacking context overlap where the application Navbar covered the modal header in fullscreen mode, guaranteeing persistent visibility of Exit Fullscreen, Minimize, and Close buttons.',
+      'Implemented smart Escape key navigation for exiting fullscreen mode or dismissing the modal, along with pinned header and action footer.'
+    ]
+  },
   {
     version: '1.74.3',
     releaseDate: '2026-09-18',
