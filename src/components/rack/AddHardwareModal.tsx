@@ -19,6 +19,8 @@ import { convertNodeToHardwareDevice } from './PhysicalNodeOnCanvas';
 import {
   X,
   Minus,
+  Maximize2,
+  Minimize2,
   Check,
   Server,
   Plus,
@@ -434,6 +436,7 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
   const [targetU, setTargetU] = useState<number>(defaultTargetU || 1);
   const [customName, setCustomName] = useState<string>('');
   const [previewViewMode, setPreviewViewMode] = useState<'front' | 'rear'>('front');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Rack creation state
   const [rackName, setRackName] = useState<string>('');
@@ -894,13 +897,24 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
 
   return createPortal(
     <div
-      className={`fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-3 sm:p-5 md:py-8 backdrop-blur-md animate-fade-in ${
+      className={`fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center backdrop-blur-md animate-fade-in ${
+        isFullscreen ? 'p-0' : 'p-3 sm:p-5 md:py-8'
+      } ${
         isLightMode ? 'bg-slate-900/40 theme-light' : 'bg-black/85'
       }`}
       dir={isRtl ? 'rtl' : 'ltr'}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
-        className={`w-full max-w-4xl max-h-[85vh] rounded-3xl border shadow-2xl overflow-hidden flex flex-col my-auto transition-colors ${
+        className={`border shadow-2xl overflow-hidden flex flex-col my-auto transition-all ${
+          isFullscreen
+            ? 'w-full h-full max-h-full rounded-none border-none'
+            : 'w-full max-w-4xl max-h-[85vh] rounded-3xl'
+        } ${
           isLightMode
             ? 'bg-white border-slate-200 text-slate-800 shadow-slate-300/60'
             : 'bg-slate-900 border-slate-700/80 text-slate-100 shadow-2xl'
@@ -972,30 +986,47 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`p-1.5 rounded transition cursor-pointer ${
+                isLightMode
+                  ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title={isFullscreen ? (isEn ? 'Exit Fullscreen' : 'حالت پنجره') : (isEn ? 'Fullscreen' : 'تمام صفحه')}
+              aria-label={isFullscreen ? (isEn ? 'Exit Fullscreen' : 'حالت پنجره') : (isEn ? 'Fullscreen' : 'تمام صفحه')}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
             {onMinimize && (
               <button
                 type="button"
                 onClick={onMinimize}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition cursor-pointer ${
+                className={`p-1.5 rounded transition cursor-pointer ${
                   isLightMode
-                    ? 'bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200'
-                    : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                    ? 'text-slate-500 hover:text-cyan-700 hover:bg-slate-200'
+                    : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800'
                 }`}
-                title={isEn ? 'Minimize' : 'کوچک‌کردن'}
+                title={isEn ? 'Minimize to bottom dock' : 'مینیمایز به نوار پایین'}
+                aria-label={isEn ? 'Minimize' : 'مینیمایز'}
               >
                 <Minus className="w-4 h-4" />
               </button>
             )}
+
             <button
               type="button"
               onClick={onClose}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition cursor-pointer ${
+              className={`p-1.5 rounded transition cursor-pointer ${
                 isLightMode
-                  ? 'bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200'
-                  : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                  ? 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                  : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800'
               }`}
               title={isEn ? 'Close' : 'بستن'}
+              aria-label={isEn ? 'Close' : 'بستن'}
             >
               <X className="w-4 h-4" />
             </button>
@@ -1130,7 +1161,7 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
                               : 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-950/50 cursor-pointer'
                             : isLightMode
                             ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 cursor-pointer shadow-xs'
-                            : 'bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-850 cursor-pointer'
+                            : 'bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-900 cursor-pointer'
                         }`}
                       >
                         <div>
@@ -1324,7 +1355,7 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
                               : 'bg-cyan-950/40 border-cyan-400 ring-1 ring-cyan-500/40 shadow-md'
                             : isLightMode
                             ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 shadow-xs'
-                            : 'bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                            : 'bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-1">

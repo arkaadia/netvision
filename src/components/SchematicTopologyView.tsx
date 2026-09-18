@@ -5603,16 +5603,18 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                   )}
                 </div>
 
-                {/* Add Device Button - accessible in both Card and Physical view modes */}
-                <button
-                  type="button"
-                  onClick={() => setIsAddDeviceOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
-                  title={isEn ? "Add network device to map" : "افزودن تجهیز شبکه به نقشه"}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{t('topology_tool_add_device')}</span>
-                </button>
+                {/* Add Device Button - only displayed in Card view mode */}
+                {globalDeviceViewMode === 'card' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddDeviceOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium shadow-xs transition active:scale-95 text-xs cursor-pointer"
+                    title={isEn ? "Add network device to map" : "افزودن تجهیز شبکه به نقشه"}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{t('topology_tool_add_device')}</span>
+                  </button>
+                )}
 
                 {/* Physical View Exclusive Button: Add Hardware, Rack & Tower Modal */}
                 {globalDeviceViewMode === 'physical' && (
@@ -6355,14 +6357,16 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                       </p>
                     </div>
                     <div className="flex items-center justify-center gap-3 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => setIsAddDeviceOpen(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg transition active:scale-95"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>{t('topology_tool_add_device')}</span>
-                      </button>
+                      {globalDeviceViewMode === 'card' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddDeviceOpen(true)}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>{t('topology_tool_add_device')}</span>
+                        </button>
+                      )}
                       {globalDeviceViewMode === 'physical' && (
                         <button
                           type="button"
@@ -8716,6 +8720,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
           racks={currentCustomMap.racks || []}
           initialDisplayMode={globalDeviceViewMode}
           onAddDevice={handleAddDeviceToCustomMap}
+          isLightMode={isLightMode}
         />
       )}
 

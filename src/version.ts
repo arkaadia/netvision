@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.76.0';
+export const APP_VERSION = '1.76.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.76.1',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'اصلاح دارک تم مودال افزودن تجهیز، انحصار دکمه افزودن تجهیز به ویو کارت و یکپارچه‌سازی دکمه‌های کنترل پنجره با ترمینال سیسکو (Add Device Modal Dark Theme & Cisco Terminal Window Controls Sync)',
+    title_en: 'Add Device Modal Dark Theme Overhaul, Restrict Add Device Button to Card View Only, and Unified Cisco Terminal Header Window Controls',
+    changes: [
+      'اصلاح و سازگار کردن کامل تم تاریک (Dark Theme) در مودال افزودن تجهیز به نقشه توپولوژی سفارشی (CustomMapAddDeviceModal) با رنگ‌بندی استاندارد، رفع کلاس‌های ناسازگار و بهبود کنتراست المان‌ها.',
+      'محدود کردن نمایش دکمه «افزودن تجهیز» در نوار ابزار و بوم خالی نقشه توپولوژی فقط به حالت نمای کارت (Card View Mode).',
+      'تجهیز هر دو مودال Add Device to Custom Topology Map و Add Hardware Device to Rack به دکمه‌های کنترل پنجره (تمام‌صفحه/خروج از تمام‌صفحه، مینیمایز و بستن) دقیقا مطابق با شرایط، آیکون‌ها، چیدمان و استایل دکمه‌های ترمینال سیسکو (CiscoTerminalModal).'
+    ],
+    changes_en: [
+      'Overhauled dark theme styling in CustomMapAddDeviceModal with a dedicated dark palette, fixing contrast and invalid background classes.',
+      'Restricted the "Add Device" button on both topology toolbar and empty canvas to strictly display only in Card View mode.',
+      'Equipped both CustomMapAddDeviceModal and AddHardwareModal with universal window controls (Fullscreen toggle, Minimize, Close) strictly matching the behavior, icons, tooltips, and styling of CiscoTerminalModal.'
+    ]
+  },
   {
     version: '1.76.0',
     releaseDate: '2026-09-18',
