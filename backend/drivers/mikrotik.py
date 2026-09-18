@@ -65,7 +65,7 @@ class MikroTikDriver(NetworkDeviceDriver):
         elif action == "set_description":
             desc = params.get("description", "")
             return f"/interface set [find name=\"{clean_iface}\"] comment=\"{desc}\""
-        elif action == "set_vlan":
+        elif action in ("set_vlan", "change_vlan", "assign_vlan", "mode_access"):
             vlan = params.get("vlan", 1)
             # Standard RouterOS VLAN assignment on bridge or sub-interface
             return f"/interface bridge port set [find interface=\"{clean_iface}\"] pvid={vlan}\n/interface vlan add name=\"vlan{vlan}-{clean_iface}\" vlan-id={vlan} interface=\"{clean_iface}\" disabled=no"

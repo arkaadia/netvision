@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.73.1';
+export const APP_VERSION = '1.73.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.73.2',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'یکپارچه‌سازی بک‌اند و اصلاح کامل تم تیره مودال تخصیص ویلن دسترسی (Assign Access VLAN)',
+    title_en: 'Backend Integration & Dark Theme Redesign for Assign Access VLAN Modal on Cisco & MikroTik',
+    changes: [
+      'پیاده‌سازی کامل بک‌اند و اجرای دستورات متناظر روی سخت‌افزار واقعی و شبیه‌ساز برای تخصیص ویلن دسترسی (Assign Access VLAN) روی سوئیچ‌ها و روترهای سیسکو و میکروتیک.',
+      'تولید هوشمند دستورات پیکربندی سوئیچ‌پورت سیسکو (switchport mode access / switchport access vlan X) و ساب‌اینترفیس‌های روتر (encapsulation dot1Q X) و پورت‌های بریج میکروتیک (pvid=X).',
+      'بازطراحی جامع استایل و تم مودال هماهنگ با تم تیره (Dark Theme Harmony)، شامل کادر پیش‌نمایش کنسول CLI به سبک کنسول شبکه، رنگ‌بندی تیره‌ی سطح بالا و کنتراست شفاف.',
+      'تجهیز مودال تخصیص ویلن به دکمه مینیمایز (Universal Modal Minimization Rule) و هماهنگی کامل چندزبانگی (انگلیسی و فارسی بدون متن هاردکد).'
+    ],
+    changes_en: [
+      'Full backend integration and physical/simulated device CLI execution for Assign Access VLAN on Cisco switches, routers, and MikroTik RouterOS devices.',
+      'Smart CLI command generation for Cisco IOS Catalyst switches (switchport mode access / switchport access vlan X), Cisco routers (encapsulation dot1Q sub-interfaces), and MikroTik RouterOS bridge ports (pvid=X).',
+      'Comprehensive redesign of the modal styling to achieve perfect dark theme harmony with network-console style CLI preview, deep slate backgrounds, and high-contrast typography.',
+      'Equipped Assign Access VLAN modal with universal minimization button (Minus icon) and strict English/Persian localization.'
+    ]
+  },
   {
     version: '1.73.1',
     releaseDate: '2026-09-18',

@@ -1962,6 +1962,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
 
             interface = body.get("interface", "")
             params = body.get("params", {})
+            params["device_type"] = device.get("type", "switch")
+            params["is_router"] = device.get("type") == "router"
             platform = device.get("platform", "cisco_ios_xe")
             driver = get_driver(platform, device.get("connection_mode", "simulator"))
 
@@ -2018,8 +2020,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 elif operation in ("enable_interface", "no_shutdown"):
                     target_port["admin_status"] = "enabled"
                     target_port["status"] = "up"
-                elif operation in ("set_vlan", "change_vlan"):
-                    target_port["vlan"] = params.get("vlan", 1)
+                elif operation in ("set_vlan", "change_vlan", "assign_vlan"):
+                    target_port["vlan"] = int(params.get("vlan", 1))
                     target_port["mode"] = "access"
                 elif operation == "mode_trunk":
                     target_port["mode"] = "trunk"
@@ -3105,7 +3107,26 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             if "mode" in body:
                 port["mode"] = body["mode"]  # "trunk" or "access"
             if "vlan" in body:
-                port["vlan"] = int(body["vlan"])
+                new_vlan = int(body["vlan"])
+                port["vlan"] = new_vlan
+                if "mode" not in body and port.get("mode") != "trunk":
+                    port["mode"] = "access"
+                if device:
+                    try:
+                        platform = device.get("platform", "cisco_ios_xe")
+                        driver = get_driver(platform, device.get("connection_mode", "simulator"))
+                        target_iface = port.get("port_id") or port.get("name") or port_id
+                        vlan_params = {
+                            "vlan": new_vlan,
+                            "device_type": device.get("type", "switch"),
+                            "is_router": device.get("type") == "router"
+                        }
+                        cli_cmd = driver.generate_action_cli("set_vlan", target_iface, vlan_params)
+                        require_real = device.get("connection_mode") != "simulator"
+                        exec_res = connection_manager.execute_command(device, cli_cmd, require_real=require_real)
+                        cli_output = (cli_output + "\n" + exec_res.get("output", "")).strip()
+                    except Exception as e:
+                        print(f"[SetPortVlan Direct CLI Note] {e}")
             if "allowed_vlans" in body:
                 port["allowed_vlans"] = str(body["allowed_vlans"])
             if "speed" in body:

@@ -68,11 +68,11 @@ class CiscoDriver(NetworkDeviceDriver):
             return f"configure terminal\ninterface {interface}\n no shutdown\nexit\nexit"
         elif action == "mode_trunk":
             return f"configure terminal\ninterface {interface}\n switchport trunk encapsulation dot1q\n switchport mode trunk\nexit\nexit"
-        elif action == "mode_access":
+        elif action in ("mode_access", "set_vlan", "change_vlan", "assign_vlan"):
             vlan = params.get("vlan", 1)
-            return f"configure terminal\ninterface {interface}\n switchport mode access\n switchport access vlan {vlan}\nexit\nexit"
-        elif action == "set_vlan":
-            vlan = params.get("vlan", 1)
+            is_router = params.get("is_router") or params.get("device_type") == "router"
+            if is_router:
+                return f"configure terminal\ninterface {interface}.{vlan}\n encapsulation dot1q {vlan}\nexit\nexit"
             return f"configure terminal\ninterface {interface}\n switchport mode access\n switchport access vlan {vlan}\nexit\nexit"
         elif action == "port_sec_enable":
             max_mac = params.get("max_mac", 1)

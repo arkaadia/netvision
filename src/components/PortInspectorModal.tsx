@@ -199,24 +199,61 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   const handleConfirmAssignVlan = async (newVlan: number) => {
     if (!vlanAssignModalPort || !device) return;
     const targetPort = vlanAssignModalPort;
-    const updates: Partial<SwitchPort> = {
-      vlan: newVlan,
-      mode: 'access',
-    };
 
     try {
       setIsAssigningVlan(true);
-      await updateSwitchPort(device.id, targetPort.port_id, updates);
-      setPorts((prev) =>
-        prev.map((p) => (p.port_id === targetPort.port_id ? { ...p, ...updates } : p))
-      );
-      if (selectedPort?.port_id === targetPort.port_id) {
-        setSelectedPort((prev) => (prev ? { ...prev, ...updates } : null));
+      // 1. Execute the configuration command on the device via the operations API (real SSH or simulator)
+      let opRes: any = null;
+      try {
+        opRes = await executeDeviceOperation(
+          device.id,
+          'set_vlan',
+          targetPort.port_id,
+          { vlan: newVlan, device_type: device.type, is_router: device.type === 'router' }
+        );
+      } catch (opErr) {
+        console.warn('executeDeviceOperation set_vlan note:', opErr);
       }
+
+      // 2. Persist via updateSwitchPort (which updates DB and applies CLI command)
+      try {
+        await updateSwitchPort(device.id, targetPort.port_id, {
+          vlan: newVlan,
+          mode: 'access',
+        });
+      } catch (putErr) {
+        if (!opRes?.success) {
+          throw putErr;
+        }
+      }
+
+      // 3. Update local ports state and selected port view
+      setPorts((prev) =>
+        prev.map((p) =>
+          p.port_id === targetPort.port_id || p.name === targetPort.port_id
+            ? { ...p, vlan: newVlan, mode: 'access' }
+            : p
+        )
+      );
+
+      if (
+        selectedPort &&
+        (selectedPort.port_id === targetPort.port_id || selectedPort.name === targetPort.port_id)
+      ) {
+        setSelectedPort((prev) => (prev ? { ...prev, vlan: newVlan, mode: 'access' } : null));
+        setEditVlan(newVlan);
+        setEditMode('access');
+      }
+
+      device.has_unsaved_changes = true;
       setVlanAssignModalPort(null);
       if (onPortUpdated) onPortUpdated();
     } catch (err: any) {
       console.error('Failed to assign VLAN:', err);
+      alert(
+        (isEn ? 'Failed to assign VLAN: ' : 'خطا در تخصیص ویلن به پورت: ') +
+          (err.message || err)
+      );
     } finally {
       setIsAssigningVlan(false);
     }
@@ -1765,6 +1802,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
           <AssignVlanModal
             isOpen={!!vlanAssignModalPort}
             onClose={() => setVlanAssignModalPort(null)}
+            onMinimize={() => setVlanAssignModalPort(null)}
             onAssign={handleConfirmAssignVlan}
             port={vlanAssignModalPort}
             device={device}

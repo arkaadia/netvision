@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Server, Cable, Zap, Shield, ShieldCheck, Search, Filter, Edit3, Save, CheckCircle2, AlertCircle, AlertTriangle, Layers } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
-import { fetchDevicePorts, updateSwitchPort, batchUpdateSwitchPorts } from '../services/api';
+import { fetchDevicePorts, updateSwitchPort, batchUpdateSwitchPorts, executeDeviceOperation } from '../services/api';
 import { CiscoPortContextMenu } from './CiscoPortContextMenu';
 import { CiscoCommandConfirmModal } from './CiscoCommandConfirmModal';
 import { CiscoPortConfigConfirmModal, PortConfigUpdates } from './CiscoPortConfigConfirmModal';
@@ -368,23 +368,60 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
   const handleConfirmAssignVlan = async (newVlan: number) => {
     if (!vlanAssignModalPort || !currentDevice) return;
     const targetPort = vlanAssignModalPort;
-    const updates: Partial<SwitchPort> = {
-      vlan: newVlan,
-      mode: 'access',
-    };
 
     try {
       setIsAssigningVlan(true);
-      await updateSwitchPort(currentDevice.id, targetPort.port_id, updates);
-      setPorts((prev) =>
-        prev.map((p) => (p.port_id === targetPort.port_id ? { ...p, ...updates } : p))
-      );
-      if (selectedPort?.port_id === targetPort.port_id) {
-        setSelectedPort((prev) => (prev ? { ...prev, ...updates } : null));
+      // 1. Execute hardware operation CLI on physical device or simulator
+      let opRes: any = null;
+      try {
+        opRes = await executeDeviceOperation(
+          currentDevice.id,
+          'set_vlan',
+          targetPort.port_id,
+          { vlan: newVlan, device_type: currentDevice.type, is_router: currentDevice.type === 'router' }
+        );
+      } catch (opErr) {
+        console.warn('executeDeviceOperation set_vlan note:', opErr);
       }
+
+      // 2. Persist state via updateSwitchPort
+      try {
+        await updateSwitchPort(currentDevice.id, targetPort.port_id, {
+          vlan: newVlan,
+          mode: 'access',
+        });
+      } catch (putErr) {
+        if (!opRes?.success) {
+          throw putErr;
+        }
+      }
+
+      // 3. Update local ports list
+      setPorts((prev) =>
+        prev.map((p) =>
+          p.port_id === targetPort.port_id || p.name === targetPort.port_id
+            ? { ...p, vlan: newVlan, mode: 'access' }
+            : p
+        )
+      );
+
+      if (
+        selectedPort &&
+        (selectedPort.port_id === targetPort.port_id || selectedPort.name === targetPort.port_id)
+      ) {
+        setSelectedPort((prev) => (prev ? { ...prev, vlan: newVlan, mode: 'access' } : null));
+        setEditVlan(newVlan);
+        setEditMode('access');
+      }
+
+      currentDevice.has_unsaved_changes = true;
       setVlanAssignModalPort(null);
     } catch (err: any) {
       console.error('Failed to assign VLAN:', err);
+      alert(
+        (isEn ? 'Failed to assign VLAN: ' : 'خطا در تخصیص ویلن به پورت: ') +
+          (err.message || err)
+      );
     } finally {
       setIsAssigningVlan(false);
     }
@@ -1242,6 +1279,7 @@ export const PortManagementView: React.FC<PortManagementViewProps> = ({ devices 
         <AssignVlanModal
           isOpen={!!vlanAssignModalPort}
           onClose={() => setVlanAssignModalPort(null)}
+          onMinimize={() => setVlanAssignModalPort(null)}
           onAssign={handleConfirmAssignVlan}
           port={vlanAssignModalPort}
           device={currentDevice}
