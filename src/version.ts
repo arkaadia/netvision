@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.77.0';
+export const APP_VERSION = '1.78.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.78.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'تفکیک تب‌های پورت و فیس‌پلیت و منابع سیستم در مودال پورت سیسکو با نمایش گرافیکی تله‌متری سخت‌افزار (Cisco Port Modal Tabs & Graphical System Resources Suite)',
+    title_en: 'Cisco Port Modal Tabbed Navigation (Port & Faceplate vs System Resources) with Graphical Hardware Telemetry Suite',
+    changes: [
+      'تفکیک ساختار محتوایی مودال پورت سیسکو (PortInspectorModal) به دو تب مجزا: تب «Port & Faceplate» (شامل فیس‌پلیت گرافیکی، تنظیمات تک‌پورت/گروهی و جدول پورت‌ها) و تب جدید «System Resources».',
+      'طراحی و پیاده‌سازی ماژول جامع و بصری نمایش منابع سیستم تجهیزات سیسکو (CiscoSystemResourcesTab) با استایل کارتی مدرن و گیج‌های پیشرفت رنگی منطبق با الگوی گرافیکی منابع سیستم.',
+      'تجهیز تب منابع به کارت‌های گرافیکی معماری و بار پردازنده (CPU Architecture & Multi-Core Load)، حافظه اصلی سیستم (DRAM/RAM)، حافظه فلش و NVRAM، سنسورهای حرارتی و دمای شاسی، وضعیت فن‌های خنک‌کننده و جهت گردش باد، و تخصیص توان PoE.',
+      'افزودن پنل مشخصات معماری سوئیچینگ، پهنای باند و ریت فورواردینگ ASIC همراه با کنسول تعاملی خروجی فرامین تشخیصی سیسکو IOS (نظیر show processes cpu، show memory stats، show env all، show power inline و show version) با قابلیت کپی مستقیم.'
+    ],
+    changes_en: [
+      'Restructured Cisco Port Inspector Modal into two dedicated navigation tabs: "Port & Faceplate" (containing the interactive RJ45 faceplate, port editor, and ports table) and the new "System Resources" tab.',
+      'Designed and integrated the comprehensive CiscoSystemResourcesTab component featuring modern high-contrast metric cards with animated visual progress bars and hardware status gauges.',
+      'Equipped the System Resources tab with graphical telemetry for CPU architecture and multi-core load breakdown, system DRAM memory, Flash storage and NVRAM, chassis thermal sensors, cooling fans RPM, and PoE power supply budget.',
+      'Added switching fabric and ASIC packet forwarding engine specifications alongside an interactive Cisco IOS CLI diagnostic console (show processes cpu, show memory stats, show env all, show power inline, show version) with one-click clipboard copying.'
+    ]
+  },
   {
     version: '1.77.0',
     releaseDate: '2026-09-18',

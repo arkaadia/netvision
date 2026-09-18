@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge } from 'lucide-react';
+import { X, Minus, Cable, Zap, Shield, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, Edit3, Save, Power, Terminal, AlertTriangle, ArrowRight, Check, Lock, Key, Layers, CheckSquare, Square, FileText, Gauge, Activity } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
 import { fetchDevicePorts, updateSwitchPort, writeMemory, batchUpdateSwitchPorts, executeDeviceOperation } from '../services/api';
 import { NetworkPortSvg } from './NetworkPortSvg';
@@ -9,6 +9,7 @@ import { CiscoPortConfigConfirmModal, PortConfigUpdates } from './CiscoPortConfi
 import { AssignVlanModal } from './AssignVlanModal';
 import { PortDescriptionModal } from './PortDescriptionModal';
 import { CiscoWriteConfirmModal, WriteChangeItem } from './CiscoWriteConfirmModal';
+import { CiscoSystemResourcesTab } from './CiscoSystemResourcesTab';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface PortInspectorModalProps {
@@ -35,6 +36,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPort, setSelectedPort] = useState<SwitchPort | null>(null);
+  const [activeTab, setActiveTab] = useState<'ports' | 'resources'>('ports');
   const [filterMode, setFilterMode] = useState<'all' | 'up' | 'down' | 'trunk' | 'access' | 'port-sec'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -861,8 +863,59 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
           </div>
         </div>
 
+        {/* Navigation Tabs Bar: Port & Faceplate vs System Resources */}
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-5 text-xs shrink-0 select-none">
+          <div className="flex items-center gap-1 -mb-px">
+            <button
+              type="button"
+              onClick={() => setActiveTab('ports')}
+              className={`px-4 py-2.5 border-b-2 flex items-center gap-2 transition-colors cursor-pointer font-medium ${
+                activeTab === 'ports'
+                  ? 'border-indigo-500 text-indigo-400 font-bold bg-indigo-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+              }`}
+            >
+              <Cable className="w-4 h-4 text-indigo-400" />
+              <span>{isEn ? 'Port & Faceplate' : 'پورت و فیس‌پلیت'}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-semibold">
+                {ports.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('resources')}
+              className={`px-4 py-2.5 border-b-2 flex items-center gap-2 transition-colors cursor-pointer font-medium ${
+                activeTab === 'resources'
+                  ? 'border-cyan-400 text-cyan-400 font-bold bg-cyan-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-cyan-400" />
+              <span>{isEn ? 'System Resources' : 'منابع سیستم (System Resources)'}</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-slate-400">
+            <span className="text-slate-500">{isEn ? 'Architecture:' : 'معماری:'}</span>
+            <span className="text-cyan-300 font-bold">{device.model || 'Cisco Switch'}</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-emerald-400 font-bold">{isEn ? 'Health: OK' : 'سلامت: نرمال'}</span>
+          </div>
+        </div>
+
         {/* Content Body */}
         <div className="p-5 overflow-y-auto space-y-4 flex-1">
+          {activeTab === 'resources' ? (
+            <CiscoSystemResourcesTab
+              device={device}
+              ports={ports}
+              isEn={isEn}
+              onConnectTerminal={onConnectTerminal}
+            />
+          ) : (
+            <>
           {/* Switch Faceplate (Visual Rack Interface) */}
           <div className="bg-slate-900 border border-slate-800 rounded-lg p-3.5 shadow-inner">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -1857,6 +1910,8 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
               </table>
             </div>
           </div>
+            </>
+          )}
         </div>
 
         {/* Cisco Port Config / Batch Apply Confirmation Modal */}
