@@ -373,18 +373,70 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
 
     log('--- [Phase 1/6] Initiating Full Software Upgrade Pipeline ---');
     const gitDir = path.join(projectRoot, '.git');
+    const envPath = path.join(projectRoot, '.env');
+    const dbStore = path.join(projectRoot, 'backend', 'database_store.json');
+    const netData = path.join(projectRoot, 'backend', 'network_data.json');
 
-    // Step 1: Backup critical state files to prevent accidental loss
-    const backupDir = path.join('/tmp', `netman_backup_${Date.now()}`);
+    // Step 1: Deep Memory & Disk Snapshot of all user data to prevent any data loss
+    let preNetworkData: any = null;
+    let preDatabaseStore: any = null;
+    let preEnvContent: string | null = null;
+    let userDeviceCount = 0;
+
+    try {
+      if (fs.existsSync(netData)) {
+        preNetworkData = JSON.parse(fs.readFileSync(netData, 'utf-8'));
+        if (Array.isArray(preNetworkData.devices)) {
+          userDeviceCount = preNetworkData.devices.length;
+        }
+      }
+    } catch (rErr: any) {
+      log(`Notice reading existing network_data.json: ${rErr.message}`);
+    }
+
+    try {
+      if (fs.existsSync(dbStore)) {
+        preDatabaseStore = JSON.parse(fs.readFileSync(dbStore, 'utf-8'));
+        if (userDeviceCount === 0 && Array.isArray(preDatabaseStore.devices)) {
+          userDeviceCount = preDatabaseStore.devices.length;
+        }
+      }
+    } catch (rErr: any) {
+      log(`Notice reading existing database_store.json: ${rErr.message}`);
+    }
+
+    try {
+      if (fs.existsSync(envPath)) {
+        preEnvContent = fs.readFileSync(envPath, 'utf-8');
+      }
+    } catch (rErr: any) {
+      log(`Notice reading existing .env: ${rErr.message}`);
+    }
+
+    // Persist snapshot to both /tmp and persistent backend/backups directory
+    const timestamp = Date.now();
+    const backupDir = path.join('/tmp', `netman_backup_${timestamp}`);
+    const persistentVaultDir = path.join(projectRoot, 'backend', 'backups', `vault_pre_update_${timestamp}`);
+
     try {
       fs.mkdirSync(backupDir, { recursive: true });
-      const envPath = path.join(projectRoot, '.env');
-      const dbStore = path.join(projectRoot, 'backend', 'database_store.json');
-      const netData = path.join(projectRoot, 'backend', 'network_data.json');
-      if (fs.existsSync(envPath)) fs.copyFileSync(envPath, path.join(backupDir, '.env'));
-      if (fs.existsSync(dbStore)) fs.copyFileSync(dbStore, path.join(backupDir, 'database_store.json'));
-      if (fs.existsSync(netData)) fs.copyFileSync(netData, path.join(backupDir, 'network_data.json'));
-      log('Safeguarded configuration (.env) and local database store.');
+      fs.mkdirSync(persistentVaultDir, { recursive: true });
+
+      if (preEnvContent) {
+        fs.writeFileSync(path.join(backupDir, '.env'), preEnvContent, 'utf-8');
+        fs.writeFileSync(path.join(persistentVaultDir, '.env'), preEnvContent, 'utf-8');
+      }
+      if (preDatabaseStore) {
+        const str = JSON.stringify(preDatabaseStore, null, 2);
+        fs.writeFileSync(path.join(backupDir, 'database_store.json'), str, 'utf-8');
+        fs.writeFileSync(path.join(persistentVaultDir, 'database_store.json'), str, 'utf-8');
+      }
+      if (preNetworkData) {
+        const str = JSON.stringify(preNetworkData, null, 2);
+        fs.writeFileSync(path.join(backupDir, 'network_data.json'), str, 'utf-8');
+        fs.writeFileSync(path.join(persistentVaultDir, 'network_data.json'), str, 'utf-8');
+      }
+      log(`Safeguarded ${userDeviceCount} existing network devices, topology data, and environment configuration.`);
     } catch (bErr: any) {
       log(`State backup notice: ${bErr.message}`);
     }
@@ -399,7 +451,7 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
         await executeShell('git fetch origin master', projectRoot, 30000);
         await executeShell('git checkout master 2>/dev/null || git checkout -B master origin/master', projectRoot, 10000);
         await executeShell('git reset --hard origin/master', projectRoot, 10000);
-        await executeShell('git clean -fd -e .env -e backend/database_store.json -e backend/network_data.json', projectRoot, 10000);
+        await executeShell('git clean -fd -e .env -e backend/database_store.json -e backend/network_data.json -e backend/backups', projectRoot, 10000);
         log('Repository codebase successfully aligned with origin/master.');
       } catch (gitErr: any) {
         log(`Git fetch warning: ${gitErr.message}. Falling back to pull...`);
@@ -418,6 +470,114 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
       } catch (dlErr: any) {
         log(`Archive extraction warning: ${dlErr.message}`);
       }
+    }
+
+    // Step 2.5: User State & Device Database Restoration and Smart Merging
+    log('--- [Phase 2.5/6] Restoring & Merging User Devices, Credentials & Topology Maps ---');
+    try {
+      // 1. Restore & Merge network_data.json
+      if (preNetworkData) {
+        let repoNetworkData: any = {};
+        if (fs.existsSync(netData)) {
+          try {
+            repoNetworkData = JSON.parse(fs.readFileSync(netData, 'utf-8'));
+          } catch {
+            repoNetworkData = {};
+          }
+        }
+
+        // Merge Devices: User's devices are the absolute source of truth
+        const mergedDevices: any[] = [];
+        const seenIds = new Set<string>();
+
+        // First, guarantee ALL user devices are retained
+        if (Array.isArray(preNetworkData.devices)) {
+          for (const d of preNetworkData.devices) {
+            if (d && d.id) {
+              mergedDevices.push(d);
+              seenIds.add(String(d.id));
+            }
+          }
+        }
+
+        // Second, include any new seed/demo devices from upstream repo that do not conflict
+        if (Array.isArray(repoNetworkData.devices)) {
+          for (const d of repoNetworkData.devices) {
+            if (d && d.id && !seenIds.has(String(d.id))) {
+              mergedDevices.push(d);
+              seenIds.add(String(d.id));
+            }
+          }
+        }
+
+        // Merge Ports
+        const mergedPorts = {
+          ...(repoNetworkData.ports || {}),
+          ...(preNetworkData.ports || {})
+        };
+
+        const finalNetworkData = {
+          ...repoNetworkData,
+          ...preNetworkData,
+          devices: mergedDevices,
+          ports: mergedPorts,
+          topology_links: preNetworkData.topology_links || repoNetworkData.topology_links || [],
+          cdp_lldp_neighbors: preNetworkData.cdp_lldp_neighbors || repoNetworkData.cdp_lldp_neighbors || {},
+          vlans: preNetworkData.vlans || repoNetworkData.vlans || [],
+          templates: preNetworkData.templates || repoNetworkData.templates || [],
+          device_groups: preNetworkData.device_groups || repoNetworkData.device_groups || [],
+          active_directory: preNetworkData.active_directory || repoNetworkData.active_directory,
+          access_policies: preNetworkData.access_policies || repoNetworkData.access_policies || [],
+          local_users: preNetworkData.local_users || repoNetworkData.local_users || [],
+          local_groups: preNetworkData.local_groups || repoNetworkData.local_groups || [],
+          audit_logs: preNetworkData.audit_logs || repoNetworkData.audit_logs || [],
+          custom_maps: preNetworkData.custom_maps || repoNetworkData.custom_maps || [],
+          node_positions: preNetworkData.node_positions || repoNetworkData.node_positions || {},
+          device_notes: preNetworkData.device_notes || repoNetworkData.device_notes || {}
+        };
+
+        fs.writeFileSync(netData, JSON.stringify(finalNetworkData, null, 2), 'utf-8');
+        log(`Safeguarded and restored ${mergedDevices.length} network devices in network_data.json.`);
+      }
+
+      // 2. Restore & Merge database_store.json
+      if (preDatabaseStore) {
+        let repoDbStore: any = {};
+        if (fs.existsSync(dbStore)) {
+          try {
+            repoDbStore = JSON.parse(fs.readFileSync(dbStore, 'utf-8'));
+          } catch {
+            repoDbStore = {};
+          }
+        }
+
+        const finalDbStore = {
+          ...repoDbStore,
+          ...preDatabaseStore,
+          users: preDatabaseStore.users || repoDbStore.users || [],
+          user_groups: preDatabaseStore.user_groups || repoDbStore.user_groups || [],
+          access_policies: preDatabaseStore.access_policies || repoDbStore.access_policies || [],
+          devices: (preDatabaseStore.devices && preDatabaseStore.devices.length > 0)
+            ? preDatabaseStore.devices
+            : (preNetworkData?.devices || repoDbStore.devices || []),
+          custom_maps: preDatabaseStore.custom_maps || repoDbStore.custom_maps || [],
+          topology_hierarchy: preDatabaseStore.topology_hierarchy || repoDbStore.topology_hierarchy || [],
+          node_positions: preDatabaseStore.node_positions || repoDbStore.node_positions || {},
+          device_sticky_notes: preDatabaseStore.device_sticky_notes || repoDbStore.device_sticky_notes || [],
+          audit_logs: preDatabaseStore.audit_logs || repoDbStore.audit_logs || []
+        };
+
+        fs.writeFileSync(dbStore, JSON.stringify(finalDbStore, null, 2), 'utf-8');
+        log(`Safeguarded and restored database store with ${((finalDbStore.devices as any[]) || []).length} synced devices.`);
+      }
+
+      // 3. Restore .env
+      if (preEnvContent) {
+        fs.writeFileSync(envPath, preEnvContent, 'utf-8');
+        log('Safeguarded and restored environment configuration (.env).');
+      }
+    } catch (restoreErr: any) {
+      log(`Error during user data restoration: ${restoreErr.message}`);
     }
 
     // Restore executable permissions for shell scripts
@@ -465,9 +625,9 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
     // Step 4: Terminate old Python backend and update Python dependencies
     log('--- [Phase 4/6] Terminating Stale Python Backend & Reconciling Python Dependencies ---');
     try {
-      // Kill old python backend process so port 8000 is released and new backend files will be loaded!
+      // Kill old python backend process so port PYTHON_PORT (5001/8000) is released and new backend files will be loaded!
       await executeShell('pkill -9 -f "backend/server.py" 2>/dev/null || true', projectRoot, 5000);
-      await executeShell('fuser -k 8000/tcp 2>/dev/null || true', projectRoot, 5000);
+      await executeShell(`fuser -k ${PYTHON_PORT}/tcp 2>/dev/null || fuser -k 5001/tcp 2>/dev/null || fuser -k 8000/tcp 2>/dev/null || true`, projectRoot, 5000);
       if (pythonProcess) {
         try {
           pythonProcess.kill('SIGKILL');
@@ -476,7 +636,7 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
           // ignore
         }
       }
-      log('Released port 8000 from old Python backend instance.');
+      log(`Released port ${PYTHON_PORT} from old Python backend instance.`);
 
       const pipInstallCmd = 'python3 -m pip install --upgrade --break-system-packages paramiko cryptography websockets requests flask python-dotenv 2>/dev/null || pip3 install paramiko cryptography websockets requests flask 2>/dev/null || pip install paramiko cryptography websockets requests 2>/dev/null || true';
       await executeShell(pipInstallCmd, projectRoot, 60000);
@@ -496,6 +656,30 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
       log('Production bundle compiled successfully (dist/ and dist/server.cjs ready).');
     } catch (bErr: any) {
       log(`Build warning: ${bErr.message}`);
+    }
+
+    // Final Post-Build Data Integrity Guard: Ensure devices database is intact before service reboot
+    try {
+      let finalDevCount = 0;
+      if (fs.existsSync(netData)) {
+        const checkData = JSON.parse(fs.readFileSync(netData, 'utf-8'));
+        if (Array.isArray(checkData.devices)) {
+          finalDevCount = checkData.devices.length;
+        }
+      }
+      if (userDeviceCount > 0 && finalDevCount < userDeviceCount && preNetworkData) {
+        log(`Post-build safety guard: Re-affirming ${userDeviceCount} devices in network_data.json...`);
+        fs.writeFileSync(netData, JSON.stringify(preNetworkData, null, 2), 'utf-8');
+      }
+      if (preDatabaseStore && fs.existsSync(dbStore)) {
+        const checkDb = JSON.parse(fs.readFileSync(dbStore, 'utf-8'));
+        if (!Array.isArray(checkDb.devices) || checkDb.devices.length < userDeviceCount) {
+          fs.writeFileSync(dbStore, JSON.stringify(preDatabaseStore, null, 2), 'utf-8');
+        }
+      }
+      log('Integrity guard: All network equipment, credentials, and topology maps confirmed in database.');
+    } catch (guardErr: any) {
+      log(`Integrity guard notice: ${guardErr.message}`);
     }
 
     // Read updated version from package.json

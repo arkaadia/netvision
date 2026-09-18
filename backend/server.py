@@ -1156,7 +1156,45 @@ def load_data():
 
                 return data
         except Exception as e:
-            print(f"Error reading {DATA_FILE}: {e}, regenerating seed data")
+            print(f"Error reading {DATA_FILE}: {e}. Attempting recovery from persistent backups...")
+            recovered = False
+            # Check database_store.json
+            db_store_file = os.path.join(DATA_DIR, "database_store.json")
+            if os.path.exists(db_store_file):
+                try:
+                    with open(db_store_file, "r", encoding="utf-8") as f_db:
+                        db_content = json.load(f_db)
+                        if isinstance(db_content.get("devices"), list) and len(db_content["devices"]) > 0:
+                            data = get_initial_seed_data()
+                            data["devices"] = db_content["devices"]
+                            if "ports" in db_content:
+                                data["ports"] = db_content["ports"]
+                            save_data_unsafe(data)
+                            print(f"[Recovery] Restored {len(data['devices'])} devices from database_store.json")
+                            recovered = True
+                            return data
+                except Exception as db_err:
+                    print(f"[Recovery] Could not recover from database_store.json: {db_err}")
+
+            if not recovered:
+                # Check backend/backups
+                backups_dir = os.path.join(DATA_DIR, "backups")
+                if os.path.exists(backups_dir):
+                    backup_files = sorted([os.path.join(backups_dir, f) for f in os.listdir(backups_dir)], reverse=True)
+                    for b_file in backup_files:
+                        target_json = b_file if b_file.endswith(".json") else os.path.join(b_file, "network_data.json")
+                        if os.path.exists(target_json):
+                            try:
+                                with open(target_json, "r", encoding="utf-8") as bf:
+                                    b_data = json.load(bf)
+                                    if isinstance(b_data.get("devices"), list) and len(b_data["devices"]) > 0:
+                                        save_data_unsafe(b_data)
+                                        print(f"[Recovery] Restored {len(b_data['devices'])} devices from backup: {target_json}")
+                                        return b_data
+                            except Exception:
+                                continue
+
+            print(f"[Notice] No backup found to recover. Generating seed data.")
             data = get_initial_seed_data()
             save_data_unsafe(data)
             return data

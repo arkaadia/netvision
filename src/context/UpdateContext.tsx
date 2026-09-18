@@ -210,13 +210,13 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Provide live progressive UI logs during server operations
       const simulatedSteps = isPersian ? [
-        '[گام ۲/۶] همگام‌سازی کامل کدها و فایل‌های مخزن با برنچ اصلی GitHub...',
+        '[گام ۲/۶] همگام‌سازی کدهای مخزن، پشتیبان‌گیری و ادغام پایدار دیتابیس و دیوایس‌ها...',
         '[گام ۳/۶] نصب و بازسازی پکیج‌های NPM و ابزارهای ساخت (Vite/TypeScript)...',
         '[گام ۴/۶] پاکسازی پروسه پایتون و بررسی ماژول‌های backend (paramiko, requests)...',
         '[گام ۵/۶] ساخت و کامپایل مجدد کدهای اجرایی پنل (Production Build)...',
         '[گام ۶/۶] نهایی‌سازی تنظیمات، آماده‌سازی سرویس و ری‌استارت نهایی...'
       ] : [
-        '[Phase 2/6] Synchronizing repository codebase with GitHub master branch...',
+        '[Phase 2/6] Synchronizing repository, safeguarding and merging device inventory & database...',
         '[Phase 3/6] Installing & reconciling NPM packages and build tools (Vite/TypeScript)...',
         '[Phase 4/6] Clearing stale Python process & verifying backend packages (paramiko, requests)...',
         '[Phase 5/6] Compiling production frontend and backend bundles...',

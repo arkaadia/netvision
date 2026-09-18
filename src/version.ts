@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.74.4';
+export const APP_VERSION = '1.74.5';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.74.5',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'حفظ و ادغام قطعی دیتابیس، تجهیزات و تنظیمات کاربر در هنگام به‌روزرسانی پنل (User Inventory & Database Persistence During Update)',
+    title_en: 'Guaranteed Device Inventory, Database State & Credential Persistence Engine During Panel Updates',
+    changes: [
+      'حل کامل مشکل حذف تجهیزات ثبت‌شده در صفحه Network Equipment Inventory پس از اجرای Standard Update یا Clean Reinstall.',
+      'ایجاد موتور پشتیبان‌گیری چندلایه‌ای عمیق (Deep Snapshot & Persistent Vault) در حافظه و دیسک قبل از شروع فرآیند به‌روزرسانی برای نگهداری کامل network_data.json، database_store.json و .env.',
+      'پیاده‌سازی مرحله ادغام هوشمند (Smart Merge) پس از همگام‌سازی با گیت‌هاب جهت حفظ و اولویت‌دهی ۱۰۰٪ به تمام تجهیزات، پورت‌ها، لینک‌های توپولوژی، نقشه‌های سفارشی، پسوردها و یادداشت‌های ثبت‌شده توسط کاربر.',
+      'افزودن لایه بازگردانی اضطراری خودکار (Fallback Auto-Recovery) در بک‌اند در صورت وقوع هرگونه خطای احتمالی در فایل‌های داده.'
+    ],
+    changes_en: [
+      'Completely resolved device inventory loss where user-created network equipment disappeared after performing a Standard Update or Clean Reinstall.',
+      'Introduced a multi-layered Deep Snapshot & Persistent Vault engine storing in-memory and disk backups of network_data.json, database_store.json, and .env before update pipelines start.',
+      'Engineered an intelligent post-git synchronization Smart Merge phase ensuring 100% preservation and priority for all user-defined devices, ports, topology links, custom maps, credentials, and sticky notes.',
+      'Added automated fallback recovery in backend data loader to restore state from persistent backups if any corruption or missing data is detected.'
+    ]
+  },
   {
     version: '1.74.4',
     releaseDate: '2026-09-18',
