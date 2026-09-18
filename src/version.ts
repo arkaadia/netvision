@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.74.1';
+export const APP_VERSION = '1.74.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.74.2',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'تجهیز مودال تایید رایت NVRAM به دکمه و حالت تمام‌صفحه و یکپارچگی سراسری (Modal Fullscreen & Architecture Verification)',
+    title_en: 'Write Memory Confirmation Modal Fullscreen Support & Architecture Verification',
+    changes: [
+      'بررسی و تایید معماری یکپارچه مودال تایید رایت (Confirm Save Configuration to NVRAM): استفاده از کامپوننت مشترک واحد در تمام بخش‌ها (لیست تجهیزات، مودال پورت سیسکو و ترمینال سیسکو).',
+      'تجهیز مودال تایید به دکمه فول‌اسکرین (Fullscreen / Maximize) در هدر با آیکون‌های استاندارد Maximize2 و Minimize2.',
+      'گسترش هوشمندانه ارتفاع و ابعاد بخش لیست تغییرات پورت‌ها و کادر پیش‌نمایش دستورات خط فرمان سیسکو (CLI Diff Preview) در حالت تمام‌صفحه جهت سهولت بررسی تغییرات حجیم.',
+      'رعایت دقیق قوانین چندزبانگی و واکنش‌گرایی در هر دو تم تیره و روشن.'
+    ],
+    changes_en: [
+      'Architecture verification: confirmed a single unified "Confirm Save Configuration to NVRAM" modal component across all interfaces (Device Inventory, Port Inspector, and Cisco Terminal).',
+      'Equipped the confirmation modal with Fullscreen/Maximize toggle in the header controls using standard Lucide Maximize2 and Minimize2 icons.',
+      'Intelligent layout and height expansion for modified interfaces list and Cisco CLI Diff Preview box in fullscreen mode for effortless auditing of large configurations.',
+      'Strict adherence to multilingual localization and responsive design in both dark and light modes.'
+    ]
+  },
   {
     version: '1.74.1',
     releaseDate: '2026-09-18',

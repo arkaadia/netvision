@@ -55,6 +55,7 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
   const [activeTab, setActiveTab] = useState<'summary' | 'cli'>('summary');
   const [remoteData, setRemoteData] = useState<DeviceUnsavedChangesInfo | null>(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Determine light mode from prop or document element
   const isLight =
@@ -179,12 +180,18 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto"
+      className={`fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm transition-all duration-150 ${
+        isFullscreen ? 'p-0 overflow-hidden' : 'p-3 sm:p-4 overflow-y-auto'
+      }`}
       data-modal-backdrop="true"
     >
       <div
         dir={isEn ? 'ltr' : 'rtl'}
-        className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col my-auto transition-all animate-in fade-in zoom-in-95 duration-150 ${
+        className={`border shadow-2xl flex flex-col transition-all duration-200 ${
+          isFullscreen
+            ? 'w-full h-full max-w-none rounded-none border-0'
+            : 'w-full max-w-2xl rounded-2xl my-auto max-h-[90vh] animate-in fade-in zoom-in-95'
+        } ${
           isLight
             ? 'bg-white border-slate-200 text-slate-800 shadow-slate-300/50'
             : 'bg-slate-900 border-slate-800 text-slate-100 shadow-black/80'
@@ -227,6 +234,8 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
           <ModalHeaderControls
             onClose={onClose}
             onMinimize={onMinimize}
+            onMaximizeToggle={() => setIsFullscreen((prev) => !prev)}
+            isMaximized={isFullscreen}
             isLightMode={isLight}
             isEn={isEn}
             minimizeTooltip={isEn ? 'Minimize confirmation' : 'مینیمایز پنجره'}
@@ -235,7 +244,11 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
+        <div
+          className={`p-5 space-y-4 overflow-y-auto flex-1 ${
+            isFullscreen ? 'max-h-none' : 'max-h-[70vh]'
+          }`}
+        >
           {/* Warning Banner */}
           <div
             className={`p-3.5 rounded-xl border flex items-start gap-3 ${
@@ -340,7 +353,9 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
                     </span>
                   </p>
 
-                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  <div className={`space-y-1.5 overflow-y-auto pr-1 ${
+                    isFullscreen ? 'max-h-[55vh]' : 'max-h-56'
+                  }`}>
                     {combinedPending.map((item, idx) => (
                       <div
                         key={item.id || idx}
@@ -447,7 +462,9 @@ export const CiscoWriteConfirmModal: React.FC<CiscoWriteConfirmModalProps> = ({
           {activeTab === 'cli' && (
             <div className="space-y-2">
               <div
-                className={`p-3 rounded-xl font-mono text-[11px] leading-relaxed overflow-x-auto max-h-64 border shadow-inner ${
+                className={`p-3 rounded-xl font-mono text-[11px] leading-relaxed overflow-x-auto border shadow-inner ${
+                  isFullscreen ? 'max-h-[60vh]' : 'max-h-64'
+                } ${
                   isLight
                     ? 'bg-slate-950 text-emerald-400 border-slate-800'
                     : 'bg-slate-950 text-emerald-400 border-slate-800'
