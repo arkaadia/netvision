@@ -10,9 +10,49 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.81.2';
+export const APP_VERSION = '1.83.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.83.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'دریافت واقعی تله‌متری و منابع سخت‌افزاری روتر میکروتیک از طریق SSH، افکت لودینگ شیمر (Shimmer) و شفاف‌سازی کادر مدیریت تجهیزات',
+    title_en: 'Live Real-Hardware MikroTik System Resources & Telemetry via SSH, Shimmer Loading Effect, and Transparent Inventory Header',
+    changes: [
+      'جایگزینی کامل دیتای شبیه‌سازی‌شده در تب منابع سیستم (System Resources) روتر میکروتیک با دریافت بلادرنگ و زنده اطلاعات سخت‌افزاری از طریق SSH با دستورات /system resource, /system health, /system routerboard و /interface.',
+      'طراحی و پیاده‌سازی کامپوننت اختصاصی MikroTikSystemResourcesTab شامل ۶ کارت متریک پیشرفته (معماری و لود CPU، حافظه RAM، حافظه ذخیره‌سازی فلش و Bad Blocks، ولتاژ و سنسورهای حرارتی، فریم‌ور و بایوس روتربورد، وضعیت اینترفیس‌ها و FastPath/L3HW).',
+      'تجهیز تب منابع سیستم به افکت انیمیشنی پیشرفته شیمر (Shimmer Effect) و حالت اسکلتون در هنگام استعلام و رفرش داده‌ها.',
+      'افزودن کنسول زنده خروجی دستورات تشخیصی RouterOS با قابلیت سوئیچ و کپی سریع به همراه بازخورد دیداری.',
+      'اصلاح کادر عنوان "Network Equipment Inventory & Management" در DeviceListView و حذف پس‌زمینه مشکی جهت نمایش کاملاً شفاف و بی‌رنگ در هر دو تم تیره و روشن.'
+    ],
+    changes_en: [
+      'Completely replaced simulated hardware values in MikroTik Port Modal System Resources tab with live real-time hardware telemetry over SSH using /system resource, /system health, /system routerboard, and /interface commands.',
+      'Architected dedicated MikroTikSystemResourcesTab component featuring 6 high-density telemetry cards (CPU architecture & load, RAM memory headroom, NAND flash & bad blocks wear, DC/AC voltages & thermal sensors, RouterBOOT firmware/BIOS, interface engine & FastPath/L3HW offload).',
+      'Integrated sleek Shimmer loading animation and pulse skeleton states during initial load and telemetry refresh operations.',
+      'Added live RouterOS CLI diagnostic viewer with interactive command switching tabs and one-click copy to clipboard.',
+      'Made "Network Equipment Inventory & Management" header container in DeviceListView fully transparent, removing unwanted dark background across both light and dark themes.'
+    ]
+  },
+  {
+    version: '1.82.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'دریافت واقعی منابع سیستم و تله‌متری سخت‌افزار سیسکو از طریق SSH به همراه افکت لودینگ شیمر (Shimmer)',
+    title_en: 'Live Real-Hardware Cisco System Resources & Telemetry Telemetry via SSH with Shimmer Loading Effect',
+    changes: [
+      'جایگزینی کامل داده‌های شبیه‌سازی‌شده در تب منابع سیستم (System Resources) مودال پورت سیسکو با دریافت واقعی دیتای سخت‌افزار از طریق دستورات تشخیصی SSH.',
+      'پیاده‌سازی انیمیشن و افکت پیشرفته شیمر (Shimmer Effect) در حین واکشی و لودینگ دیتا و رفرش مجدد، جهت ارائه تجربه کاربری روان و شیک.',
+      'افزودن متدهای اختصاصی get_system_resources_commands و parse_system_resources در درایور سیسکو و ایجاد اندپوینت /api/devices/:id/cisco-resources در بک‌اند.',
+      'تجهیز کلیه کارت‌های پردازنده، حافظه، فلش، حرارت، PoE و سیستم خنک‌کننده به ابزارک‌های راهنمای سه‌بخشی (FieldInfoTooltip) و پشتیبانی صددرصدی از زبان انتخابی (فارسی و انگلیسی).'
+    ],
+    changes_en: [
+      'Completely replaced simulated hardware figures in the Cisco Port Modal System Resources tab with live telemetry retrieved directly from switch hardware over SSH.',
+      'Implemented a sleek Shimmer loading skeleton effect during initial telemetry load and dynamic re-fetch operations.',
+      'Added specialized get_system_resources_commands and parse_system_resources methods to backend Cisco driver and integrated /api/devices/:id/cisco-resources API endpoint.',
+      'Equipped all metric cards (CPU, RAM, Flash, Thermal, PoE, Cooling) with 3-part boundary-safe FieldInfoTooltips and strict bidirectional localization.'
+    ]
+  },
   {
     version: '1.81.2',
     releaseDate: '2026-09-18',

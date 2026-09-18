@@ -1,4 +1,5 @@
 import json
+import datetime
 import os
 import sys
 import time
@@ -1260,6 +1261,85 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
 
+    def _handle_device_resources(self, path: str, body: Optional[Dict[str, Any]] = None):
+        parts = path.split("/")
+        dev_id = parts[3] if len(parts) >= 4 else ""
+        data = load_data()
+        device = next((d for d in data["devices"] if d["id"] == dev_id), None)
+        if not device:
+            self._send_json(404, {"error": "Device not found", "success": False})
+            return
+
+        dev_platform = device.get("platform", "")
+        if path.endswith("/mikrotik-resources") or "mikrotik" in str(dev_platform).lower():
+            default_platform = "mikrotik_routeros"
+        else:
+            default_platform = "cisco_ios_xe"
+        platform = dev_platform or default_platform
+        driver = get_driver(platform, default_platform)
+        existing_ports = data.get("ports", {}).get(dev_id, [])
+
+        conn = device.get("connection", {}) or {}
+        conn_host = conn.get("host") or device.get("ssh_host") or device.get("ip", "")
+
+        # Check if caller passed override credentials in body
+        if body and isinstance(body, dict):
+            if body.get("host"):
+                conn_host = body.get("host")
+            if body.get("username"):
+                device = dict(device)
+                device["ssh_username"] = body.get("username")
+            if body.get("password"):
+                device = dict(device)
+                device["ssh_password"] = body.get("password")
+
+        is_live = False
+        raw_outputs = {}
+        error_msg = ""
+        latency_ms = None
+
+        if conn_host:
+            sess = connection_manager.get_or_create_session(device, require_real=True)
+            if sess.status == "connected" and sess.is_real and sess.paramiko_client:
+                try:
+                    cmd_defs = driver.get_system_resources_commands() if hasattr(driver, "get_system_resources_commands") else []
+                    for item in cmd_defs:
+                        k = item["key"]
+                        c = item["cmd"]
+                        res = connection_manager.execute_command(device, c, require_real=True)
+                        if res.get("success") and res.get("output") is not None:
+                            raw_outputs[k] = res["output"]
+                    is_live = len(raw_outputs) > 0
+                    latency_ms = sess.latency_ms
+                except Exception as ex:
+                    error_msg = str(ex)
+            else:
+                error_msg = sess.error_message or f"SSH connection to {conn_host} failed or device offline"
+        else:
+            error_msg = "Device IP or SSH host is not configured."
+
+        if hasattr(driver, "parse_system_resources"):
+            parsed = driver.parse_system_resources(raw_outputs, device, existing_ports)
+        else:
+            parsed = {}
+
+        parsed["success"] = is_live
+        parsed["is_live"] = is_live
+        parsed["connected"] = is_live
+        parsed["latency_ms"] = latency_ms
+        parsed["timestamp"] = datetime.datetime.utcnow().isoformat() + "Z"
+        parsed["host"] = conn_host
+        if not is_live:
+            parsed["warning"] = error_msg or "Live hardware telemetry unavailable"
+            parsed["error"] = error_msg
+        self._send_json(200, parsed)
+
+    def _handle_cisco_resources(self, path: str, body: Optional[Dict[str, Any]] = None):
+        self._handle_device_resources(path, body)
+
+    def _handle_mikrotik_resources(self, path: str, body: Optional[Dict[str, Any]] = None):
+        self._handle_device_resources(path, body)
+
     def do_GET(self):
         url = urlparse(self.path)
         path = url.path.rstrip('/') or '/'
@@ -1522,6 +1602,11 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 "banner": sess.banner if sess else "",
                 "mode": sess.mode if sess else device.get("connection_mode", "ssh")
             })
+            return
+
+        if path.startswith("/api/devices/") and (path.endswith("/cisco-resources") or path.endswith("/mikrotik-resources") or path.endswith("/system-resources")):
+            # GET /api/devices/:id/cisco-resources or /mikrotik-resources or /system-resources
+            self._handle_device_resources(path)
             return
 
         if path.startswith("/api/devices/") and path.endswith("/vlans"):
@@ -2551,6 +2636,11 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             require_real = device.get("connection_mode") != "simulator"
             res = connection_manager.execute_command(device, cmd, require_real=require_real)
             self._send_json(200, res)
+            return
+
+        if path.startswith("/api/devices/") and (path.endswith("/cisco-resources") or path.endswith("/mikrotik-resources") or path.endswith("/system-resources")):
+            # POST /api/devices/:id/cisco-resources or /mikrotik-resources (with optional force/credentials)
+            self._handle_device_resources(path, body)
             return
 
         if path.startswith("/api/devices/") and path.endswith("/ports/sync"):

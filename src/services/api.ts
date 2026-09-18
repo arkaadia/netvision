@@ -826,3 +826,204 @@ export async function deleteMikroTikVPN(
   return data;
 }
 
+export interface CiscoSystemResourcesResponse {
+  success: boolean;
+  is_live: boolean;
+  connected?: boolean;
+  device_id?: string;
+  host?: string;
+  timestamp?: string;
+  warning?: string;
+  error?: string;
+  latency_ms?: number | null;
+  cpu: {
+    cpuLoad5s: number;
+    cpuLoad1m: number;
+    cpuLoad5m: number;
+    interrupts: number;
+    cpuArch: string;
+    topProcesses: Array<{
+      pid: number;
+      name: string;
+      cpu5s: number;
+      cpu1m: number;
+      cpu5m: number;
+    }>;
+  };
+  ram: {
+    totalRamMB: number;
+    usedRamMB: number;
+    freeRamMB: number;
+    ramPercent: number;
+    ioBuffersMB: number;
+  };
+  storage: {
+    totalFlashMB: number;
+    usedFlashMB: number;
+    freeFlashMB: number;
+    flashPercent: number;
+    nvramKB: number;
+    usedNvramKB: number;
+  };
+  thermal: {
+    currentTemp: number;
+    tempThreshold: number;
+    tempState: string;
+    inletTemp: number;
+    exhaustTemp: number;
+  };
+  poe: {
+    maxPoeWatts: number;
+    totalPoeWatts: number;
+    remainingPoeWatts: number;
+    poePercent: number;
+    poeDeliveringPortsCount: number;
+  };
+  cooling: {
+    fansCount: number;
+    fanSpeeds: string;
+    fanStatus: string;
+    airflow: string;
+    psuStatus: string;
+  };
+  hardware: {
+    hostname: string;
+    model: string;
+    iosVersion: string;
+    uptime: string;
+    processorBoardId: string;
+    lastReloadReason: string;
+    systemImageFile: string;
+    totalPortsCount: number;
+    upPortsCount: number;
+    macTableCount: number;
+    vlanCapacity: number;
+    asicForwardingMpps: number;
+    bandwidthGbps: number;
+  };
+  cliOutputs: {
+    cpu: { cmd: string; output: string };
+    memory: { cmd: string; output: string };
+    env: { cmd: string; output: string };
+    power: { cmd: string; output: string };
+    version: { cmd: string; output: string };
+  };
+}
+
+export async function fetchCiscoSystemResources(
+  deviceId: string,
+  credentials?: { host?: string; username?: string; password?: string }
+): Promise<CiscoSystemResourcesResponse> {
+  const options: RequestInit = credentials
+    ? {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      }
+    : {
+        method: 'GET',
+      };
+
+  const res = await fetch(`${API_BASE}/devices/${deviceId}/cisco-resources`, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to fetch Cisco system resources' }));
+    throw new Error(err.error || err.warning || err.message || 'Failed to fetch Cisco system resources');
+  }
+  return res.json();
+}
+
+export interface MikroTikSystemResourcesResponse {
+  device_id: string;
+  is_live: boolean;
+  connected: boolean;
+  latency_ms?: number | null;
+  timestamp: string;
+  host?: string;
+  warning?: string;
+  error?: string;
+  cpu: {
+    cpuArch: string;
+    cpuCores: number;
+    cpuFrequency: string;
+    cpuLoad: number;
+    cpuTemp?: number;
+  };
+  ram: {
+    totalRamMB: number;
+    usedRamMB: number;
+    freeRamMB: number;
+    ramPercent: number;
+  };
+  storage: {
+    totalHddMB: number;
+    usedHddMB: number;
+    freeHddMB: number;
+    hddPercent: number;
+    badBlocks: string;
+    writeSectSinceReboot: number;
+    writeSectTotal: number;
+  };
+  health: {
+    voltage: string;
+    current: string;
+    boardTemp: number;
+    cpuTemp: number;
+    sfpTemp: number;
+    fanStatus: string;
+    fanSpeeds: string;
+    psuStatus: string;
+  };
+  routerboard: {
+    isRouterboard: boolean;
+    model: string;
+    serialNumber: string;
+    currentFirmware: string;
+    upgradeFirmware: string;
+    firmwareType: string;
+    factorySoftware: string;
+  };
+  system: {
+    identity: string;
+    uptime: string;
+    version: string;
+    architecture: string;
+    boardName: string;
+    softwareId: string;
+    licenseLevel: string;
+    totalInterfaces: number;
+    runningInterfaces: number;
+  };
+  cliOutputs: {
+    resource: { cmd: string; output: string };
+    health: { cmd: string; output: string };
+    routerboard: { cmd: string; output: string };
+    license: { cmd: string; output: string };
+    package: { cmd: string; output: string };
+    interface: { cmd: string; output: string };
+  };
+}
+
+export async function fetchMikroTikSystemResources(
+  deviceId: string,
+  credentials?: { host?: string; username?: string; password?: string }
+): Promise<MikroTikSystemResourcesResponse> {
+  const options: RequestInit = credentials
+    ? {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      }
+    : {
+        method: 'GET',
+      };
+
+  const res = await fetch(`${API_BASE}/devices/${deviceId}/mikrotik-resources`, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to fetch MikroTik system resources' }));
+    throw new Error(err.error || err.warning || err.message || 'Failed to fetch MikroTik system resources');
+  }
+  return res.json();
+}
+
+
+

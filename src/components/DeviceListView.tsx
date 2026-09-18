@@ -298,7 +298,7 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
   return (
     <div className={`p-4 sm:p-6 space-y-4 max-w-7xl mx-auto ${isRtl ? 'text-right' : 'text-left'} text-slate-100`}>
       {/* Page Header (Sticky header so Register New Device remains fixed on scroll) */}
-      <div className="sticky top-0 z-20 -mt-2 pt-2 pb-2 bg-slate-950/85 backdrop-blur-xl border-b border-white/5 -mx-4 sm:-mx-6 px-4 sm:px-6 transition-all">
+      <div className="sticky top-0 z-20 -mt-2 pt-2 pb-2 bg-transparent -mx-4 sm:-mx-6 px-4 sm:px-6 transition-all">
         <div className="flex flex-wrap items-center justify-between gap-3 spatial-glass p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl">
           <div>
             <div className="flex items-center gap-2.5">

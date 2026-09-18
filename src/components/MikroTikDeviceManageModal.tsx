@@ -37,6 +37,7 @@ import {
 } from './MikroTikPortConfigConfirmModal';
 import { MikroTikVPNSuite } from './vpn/MikroTikVPNSuite';
 import { WinBoxLauncherModal } from './terminal/WinBoxLauncherModal';
+import { MikroTikSystemResourcesTab } from './MikroTikSystemResourcesTab';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export interface MikroTikDeviceManageModalProps {
@@ -1071,64 +1072,13 @@ export const MikroTikDeviceManageModal: React.FC<MikroTikDeviceManageModalProps>
           )}
 
           {activeTab === 'resources' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div
-                className={`p-4 rounded-xl border space-y-2 ${
-                  isLightMode ? 'border-slate-200 bg-white shadow-xs' : 'border-slate-800 bg-slate-900/60'
-                }`}
-              >
-                <span className={`text-xs flex items-center gap-1.5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                  <Cpu className={`w-4 h-4 ${isLightMode ? 'text-cyan-600' : 'text-cyan-400'}`} />
-                  {isEn ? 'CPU Architecture' : 'معماری و پردازنده'}
-                </span>
-                <div className={`text-lg font-bold font-mono ${isLightMode ? 'text-slate-900' : 'text-white'}`}>ARM 64-bit</div>
-                <div className={`text-xs font-mono ${isLightMode ? 'text-cyan-700 font-bold' : 'text-cyan-300'}`}>
-                  4 Cores @ 2000 MHz
-                </div>
-                <div className={`w-full rounded-full h-1.5 mt-2 overflow-hidden ${isLightMode ? 'bg-slate-200' : 'bg-slate-800'}`}>
-                  <div className="bg-cyan-500 h-full w-[14%]" />
-                </div>
-                <div className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Current Load: 14%</div>
-              </div>
-
-              <div
-                className={`p-4 rounded-xl border space-y-2 ${
-                  isLightMode ? 'border-slate-200 bg-white shadow-xs' : 'border-slate-800 bg-slate-900/60'
-                }`}
-              >
-                <span className={`text-xs flex items-center gap-1.5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                  <Zap className={`w-4 h-4 ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`} />
-                  {isEn ? 'System Memory (RAM)' : 'حافظه اصلی (RAM)'}
-                </span>
-                <div className={`text-lg font-bold font-mono ${isLightMode ? 'text-slate-900' : 'text-white'}`}>4096 MB</div>
-                <div className={`text-xs font-mono ${isLightMode ? 'text-emerald-700 font-bold' : 'text-emerald-300'}`}>
-                  Free: 3412.5 MB (83%)
-                </div>
-                <div className={`w-full rounded-full h-1.5 mt-2 overflow-hidden ${isLightMode ? 'bg-slate-200' : 'bg-slate-800'}`}>
-                  <div className="bg-emerald-500 h-full w-[17%]" />
-                </div>
-                <div className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Used: 683.5 MB</div>
-              </div>
-
-              <div
-                className={`p-4 rounded-xl border space-y-2 ${
-                  isLightMode ? 'border-slate-200 bg-white shadow-xs' : 'border-slate-800 bg-slate-900/60'
-                }`}
-              >
-                <span className={`text-xs flex items-center gap-1.5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                  <HardDrive className={`w-4 h-4 ${isLightMode ? 'text-purple-600' : 'text-purple-400'}`} />
-                  {isEn ? 'NAND Flash Storage' : 'حافظه ذخیره‌سازی فلش'}
-                </span>
-                <div className={`text-lg font-bold font-mono ${isLightMode ? 'text-slate-900' : 'text-white'}`}>128 MB</div>
-                <div className={`text-xs font-mono ${isLightMode ? 'text-purple-700 font-bold' : 'text-purple-300'}`}>
-                  Free: 94.2 MB (73%)
-                </div>
-                <div className={`w-full rounded-full h-1.5 mt-2 overflow-hidden ${isLightMode ? 'bg-slate-200' : 'bg-slate-800'}`}>
-                  <div className="bg-purple-500 h-full w-[27%]" />
-                </div>
-                <div className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Bad Blocks: 0.0%</div>
-              </div>
-            </div>
+            <MikroTikSystemResourcesTab
+              device={device}
+              ports={ports}
+              isLightMode={isLightMode}
+              isEn={isEn}
+              onConnectTerminal={onConnectTerminal}
+            />
           )}
 
           {activeTab === 'export' && (

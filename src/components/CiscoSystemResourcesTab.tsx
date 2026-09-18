@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Cpu,
   Zap,
@@ -16,9 +16,14 @@ import {
   Clock,
   ShieldCheck,
   AlertTriangle,
-  Info
+  Wifi,
+  WifiOff,
+  Radio,
+  ExternalLink
 } from 'lucide-react';
 import { Device, SwitchPort } from '../types';
+import { fetchCiscoSystemResources, CiscoSystemResourcesResponse } from '../services/api';
+import { FieldInfoTooltip } from './common/FieldInfoTooltip';
 
 interface CiscoSystemResourcesTabProps {
   device: Device;
@@ -33,26 +38,62 @@ export const CiscoSystemResourcesTab: React.FC<CiscoSystemResourcesTabProps> = (
   isEn,
   onConnectTerminal,
 }) => {
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [resources, setResources] = useState<CiscoSystemResourcesResponse | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedCliCommand, setSelectedCliCommand] = useState<'cpu' | 'memory' | 'env' | 'power' | 'version'>('cpu');
-  const [copiedCli, setCopiedCli] = useState(false);
-  const [telemetryTick, setTelemetryTick] = useState(0);
+  const [copiedCli, setCopiedCli] = useState<boolean>(false);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+
+  const loadResources = useCallback(async (isManualRefresh: boolean = false) => {
+    if (isManualRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    setFetchError(null);
+
+    try {
+      const data = await fetchCiscoSystemResources(device.id);
+      setResources(data);
+      setLastFetched(new Date());
+      if (!data.is_live && data.warning) {
+        setFetchError(data.warning);
+      }
+    } catch (err: any) {
+      console.warn('Failed to load Cisco system resources:', err);
+      setFetchError(err.message || (isEn ? 'Could not reach device SSH service' : 'عدم دسترسی به سرویس SSH تجهیز'));
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [device.id, isEn]);
+
+  useEffect(() => {
+    loadResources(false);
+  }, [loadResources]);
 
   const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setTelemetryTick((prev) => prev + 1);
-      setIsRefreshing(false);
-    }, 450);
+    if (isLoading || isRefreshing) return;
+    loadResources(true);
   };
 
-  // Derive realistic hardware specs from device model
+  const handleCopyCli = () => {
+    const activeText = resources?.cliOutputs?.[selectedCliCommand]?.output || '';
+    if (!activeText) return;
+    navigator.clipboard.writeText(activeText);
+    setCopiedCli(true);
+    setTimeout(() => setCopiedCli(false), 2000);
+  };
+
+  // Safe fallback calculation based on device if resources are not yet loaded
   const modelUpper = (device.model || '').toUpperCase();
   const isCatalyst9000 = modelUpper.includes('9300') || modelUpper.includes('9200') || modelUpper.includes('9500');
   const isCatalyst3850 = modelUpper.includes('3850') || modelUpper.includes('3650');
   const isNexus = modelUpper.includes('NEXUS') || modelUpper.includes('N9K') || modelUpper.includes('N3K');
 
-  const cpuArch = isCatalyst9000
+  const defaultCpuArch = isCatalyst9000
     ? 'x86 Quad-Core @ 1.80 GHz (x86_64)'
     : isCatalyst3850
     ? 'ARMv7 Multi-Core @ 1.20 GHz'
@@ -60,132 +101,98 @@ export const CiscoSystemResourcesTab: React.FC<CiscoSystemResourcesTabProps> = (
     ? 'Intel Xeon 4-Core @ 2.40 GHz'
     : 'PowerPC APM86392 Dual-Core @ 600 MHz';
 
-  const totalRamMB = isCatalyst9000 ? 8192 : isCatalyst3850 ? 4096 : isNexus ? 16384 : 512;
-  const totalFlashMB = isCatalyst9000 ? 16384 : isCatalyst3850 ? 2048 : isNexus ? 32768 : 128;
-  const nvramKB = isCatalyst9000 ? 4096 : isCatalyst3850 ? 2048 : isNexus ? 8192 : 512;
+  const cpu = resources?.cpu || {
+    cpuLoad5s: 12,
+    cpuLoad1m: 14,
+    cpuLoad5m: 11,
+    interrupts: 1,
+    cpuArch: defaultCpuArch,
+    topProcesses: []
+  };
 
-  // Real-time jitter for dynamic display
-  const baseCpu = 14 + (telemetryTick % 5);
-  const cpuLoad5s = Math.min(95, baseCpu);
-  const cpuLoad1m = Math.max(8, baseCpu - 2);
-  const cpuLoad5m = Math.max(6, baseCpu - 4);
+  const ram = resources?.ram || {
+    totalRamMB: isCatalyst9000 ? 8192 : isCatalyst3850 ? 4096 : 512,
+    usedRamMB: isCatalyst9000 ? 2100 : 180,
+    freeRamMB: isCatalyst9000 ? 6092 : 332,
+    ramPercent: 35,
+    ioBuffersMB: 18
+  };
 
-  const usedRamMB = Math.round(totalRamMB * (0.22 + ((telemetryTick % 3) * 0.01)));
-  const freeRamMB = totalRamMB - usedRamMB;
-  const ramPercent = Math.round((usedRamMB / totalRamMB) * 100);
+  const storage = resources?.storage || {
+    totalFlashMB: isCatalyst9000 ? 16384 : 128,
+    usedFlashMB: isCatalyst9000 ? 6200 : 82,
+    freeFlashMB: isCatalyst9000 ? 10184 : 46,
+    flashPercent: 64,
+    nvramKB: 2048,
+    usedNvramKB: 184
+  };
 
-  const usedFlashMB = Math.round(totalFlashMB * 0.38);
-  const freeFlashMB = totalFlashMB - usedFlashMB;
-  const flashPercent = Math.round((usedFlashMB / totalFlashMB) * 100);
+  const thermal = resources?.thermal || {
+    currentTemp: 34,
+    tempThreshold: 65,
+    tempState: 'GREEN',
+    inletTemp: 27,
+    exhaustTemp: 36
+  };
 
-  const usedNvramKB = Math.round(nvramKB * 0.09);
-  const freeNvramKB = nvramKB - usedNvramKB;
+  const poe = resources?.poe || {
+    maxPoeWatts: 370,
+    totalPoeWatts: 78,
+    remainingPoeWatts: 292,
+    poePercent: 21,
+    poeDeliveringPortsCount: 4
+  };
 
-  // Active port calculations
-  const upPortsCount = ports.filter((p) => p.status === 'up').length;
-  const totalPortsCount = ports.length || 48;
+  const cooling = resources?.cooling || {
+    fansCount: 2,
+    fanSpeeds: 'Fan 1: 4,820 RPM • Fan 2: 4,790 RPM',
+    fanStatus: '2x Fans OK',
+    airflow: 'Front-to-Back',
+    psuStatus: 'PSU 1: Operational'
+  };
 
-  // PoE Calculation from ports
-  const poeDeliveringPorts = ports.filter((p) => p.poe_status === 'delivering' || (p.poe_power && p.poe_power > 0));
-  const totalPoeWatts = ports.reduce((acc, p) => acc + (Number(p.poe_power) || 0), 0) || 78;
-  const maxPoeWatts = 370;
-  const poePercent = Math.min(100, Math.round((totalPoeWatts / maxPoeWatts) * 100));
+  const hw = resources?.hardware || {
+    hostname: device.name || 'Switch',
+    model: device.model || 'Cisco Switch',
+    iosVersion: '15.2(7)E7',
+    uptime: '48 days, 14 hours, 32 minutes',
+    processorBoardId: 'FOC2149V001',
+    lastReloadReason: 'Power-on',
+    systemImageFile: 'flash:c2960x-universalk9-mz.152-7.E7.bin',
+    totalPortsCount: ports.length || 48,
+    upPortsCount: ports.filter(p => p.status === 'up').length || 16,
+    macTableCount: 16384,
+    vlanCapacity: 4096,
+    asicForwardingMpps: 101.2,
+    bandwidthGbps: 128
+  };
 
-  // Temperature
-  const currentTemp = 33 + (telemetryTick % 3);
-
-  // Formatted Cisco CLI Commands outputs
-  const cliOutputs: Record<string, { cmd: string; output: string }> = {
+  // Fallback formatted CLI outputs if real ones are loading
+  const cliOutputs = resources?.cliOutputs || {
     cpu: {
       cmd: 'show processes cpu sorted',
-      output: `${device.name || 'Switch'}# show processes cpu sorted
-CPU utilization for five seconds: ${cpuLoad5s}%/2%; one minute: ${cpuLoad1m}%; five minutes: ${cpuLoad5m}%
- PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process
-   1           0           4          0  0.00%  0.00%  0.00%   0 Chunk Manager
-   2        3412       12891        264  1.42%  1.18%  1.10%   0 IP Input
-   3        1248        8912        140  0.88%  0.72%  0.68%   0 Spanning Tree
-   4        5820       24810        234  1.20%  1.10%  0.95%   0 SSH Process
-   5         940        4812        195  0.45%  0.38%  0.32%   0 SNMP Engine
-   6         420        2100        200  0.20%  0.15%  0.12%   0 CDP Protocol
-   7         310        1520        203  0.15%  0.12%  0.10%   0 LLDP Protocol
-[OK - Normal System Load]`
+      output: `${device.name || 'Switch'}# show processes cpu sorted\n(Reading telemetry from device...)`
     },
     memory: {
       cmd: 'show memory statistics',
-      output: `${device.name || 'Switch'}# show memory statistics
-                Head    Total(b)     Used(b)     Free(b)   Lowest(b)  Largest(b)
-Processor   2B088480   ${(totalRamMB * 1024 * 1024).toLocaleString()}   ${(usedRamMB * 1024 * 1024).toLocaleString()}   ${(freeRamMB * 1024 * 1024).toLocaleString()}   ${(freeRamMB * 1024 * 900).toLocaleString()}   ${(freeRamMB * 1024 * 800).toLocaleString()}
-      I/O   3B088480    67108864    18454784    48654080    47185920    46530560
-
-Memory summary:
-  Total Processor Memory: ${totalRamMB} MB
-  Processor Memory Used : ${usedRamMB} MB (${ramPercent}%)
-  Processor Memory Free : ${freeRamMB} MB (${100 - ramPercent}%)
-  I/O Memory Used       : 17.6 MB (27.5%)
-[OK - Memory Allocation Healthy]`
+      output: `${device.name || 'Switch'}# show memory statistics\n(Reading telemetry from device...)`
     },
     env: {
-      cmd: 'show environment all',
-      output: `${device.name || 'Switch'}# show environment all
-FAN 1 is OK, Speed: 4820 RPM, Airflow: Front to Back
-FAN 2 is OK, Speed: 4790 RPM, Airflow: Front to Back
-FAN 3 is OK, Speed: 4850 RPM, Airflow: Front to Back
-
-SYSTEM TEMPERATURE is OK
-System Temperature Sensor: ${currentTemp} Celsius (Threshold: 65 Celsius)
-Internal Ambient Sensor  : 31 Celsius
-Inlet Air Sensor         : 27 Celsius
-Exhaust Air Sensor       : 36 Celsius
-
-POWER SUPPLY 1 is OK (AC Input: 220V, Output: 12V / 54V PoE, Capacity: 640W)
-POWER SUPPLY 2 is PRESENT / REDUNDANT (RPS Standby Mode)
-[OK - Thermal & Fan Telemetry Optimal]`
+      cmd: 'show env all',
+      output: `${device.name || 'Switch'}# show env all\n(Reading telemetry from device...)`
     },
     power: {
       cmd: 'show power inline',
-      output: `${device.name || 'Switch'}# show power inline
-Available: ${maxPoeWatts}.0(w)  Used: ${totalPoeWatts}.0(w)  Remaining: ${maxPoeWatts - totalPoeWatts}.0(w)
-
-Interface Admin  Oper       Power(Watts) Device              Class Max
---------- ------ ---------- ------------ ------------------- ----- ----
-Gi1/0/1   auto   on         15.4         IP Phone 8845       3     30.0
-Gi1/0/2   auto   on         15.4         IP Phone 8845       3     30.0
-Gi1/0/3   auto   on         25.5         Cisco Catalyst AP   4     30.0
-Gi1/0/4   auto   on         15.4         Cisco Desk Camera   3     30.0
-Gi1/0/5   auto   off        0.0          n/a                 n/a   30.0
-[PoE Power Management Active - ${poeDeliveringPorts.length || 4} Devices Delivering]`
+      output: `${device.name || 'Switch'}# show power inline\n(Reading telemetry from device...)`
     },
     version: {
       cmd: 'show version',
-      output: `${device.name || 'Switch'}# show version
-Cisco IOS Software, ${device.model || 'Catalyst L2/L3 Switch'} Software
-Technical Support: http://www.cisco.com/techsupport
-Copyright (c) 1986-2024 by Cisco Systems, Inc.
-Compiled Fri 12-Jan-24 14:32 by prod_rel_team
-
-ROM: Bootstrap program is ${device.model || 'Catalyst'} boot loader
-BOOTLDR: Version 15.2(7)E7, RELEASE SOFTWARE (fc3)
-
-${device.name || 'Switch'} uptime is 48 days, 14 hours, 32 minutes
-System returned to ROM by power-on
-System image file is "flash:${(device.model || 'c2960x').toLowerCase()}-universalk9-mz.152-7.E7.bin"
-
-cisco ${device.model || 'WS-C2960X-48TS-L'} (PowerPC) processor with ${totalRamMB * 1024}K bytes of memory.
-Processor board ID FOC2149V001
-Last reload reason: Power-on
-${totalPortsCount} Gigabit Ethernet interfaces
-${nvramKB}K bytes of non-volatile configuration memory.
-${totalFlashMB * 1024}K bytes of physical memory.`
+      output: `${device.name || 'Switch'}# show version\n(Reading telemetry from device...)`
     }
   };
 
-  const handleCopyCli = () => {
-    const activeText = cliOutputs[selectedCliCommand]?.output || '';
-    if (!activeText) return;
-    navigator.clipboard.writeText(activeText);
-    setCopiedCli(true);
-    setTimeout(() => setCopiedCli(false), 2000);
-  };
+  const isLive = Boolean(resources?.is_live);
+  const isBusy = isLoading || isRefreshing;
 
   return (
     <div className="space-y-4">
@@ -198,214 +205,480 @@ ${totalFlashMB * 1024}K bytes of physical memory.`
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-white font-mono">
-                {device.name} • {isEn ? 'Hardware Telemetry' : 'منابع و تله‌متری سخت‌افزار'}
+                {device.name} • {isEn ? 'Live Hardware Telemetry' : 'منابع زنده و تله‌متری سخت‌افزار'}
               </h3>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {isEn ? 'HEALTH: NORMAL' : 'وضعیت: نرمال'}
-              </span>
+
+              {isLive ? (
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{isEn ? 'LIVE SSH' : 'ارتباط زنده SSH'}</span>
+                  {resources?.latency_ms ? (
+                    <span className="text-[9px] text-emerald-400/80">({resources.latency_ms}ms)</span>
+                  ) : null}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span>{isEn ? 'SSH OFFLINE / STANDBY' : 'آفلاین / بدون پاسخ'}</span>
+                </span>
+              )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-              Model: <span className="text-cyan-300 font-bold">{device.model || 'Cisco Switch'}</span> • IP:{' '}
-              <span className="text-slate-200">{device.ip || '192.168.1.1'}</span> • Uptime:{' '}
-              <span className="text-slate-300">48d 14h 32m</span>
+
+            <p className="text-[11px] text-slate-400 mt-0.5 font-mono flex flex-wrap items-center gap-2">
+              <span>Model: <span className="text-cyan-300 font-bold">{hw.model || device.model || 'Cisco Switch'}</span></span>
+              <span>• IP: <span className="text-slate-200">{device.ip || '192.168.1.1'}</span></span>
+              <span>• Port: <span className="text-slate-300 font-mono">{device.ssh_port || 22}</span></span>
+              {hw.uptime && (
+                <span>• Uptime: <span className="text-slate-300">{hw.uptime}</span></span>
+              )}
+              {lastFetched && (
+                <span className="text-[10px] text-slate-500">
+                  ({isEn ? 'Synced' : 'بروزرسانی'}: {lastFetched.toLocaleTimeString()})
+                </span>
+              )}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {onConnectTerminal && (
+            <button
+              type="button"
+              onClick={() => onConnectTerminal(device)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold transition flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+              title={isEn ? 'Open Interactive Terminal' : 'باز کردن ترمینال زنده'}
+            >
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isEn ? 'CLI Terminal' : 'ترمینال CLI'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-            title={isEn ? 'Refresh Live System Telemetry' : 'بروزرسانی داده‌های زنده تله‌متری'}
+            disabled={isBusy}
+            className="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+            title={isEn ? 'Re-read live telemetry directly from device' : 'خواندن مجدد اطلاعات واقعی از دیوایس'}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? (isEn ? 'Reading...' : 'در حال خواندن...') : (isEn ? 'Refresh' : 'بروزرسانی')}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isBusy ? 'animate-spin' : ''}`} />
+            <span>{isBusy ? (isEn ? 'Reading from device...' : 'در حال خواندن از دیوایس...') : (isEn ? 'Refresh' : 'بروزرسانی')}</span>
           </button>
         </div>
       </div>
 
-      {/* Main Resource Cards Grid (Matching MikroTik Device Manage System Resources style) */}
+      {/* Offline / Connectivity Warning Banner if device could not be reached */}
+      {!isLive && !isBusy && (
+        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <span>{isEn ? 'Live Hardware Probe Status:' : 'وضعیت اتصال تله‌متری سخت‌افزار:'}</span>
+              <span className="font-mono text-amber-300 font-normal">
+                {fetchError || (isEn ? 'Could not establish real SSH connection with device.' : 'برقراری ارتباط زنده SSH با تجهیز میسر نشد.')}
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-300/80 leading-relaxed">
+              {isEn
+                ? `To fetch real-time data from this switch, ensure IP (${device.ip || 'none'}), SSH port (${device.ssh_port || 22}), and credentials are reachable from this server. Currently displaying model baseline telemetry.`
+                : `برای دریافت دیتای بلادرنگ از سوئیچ، از صحت آدرس آی‌پی (${device.ip || 'نامشخص'})، پورت SSH (${device.ssh_port || 22}) و دسترسی شبکه مطمئن شوید. اکنون مقادیر پیش‌فرض مدل نمایش داده می‌شوند.`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Main Resource Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {/* 1. CPU Architecture & Load */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+        <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+
           <div className="flex items-center justify-between">
             <span className="text-xs flex items-center gap-1.5 text-slate-300 font-medium">
               <Cpu className="w-4 h-4 text-cyan-400" />
               <span>{isEn ? 'CPU Architecture' : 'معماری و پردازنده'}</span>
+              <FieldInfoTooltip
+                isEn={isEn}
+                title={isEn ? 'CPU Architecture & Utilization' : 'معماری و بار پردازنده'}
+                whatIsIt={isEn
+                  ? 'Processor architecture and active CPU utilization percentages measured over 5-second, 1-minute, and 5-minute intervals.'
+                  : 'معماری پردازنده و درصد بار کاری CPU در فواصل زمانی ۵ ثانیه‌ای، ۱ دقیقه‌ای و ۵ دقیقه‌ای.'}
+                whyNeeded={isEn
+                  ? 'Sustained high CPU (>80%) indicates switching loops, excessive ARP/broadcast flooding, or unoptimized control-plane routing protocols.'
+                  : 'بالا ماندن طولانی‌مدت بار CPU (بیش از ۸۰٪) نشانه لوپ سوئیچینگ، برودکست استورم یا پردازش بیش از حد بسته‌ها در کنترل پلین است.'}
+                example={isEn
+                  ? 'Normal operating load: 5% - 25%. Run "show processes cpu sorted" on CLI to identify runaway processes.'
+                  : 'بار کاری نرمال ۵٪ تا ۲۵٪ است. با دستور "show processes cpu sorted" می‌توانید پردازش‌های پرمصرف را بررسی کنید.'}
+              />
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
-              {cpuLoad5s}% {isEn ? 'Load' : 'بار'}
-            </span>
+
+            {isBusy ? (
+              <div className="h-5 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                {cpu.cpuLoad5s}% {isEn ? 'Load' : 'بار'}
+              </span>
+            )}
           </div>
-          <div className="text-base font-bold font-mono text-white truncate" title={cpuArch}>
-            {cpuArch}
+
+          <div className="text-base font-bold font-mono text-white truncate" title={cpu.cpuArch}>
+            {isBusy ? (
+              <div className="h-5 w-48 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              cpu.cpuArch
+            )}
           </div>
+
           <div className="text-xs font-mono text-cyan-300 font-bold flex items-center justify-between">
-            <span>5s: {cpuLoad5s}% • 1m: {cpuLoad1m}% • 5m: {cpuLoad5m}%</span>
+            {isBusy ? (
+              <div className="h-4 w-full bg-slate-800/80 rounded animate-pulse" />
+            ) : (
+              <span>5s: {cpu.cpuLoad5s}% • 1m: {cpu.cpuLoad1m}% • 5m: {cpu.cpuLoad5m}%</span>
+            )}
           </div>
+
           <div className="w-full rounded-full h-2 overflow-hidden bg-slate-800">
             <div
               className="bg-cyan-500 h-full transition-all duration-500 rounded-full"
-              style={{ width: `${Math.max(5, cpuLoad5s)}%` }}
+              style={{ width: `${Math.max(5, cpu.cpuLoad5s)}%` }}
             />
           </div>
+
           <div className="text-[10px] text-slate-400 flex items-center justify-between">
-            <span>{isEn ? 'Current Load:' : 'بار کاری جاری:'} {cpuLoad5s}%</span>
-            <span className="text-slate-500">{isEn ? 'Interrupts: 2%' : 'وقفه‌ها: ۲٪'}</span>
+            <span>{isEn ? 'Current Load:' : 'بار کاری جاری:'} {cpu.cpuLoad5s}%</span>
+            <span className="text-slate-500">
+              {isEn ? `Interrupts: ${cpu.interrupts}%` : `وقفه‌ها: ${cpu.interrupts}٪`}
+            </span>
           </div>
         </div>
 
         {/* 2. System Memory (RAM) */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+        <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+
           <div className="flex items-center justify-between">
             <span className="text-xs flex items-center gap-1.5 text-slate-300 font-medium">
               <Zap className="w-4 h-4 text-emerald-400" />
               <span>{isEn ? 'System Memory (RAM)' : 'حافظه اصلی (RAM)'}</span>
+              <FieldInfoTooltip
+                isEn={isEn}
+                title={isEn ? 'System Memory (RAM)' : 'حافظه اصلی سیستم'}
+                whatIsIt={isEn
+                  ? 'Physical DRAM utilized by the Cisco IOS kernel, packet I/O ring buffers, and routing tables.'
+                  : 'حافظه رم فیزیکی مورد استفاده سیستم‌عامل سیسکو، بافرهای ورودی/خروجی بسته‌ها و جداول مسیریابی.'}
+                whyNeeded={isEn
+                  ? 'Memory exhaustion causes interface buffer drops, routing convergence failures, or kernel panic reloads.'
+                  : 'اتمام رم موجب افت فریم در اینترفیس‌ها، کندی همگرایی روتینگ و کرش ناگهانی سیستم می‌شود.'}
+                example={isEn
+                  ? '512 MB to 8 GB based on model. Healthy memory usage is typically below 70%.'
+                  : 'بین ۵۱۲ مگابایت تا ۸ گیگابایت متناسب با مدل. مصرف نرمال معمولاً زیر ۷۰٪ است.'}
+              />
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-              {ramPercent}% {isEn ? 'Used' : 'مصرف'}
-            </span>
+
+            {isBusy ? (
+              <div className="h-5 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                {ram.ramPercent}% {isEn ? 'Used' : 'مصرف'}
+              </span>
+            )}
           </div>
+
           <div className="text-base font-bold font-mono text-white">
-            {totalRamMB >= 1024 ? `${totalRamMB / 1024} GB (${totalRamMB} MB)` : `${totalRamMB} MB`}
+            {isBusy ? (
+              <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
+            ) : ram.totalRamMB >= 1024 ? (
+              `${(ram.totalRamMB / 1024).toFixed(1)} GB (${ram.totalRamMB} MB)`
+            ) : (
+              `${ram.totalRamMB} MB`
+            )}
           </div>
+
           <div className="text-xs font-mono text-emerald-300 font-bold flex items-center justify-between">
-            <span>{isEn ? 'Free:' : 'فضای آزاد:'} {freeRamMB} MB ({100 - ramPercent}%)</span>
+            {isBusy ? (
+              <div className="h-4 w-full bg-slate-800/80 rounded animate-pulse" />
+            ) : (
+              <span>{isEn ? 'Free:' : 'فضای آزاد:'} {ram.freeRamMB} MB ({100 - ram.ramPercent}%)</span>
+            )}
           </div>
+
           <div className="w-full rounded-full h-2 overflow-hidden bg-slate-800">
             <div
               className="bg-emerald-500 h-full transition-all duration-500 rounded-full"
-              style={{ width: `${Math.max(5, ramPercent)}%` }}
+              style={{ width: `${Math.max(5, ram.ramPercent)}%` }}
             />
           </div>
+
           <div className="text-[10px] text-slate-400 flex items-center justify-between">
-            <span>{isEn ? 'Used:' : 'مصرف‌شده:'} {usedRamMB} MB</span>
-            <span className="text-slate-500">{isEn ? 'I/O Buffers: 18 MB' : 'بافر I/O: ۱۸ مگ'}</span>
+            <span>{isEn ? 'Used:' : 'مصرف‌شده:'} {ram.usedRamMB} MB</span>
+            <span className="text-slate-500">
+              {isEn ? `I/O Buffers: ${ram.ioBuffersMB} MB` : `بافر I/O: ${ram.ioBuffersMB} مگابایت`}
+            </span>
           </div>
         </div>
 
         {/* 3. Flash & NVRAM Storage */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+        <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+
           <div className="flex items-center justify-between">
             <span className="text-xs flex items-center gap-1.5 text-slate-300 font-medium">
               <HardDrive className="w-4 h-4 text-purple-400" />
               <span>{isEn ? 'Flash & NVRAM Storage' : 'حافظه ذخیره‌سازی فلش'}</span>
+              <FieldInfoTooltip
+                isEn={isEn}
+                title={isEn ? 'Flash & NVRAM Storage' : 'حافظه ذخیره‌سازی فلش و NVRAM'}
+                whatIsIt={isEn
+                  ? 'Non-volatile flash memory storing Cisco IOS system binaries, crash dumps, and NVRAM storing the startup-config file.'
+                  : 'حافظه فلش غیرفرار جهت نگهداری ایمیج‌های باینری سیسکو و حافظه NVRAM جهت ذخیره تنظیمات استارتاپ.'}
+                whyNeeded={isEn
+                  ? 'Adequate flash storage is mandatory for staging software upgrade packages and bootloader recovery files.'
+                  : 'فضای کافی فلش برای دانلود پکیج‌های ارتقای سیستم‌عامل و ریکاوری بوت‌لودر کاملاً حیاتی است.'}
+                example={isEn
+                  ? 'At least 50MB free flash is recommended to stage new IOS release .bin files.'
+                  : 'حداقل ۵۰ مگابایت فضای خالی فلش جهت قرار دادن ایمیج‌های جدید سیسکو توصیه می‌شود.'}
+              />
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
-              {flashPercent}% {isEn ? 'Used' : 'اشغال'}
-            </span>
+
+            {isBusy ? (
+              <div className="h-5 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                {storage.flashPercent}% {isEn ? 'Used' : 'اشغال'}
+              </span>
+            )}
           </div>
+
           <div className="text-base font-bold font-mono text-white">
-            {totalFlashMB >= 1024 ? `${totalFlashMB / 1024} GB Flash` : `${totalFlashMB} MB Flash`}
+            {isBusy ? (
+              <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
+            ) : storage.totalFlashMB >= 1024 ? (
+              `${(storage.totalFlashMB / 1024).toFixed(1)} GB Flash`
+            ) : (
+              `${storage.totalFlashMB} MB Flash`
+            )}
           </div>
+
           <div className="text-xs font-mono text-purple-300 font-bold flex items-center justify-between">
-            <span>{isEn ? 'Free:' : 'فضای آزاد:'} {freeFlashMB} MB ({100 - flashPercent}%)</span>
+            {isBusy ? (
+              <div className="h-4 w-full bg-slate-800/80 rounded animate-pulse" />
+            ) : (
+              <span>{isEn ? 'Free:' : 'فضای آزاد:'} {storage.freeFlashMB} MB ({100 - storage.flashPercent}%)</span>
+            )}
           </div>
+
           <div className="w-full rounded-full h-2 overflow-hidden bg-slate-800">
             <div
               className="bg-purple-500 h-full transition-all duration-500 rounded-full"
-              style={{ width: `${Math.max(5, flashPercent)}%` }}
+              style={{ width: `${Math.max(5, storage.flashPercent)}%` }}
             />
           </div>
+
           <div className="text-[10px] text-slate-400 flex items-center justify-between">
-            <span>NVRAM: {usedNvramKB} KB / {nvramKB} KB</span>
+            <span>NVRAM: {storage.usedNvramKB} KB / {storage.nvramKB} KB</span>
             <span className="text-slate-500">{isEn ? 'Startup-Config: OK' : 'استارتاپ کانفیگ: سالم'}</span>
           </div>
         </div>
 
         {/* 4. Thermal & Chassis Environmental Sensors */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+        <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+
           <div className="flex items-center justify-between">
             <span className="text-xs flex items-center gap-1.5 text-slate-300 font-medium">
               <Thermometer className="w-4 h-4 text-amber-400" />
               <span>{isEn ? 'Thermal & Sensors' : 'حرارت و سنسورهای شاسی'}</span>
+              <FieldInfoTooltip
+                isEn={isEn}
+                title={isEn ? 'Chassis Temperature Sensors' : 'سنسورهای حرارتی شاسی'}
+                whatIsIt={isEn
+                  ? 'Real-time internal chassis, inlet, and exhaust air temperatures captured by hardware thermal probes.'
+                  : 'دمای لحظه‌ای بورد، هوای ورودی و هوای خروجی شاسی که توسط سنسورهای سخت‌افزاری گزارش می‌شوند.'}
+                whyNeeded={isEn
+                  ? 'Overheating causes ASIC packet corruption, component lifetime reduction, or emergency thermal shutdown.'
+                  : 'دمای بیش از حد باعث خرابی چیپ‌های سوئیچینگ، کاهش طول عمر خازن‌ها یا خاموشی اضطراری دستگاه می‌شود.'}
+                example={isEn
+                  ? 'Normal operating range is 25°C - 45°C. Critical threshold is typically 65°C - 70°C.'
+                  : 'محدوده دمای ایمن بین ۲۵ تا ۴۵ درجه سانتیگراد است. آستانه خطر در حدود ۶۵ تا ۷۰ درجه تعریف شده است.'}
+              />
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-              {isEn ? 'NORMAL' : 'نرمال'}
-            </span>
+
+            {isBusy ? (
+              <div className="h-5 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border ${
+                thermal.currentTemp > 60
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                  : thermal.currentTemp > 50
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {thermal.tempState || (isEn ? 'NORMAL' : 'نرمال')}
+              </span>
+            )}
           </div>
+
           <div className="text-base font-bold font-mono text-white flex items-center gap-2">
-            <span>{currentTemp}°C</span>
-            <span className="text-xs font-normal text-slate-400 font-mono">/ {Math.round(currentTemp * 1.8 + 32)}°F</span>
+            {isBusy ? (
+              <div className="h-5 w-24 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <>
+                <span>{thermal.currentTemp}°C</span>
+                <span className="text-xs font-normal text-slate-400 font-mono">
+                  / {Math.round(thermal.currentTemp * 1.8 + 32)}°F
+                </span>
+              </>
+            )}
           </div>
+
           <div className="text-xs font-mono text-amber-300 font-bold flex items-center justify-between">
-            <span>{isEn ? 'Threshold:' : 'آستانه هشدار:'} 65°C (Safe Zone)</span>
+            {isBusy ? (
+              <div className="h-4 w-full bg-slate-800/80 rounded animate-pulse" />
+            ) : (
+              <span>{isEn ? 'Threshold:' : 'آستانه هشدار:'} {thermal.tempThreshold}°C (Safe Zone)</span>
+            )}
           </div>
+
           <div className="w-full rounded-full h-2 overflow-hidden bg-slate-800">
             <div
               className="bg-gradient-to-r from-emerald-500 to-amber-500 h-full transition-all duration-500 rounded-full"
-              style={{ width: `${Math.round((currentTemp / 65) * 100)}%` }}
+              style={{ width: `${Math.min(100, Math.round((thermal.currentTemp / (thermal.tempThreshold || 65)) * 100))}%` }}
             />
           </div>
+
           <div className="text-[10px] text-slate-400 flex items-center justify-between">
-            <span>{isEn ? 'Inlet Air:' : 'هوای ورودی:'} 27°C</span>
-            <span className="text-slate-500">{isEn ? 'Exhaust: 36°C' : 'هوای خروجی: ۳۶°C'}</span>
+            <span>{isEn ? 'Inlet Air:' : 'هوای ورودی:'} {thermal.inletTemp}°C</span>
+            <span className="text-slate-500">{isEn ? 'Exhaust:' : 'هوای خروجی:'} {thermal.exhaustTemp}°C</span>
           </div>
         </div>
 
         {/* 5. PoE Power Budget & Power Supply */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+        <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+
           <div className="flex items-center justify-between">
             <span className="text-xs flex items-center gap-1.5 text-slate-300 font-medium">
               <BatteryCharging className="w-4 h-4 text-blue-400" />
               <span>{isEn ? 'PoE Power Supply' : 'تغذیه و توان PoE'}</span>
+              <FieldInfoTooltip
+                isEn={isEn}
+                title={isEn ? 'Power over Ethernet (PoE) Budget' : 'ظرفیت توان PoE'}
+                whatIsIt={isEn
+                  ? 'Total electrical wattage budget available and consumed by connected IP phones, wireless access points, and IP cameras.'
+                  : 'مجموع توان الکتریکی بر حسب وات که برای تغذیه تلفن‌های VoIP، اکسس پوینت‌ها و دوربین‌های مداربسته اختصاص می‌یابد.'}
+                whyNeeded={isEn
+                  ? 'Exceeding the power supply budget triggers automatic PoE port shutdown or denial of power to newly connected endpoints.'
+                  : 'مصرف بیش از ظرفیت پاور باعث خاموش شدن اولویت‌دار پورت‌ها یا عدم روشن شدن تجهیزات جدید متصل می‌شود.'}
+                example={isEn
+                  ? '370W or 740W power supplies. Class 3 VoIP devices draw ~15W; Class 4 Wi-Fi APs draw ~30W.'
+                  : 'پاورهای ۳۷۰ یا ۷۴۰ وات. تلفن‌های تحت شبکه معمولاً ۱۵ وات و اکسس‌پوینت‌ها تا ۳۰ وات برق مصرف می‌کنند.'}
+              />
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
-              {poePercent}% {isEn ? 'Drawn' : 'مصرف'}
-            </span>
+
+            {isBusy ? (
+              <div className="h-5 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                {poe.poePercent}% {isEn ? 'Drawn' : 'مصرف'}
+              </span>
+            )}
           </div>
+
           <div className="text-base font-bold font-mono text-white">
-            {maxPoeWatts} Watts {isEn ? 'Budget' : 'ظرفیت'}
+            {isBusy ? (
+              <div className="h-5 w-28 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              `${poe.maxPoeWatts} Watts ${isEn ? 'Budget' : 'ظرفیت'}`
+            )}
           </div>
+
           <div className="text-xs font-mono text-blue-300 font-bold flex items-center justify-between">
-            <span>{isEn ? 'Available:' : 'باقیمانده:'} {maxPoeWatts - totalPoeWatts} W ({100 - poePercent}%)</span>
+            {isBusy ? (
+              <div className="h-4 w-full bg-slate-800/80 rounded animate-pulse" />
+            ) : (
+              <span>
+                {isEn ? 'Available:' : 'باقیمانده:'} {poe.remainingPoeWatts} W ({100 - poe.poePercent}%)
+              </span>
+            )}
           </div>
+
           <div className="w-full rounded-full h-2 overflow-hidden bg-slate-800">
             <div
               className="bg-blue-500 h-full transition-all duration-500 rounded-full"
-              style={{ width: `${Math.max(5, poePercent)}%` }}
+              style={{ width: `${Math.max(5, poe.poePercent)}%` }}
             />
           </div>
+
           <div className="text-[10px] text-slate-400 flex items-center justify-between">
-            <span>{isEn ? 'Delivering:' : 'مصرف جاری:'} {totalPoeWatts} W</span>
+            <span>{isEn ? 'Delivering:' : 'مصرف جاری:'} {poe.totalPoeWatts} W</span>
             <span className="text-slate-500">
-              {poeDeliveringPorts.length || 4} {isEn ? 'Ports Powered' : 'پورت برق‌دار'}
+              {poe.poeDeliveringPortsCount} {isEn ? 'Ports Powered' : 'پورت برق‌دار'}
             </span>
           </div>
         </div>
 
         {/* 6. Cooling Fans & Hardware Status */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+        <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/60 shadow-xs space-y-2.5">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+
           <div className="flex items-center justify-between">
             <span className="text-xs flex items-center gap-1.5 text-slate-300 font-medium">
               <Fan className="w-4 h-4 text-teal-400" />
               <span>{isEn ? 'Cooling System' : 'سیستم خنک‌کننده شاسی'}</span>
+              <FieldInfoTooltip
+                isEn={isEn}
+                title={isEn ? 'Cooling Fans & Airflow' : 'سیستم فن و تهویه شاسی'}
+                whatIsIt={isEn
+                  ? 'Rotational speed (RPM) of internal blower fans, tray status, and airflow direction inside the chassis.'
+                  : 'سرعت چرخش فن‌های خنک‌کننده شاسی بر حسب دور در دقیقه (RPM)، وضعیت سلامت و جهت جریان هوا.'}
+                whyNeeded={isEn
+                  ? 'Fan motor failure creates localized hot spots and causes thermal throttling of the switching fabric.'
+                  : 'توقف فن‌ها موجب بالا رفتن فوری دما و کاهش سرعت سوئیچینگ به منظور محافظت از چیپ‌ها می‌شود.'}
+                example={isEn
+                  ? 'Nominal speed is 4,000 to 5,500 RPM with front-to-back rack airflow.'
+                  : 'سرعت عادی حدود ۴۰۰۰ تا ۵۵۰۰ دور در دقیقه با جهت جریان هوای جلو به عقب رک است.'}
+              />
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">
-              2x {isEn ? 'Fans OK' : 'فن فعال'}
-            </span>
+
+            {isBusy ? (
+              <div className="h-5 w-16 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">
+                {cooling.fanStatus || (isEn ? `${cooling.fansCount}x Fans OK` : `${cooling.fansCount} فن فعال`)}
+              </span>
+            )}
           </div>
+
           <div className="text-base font-bold font-mono text-white">
-            4,820 RPM (Nominal)
+            {isBusy ? (
+              <div className="h-5 w-32 bg-slate-800 rounded animate-pulse" />
+            ) : (
+              cooling.fanSpeeds?.split('•')?.[0]?.trim() || '4,820 RPM (Nominal)'
+            )}
           </div>
-          <div className="text-xs font-mono text-teal-300 font-bold flex items-center justify-between">
-            <span>Fan 1: 4,820 RPM • Fan 2: 4,790 RPM</span>
+
+          <div className="text-xs font-mono text-teal-300 font-bold flex items-center justify-between truncate">
+            {isBusy ? (
+              <div className="h-4 w-full bg-slate-800/80 rounded animate-pulse" />
+            ) : (
+              <span>{cooling.fanSpeeds}</span>
+            )}
           </div>
+
           <div className="w-full rounded-full h-2 overflow-hidden bg-slate-800">
             <div className="bg-teal-500 h-full w-[65%] rounded-full" />
           </div>
+
           <div className="text-[10px] text-slate-400 flex items-center justify-between">
-            <span>{isEn ? 'Airflow: Front-to-Back' : 'جهت باد: جلو به عقب'}</span>
-            <span className="text-slate-500">{isEn ? 'PSU 1: Operational' : 'پاور ۱: نرمال'}</span>
+            <span>{isEn ? `Airflow: ${cooling.airflow}` : `جهت باد: ${cooling.airflow}`}</span>
+            <span className="text-slate-500">{isEn ? cooling.psuStatus : 'پاور ۱: نرمال'}</span>
           </div>
         </div>
       </div>
 
       {/* Switching Fabric & Hardware Architecture Summary */}
-      <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 shadow-xs">
+      <div className="relative overflow-hidden p-4 rounded-xl border border-slate-800 bg-slate-900/40 shadow-xs">
+        {isBusy && <div className="shimmer-light-beam z-10" />}
+
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800 text-xs">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-indigo-400" />
@@ -414,35 +687,37 @@ ${totalFlashMB * 1024}K bytes of physical memory.`
             </h4>
           </div>
           <span className="text-[11px] text-slate-400 font-mono">
-            ASIC Forwarding: <span className="text-emerald-400 font-bold">101.2 Mpps</span> • Bandwidth:{' '}
-            <span className="text-indigo-300 font-bold">128 Gbps</span>
+            ASIC Forwarding: <span className="text-emerald-400 font-bold">{hw.asicForwardingMpps} Mpps</span> • Bandwidth:{' '}
+            <span className="text-indigo-300 font-bold">{hw.bandwidthGbps} Gbps</span>
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs">
           <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
             <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isEn ? 'Physical Ports' : 'پورت‌های فیزیکی'}</div>
-            <div className="text-white font-bold font-mono text-sm mt-0.5">{totalPortsCount} {isEn ? 'Ports' : 'پورت'}</div>
+            <div className="text-white font-bold font-mono text-sm mt-0.5">
+              {hw.totalPortsCount} {isEn ? 'Ports' : 'پورت'}
+            </div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">10/100/1000Base-T + SFP+</div>
           </div>
 
           <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
             <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isEn ? 'Active Links' : 'لینک‌های فعال'}</div>
             <div className="text-emerald-400 font-bold font-mono text-sm mt-0.5">
-              {upPortsCount} / {totalPortsCount} ({Math.round((upPortsCount / totalPortsCount) * 100)}%)
+              {hw.upPortsCount} / {hw.totalPortsCount} ({hw.totalPortsCount ? Math.round((hw.upPortsCount / hw.totalPortsCount) * 100) : 0}%)
             </div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{isEn ? 'Full-Duplex Wire-Speed' : 'سرعت خطی دوطرفه'}</div>
           </div>
 
           <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
             <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isEn ? 'MAC Address Table' : 'جدول مک آدرس'}</div>
-            <div className="text-cyan-300 font-bold font-mono text-sm mt-0.5">16,384 {isEn ? 'Entries' : 'رکورد'}</div>
+            <div className="text-cyan-300 font-bold font-mono text-sm mt-0.5">{hw.macTableCount.toLocaleString()} {isEn ? 'Entries' : 'رکورد'}</div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{isEn ? 'Aging Time: 300s' : 'زمان انقضا: ۳۰۰ ثانیه'}</div>
           </div>
 
           <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
             <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isEn ? 'VLAN Capacity' : 'ظرفیت وی‌لن‌ها'}</div>
-            <div className="text-purple-300 font-bold font-mono text-sm mt-0.5">4,096 VLANs</div>
+            <div className="text-purple-300 font-bold font-mono text-sm mt-0.5">{hw.vlanCapacity.toLocaleString()} VLANs</div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{isEn ? 'IEEE 802.1Q Active' : 'استاندارد 802.1Q فعال'}</div>
           </div>
         </div>
@@ -453,7 +728,14 @@ ${totalFlashMB * 1024}K bytes of physical memory.`
         <div className="p-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2">
             <Terminal className="w-4 h-4 text-emerald-400" />
-            <span className="font-bold text-white font-mono">{isEn ? 'Cisco IOS Diagnostics CLI Telemetry' : 'خروجی فرامین تشخیصی سیسکو IOS'}</span>
+            <span className="font-bold text-white font-mono">
+              {isEn ? 'Cisco IOS Diagnostics CLI Telemetry' : 'خروجی فرامین تشخیصی سیسکو IOS'}
+            </span>
+            {isLive && (
+              <span className="text-[10px] font-mono text-emerald-400/80 px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20">
+                {isEn ? 'LIVE OUTPUT' : 'خروجی واقعی زنده'}
+              </span>
+            )}
           </div>
 
           {/* Command selector pills */}
@@ -492,8 +774,9 @@ ${totalFlashMB * 1024}K bytes of physical memory.`
         </div>
 
         {/* Terminal Screen Body */}
-        <div className="p-3.5 bg-black/90 font-mono text-[11px] leading-relaxed text-emerald-400 max-h-56 overflow-y-auto whitespace-pre selection:bg-emerald-500/30 selection:text-white">
-          {cliOutputs[selectedCliCommand]?.output}
+        <div className="relative p-3.5 bg-black/95 font-mono text-[11px] leading-relaxed text-emerald-400 max-h-56 overflow-y-auto whitespace-pre selection:bg-emerald-500/30 selection:text-white">
+          {isBusy && <div className="shimmer-light-beam z-10" />}
+          {cliOutputs[selectedCliCommand]?.output || (isEn ? 'No output received.' : 'خروجی دریافت نشد.')}
         </div>
       </div>
     </div>
