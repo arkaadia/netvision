@@ -1565,6 +1565,104 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if path.startswith("/api/devices/") and path.endswith("/unsaved-changes"):
+            # GET /api/devices/:id/unsaved-changes
+            parts = path.split("/")
+            dev_id = parts[3]
+            device = next((d for d in data["devices"] if d["id"] == dev_id), None)
+            if not device:
+                self._send_json(404, {"error": "Device not found"})
+                return
+
+            ports = data.get("ports", {}).get(dev_id, [])
+            modified_ports = []
+            for p in ports:
+                is_mod = (
+                    (p.get("description") and p.get("description").strip()) or
+                    p.get("vlan", 1) != 1 or
+                    p.get("mode") == "trunk" or
+                    p.get("port_security_enabled") or
+                    p.get("admin_status") == "disabled"
+                )
+                if is_mod:
+                    summary_parts = []
+                    if p.get("admin_status") == "disabled":
+                        summary_parts.append("shutdown")
+                    if p.get("mode") == "trunk":
+                        summary_parts.append(f"mode trunk (allowed: {p.get('allowed_vlans', 'all')})")
+                    elif p.get("vlan", 1) != 1:
+                        summary_parts.append(f"vlan {p.get('vlan')}")
+                    if p.get("description"):
+                        summary_parts.append(f"description \"{p.get('description')}\"")
+                    if p.get("port_security_enabled"):
+                        summary_parts.append(f"port-security ({p.get('port_security_mode', 'sticky')})")
+
+                    modified_ports.append({
+                        "port_id": p.get("port_id"),
+                        "mode": p.get("mode", "access"),
+                        "vlan": p.get("vlan", 1),
+                        "status": p.get("status", "down"),
+                        "admin_status": p.get("admin_status", "enabled"),
+                        "description": p.get("description", ""),
+                        "port_security_enabled": p.get("port_security_enabled", False),
+                        "change_summary": ", ".join(summary_parts) if summary_parts else "Active custom configuration"
+                    })
+
+            pending = device.get("pending_changes", [])
+            cli_diff_lines = [
+                f"! ==============================================================================",
+                f"! Cisco IOS Running-Config Pending Changes for NVRAM (Startup-Config)",
+                f"! Target Device: {device.get('name')} ({device.get('ip')})",
+                f"! Platform: {device.get('platform', 'cisco_ios')} - Role: {device.get('role', 'Switch')}",
+                f"! Status: Active in volatile RAM (Running-Config) | Unsaved in NVRAM",
+                f"! ==============================================================================",
+                f"configure terminal",
+            ]
+
+            if pending:
+                cli_diff_lines.append(f"! [Recent Pending Session Operations]")
+                for item in pending:
+                    cli_diff_lines.append(f"! * {item.get('port_id', 'Device')}: {item.get('description', item.get('type', 'change'))}")
+                    if item.get("command"):
+                        cli_diff_lines.append(f" {item.get('command')}")
+
+            if modified_ports:
+                cli_diff_lines.append(f"!")
+                cli_diff_lines.append(f"! [Active Configured Interfaces to be Written]")
+                for mp in modified_ports:
+                    cli_diff_lines.append(f"interface {mp['port_id']}")
+                    if mp.get("description"):
+                        cli_diff_lines.append(f" description {mp['description']}")
+                    if mp.get("mode") == "trunk":
+                        cli_diff_lines.append(f" switchport mode trunk")
+                    else:
+                        cli_diff_lines.append(f" switchport mode access")
+                        if mp.get("vlan", 1) != 1:
+                            cli_diff_lines.append(f" switchport access vlan {mp['vlan']}")
+                    if mp.get("port_security_enabled"):
+                        cli_diff_lines.append(f" switchport port-security")
+                    if mp.get("admin_status") == "disabled":
+                        cli_diff_lines.append(f" shutdown")
+                    else:
+                        cli_diff_lines.append(f" no shutdown")
+                    cli_diff_lines.append(f" exit")
+
+            cli_diff_lines.extend([
+                f"end",
+                f"write memory",
+                f"! Destination: NVRAM:startup-config",
+                f"! [Building configuration... OK]"
+            ])
+
+            self._send_json(200, {
+                "has_unsaved_changes": device.get("has_unsaved_changes", False),
+                "pending_changes": pending,
+                "modified_ports": modified_ports,
+                "last_modified_time": device.get("last_modified_time", ""),
+                "cli_diff": "\n".join(cli_diff_lines)
+            })
+            return
+
         if path.startswith("/api/devices/") and "/ports" in path:
             # /api/devices/:id/ports
             parts = path.split("/")
@@ -2113,6 +2211,31 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 elif operation == "set_description":
                     target_port["description"] = (params.get("description") or "").strip()
 
+            if "pending_changes" not in device or not isinstance(device["pending_changes"], list):
+                device["pending_changes"] = []
+            desc_text = f"Interface {port_id}: {operation.replace('_', ' ').title()}"
+            if operation == "set_description":
+                desc_text = f"Interface {port_id}: description \"{params.get('description', '')}\""
+            elif operation == "mode_access":
+                desc_text = f"Interface {port_id}: switchport mode access"
+            elif operation == "mode_trunk":
+                desc_text = f"Interface {port_id}: switchport mode trunk"
+            elif operation == "shutdown":
+                desc_text = f"Interface {port_id}: shutdown"
+            elif operation == "no_shutdown":
+                desc_text = f"Interface {port_id}: no shutdown"
+            elif operation == "port_sec_enable":
+                desc_text = f"Interface {port_id}: port-security enable"
+            elif operation == "port_sec_disable":
+                desc_text = f"Interface {port_id}: port-security disable"
+
+            device["pending_changes"].append({
+                "port_id": port_id,
+                "type": operation,
+                "description": desc_text,
+                "command": cli_cmd,
+                "timestamp": time.strftime("%H:%M:%S")
+            })
             device["has_unsaved_changes"] = True
             device["last_modified_time"] = time.strftime("%H:%M:%S")
             save_data(data)
@@ -2831,6 +2954,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 self._send_json(404, {"error": "Device not found"})
                 return
             device["has_unsaved_changes"] = False
+            device["pending_changes"] = []
+            device["last_write_memory_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
             save_data(data)
             self._send_json(200, {
                 "success": True,
@@ -3128,6 +3253,14 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                     if "port_security_violation" in updates:
                         port["port_security_violation"] = updates["port_security_violation"]
 
+            if "pending_changes" not in device or not isinstance(device["pending_changes"], list):
+                device["pending_changes"] = []
+            device["pending_changes"].append({
+                "port_id": f"{updated_count} Ports Batch",
+                "type": "batch_update",
+                "description": f"Batch update on {updated_count} interfaces",
+                "timestamp": time.strftime("%H:%M:%S")
+            })
             device["has_unsaved_changes"] = True
             device["last_modified_time"] = time.strftime("%H:%M:%S")
             save_data(data)
@@ -3259,6 +3392,15 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
 
             # Mark device as having unsaved running-config changes (needs write memory)
             if device:
+                if "pending_changes" not in device or not isinstance(device["pending_changes"], list):
+                    device["pending_changes"] = []
+                device["pending_changes"].append({
+                    "port_id": port_id,
+                    "type": "port_update",
+                    "description": f"Interface {port_id} configuration update",
+                    "command": cli_output,
+                    "timestamp": time.strftime("%H:%M:%S")
+                })
                 device["has_unsaved_changes"] = True
                 device["last_modified_time"] = time.strftime("%H:%M:%S")
 

@@ -15,7 +15,7 @@
       ],
       "is_builtin": true,
       "created_at": "2026-09-14T09:35:13.477Z",
-      "last_login": "2026-09-17T06:55:29.931Z"
+      "last_login": "2026-09-18T10:59:33.710Z"
     },
     {
       "id": "user-helpdesk",
@@ -647,6 +647,18 @@
       "details": "User \"admin\" authenticated successfully via Local Database from IP 206.222.8.60",
       "ip_address": "206.222.8.60",
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1789729173915-l96bf",
+      "timestamp": "2026-09-18T10:59:33.915Z",
+      "user_name": "admin",
+      "action": "Successful User Login",
+      "category": "security",
+      "target": "Auth Gateway",
+      "status": "success",
+      "details": "User \"admin\" authenticated successfully via Local Database from IP 206.222.8.60",
+      "ip_address": "206.222.8.60",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 OPR/135.0.0.0"
     }
   ],
   "ad_config": {

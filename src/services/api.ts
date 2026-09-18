@@ -339,6 +339,37 @@ export async function closeDeviceTerminalSession(deviceId: string): Promise<{ su
   return res.json().catch(() => ({ success: true, message: 'Terminal closed' }));
 }
 
+export interface DeviceUnsavedChangesInfo {
+  has_unsaved_changes: boolean;
+  pending_changes?: Array<{
+    port_id?: string;
+    type?: string;
+    description?: string;
+    command?: string;
+    timestamp?: string;
+  }>;
+  modified_ports?: Array<{
+    port_id: string;
+    mode: string;
+    vlan: number;
+    status: string;
+    admin_status?: string;
+    description: string;
+    port_security_enabled?: boolean;
+    change_summary?: string;
+  }>;
+  last_modified_time?: string;
+  cli_diff?: string;
+}
+
+export async function fetchDeviceUnsavedChanges(deviceId: string): Promise<DeviceUnsavedChangesInfo> {
+  const res = await fetch(`${API_BASE}/devices/${deviceId}/unsaved-changes`);
+  if (!res.ok) {
+    return { has_unsaved_changes: true, pending_changes: [] };
+  }
+  return res.json();
+}
+
 export async function writeMemory(deviceId: string): Promise<{ success: boolean; device: Device; message: string }> {
   const res = await fetch(`${API_BASE}/devices/${deviceId}/write-memory`, {
     method: 'POST',

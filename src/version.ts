@@ -10,9 +10,32 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.73.3';
+export const APP_VERSION = '1.74.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.74.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'مودال تایید هوشمند پیش از رایت پیکربندی در NVRAM و اصلاح نمایش وضعیت در لیست تجهیزات (Write Memory Confirmation Modal)',
+    title_en: 'Write Memory Confirmation Modal & Equipment List Action Button Refinement',
+    changes: [
+      'افزودن مودال تایید اختصاصی و هوشمند پیش از اجرای رایت (Write Memory) در مودال پورت سیسکو (Port Inspector) و ترمینال سیسکو (Cisco Terminal)، جهت جلوگیری از رایت ناخواسته.',
+      'نمایش لیست جامع و دقیق تغییرات اعمال‌شده شامل پورت‌های تغییریافته، نوع تغییر (VLAN, Description, Port-Security, Mode, Shutdown)، زمان اعمال و پیش‌نمایش دستورات خط فرمان سیسکو (CLI Diff Preview).',
+      'پشتیبانی کامل و دوگانه از تم تاریک (Dark Mode) و تم روشن (Light Mode) با طراحی شیشه‌ای مدرن و کنتراست استاندارد.',
+      'افزودن اندپوینت بک‌اند GET /api/devices/:id/unsaved-changes جهت ارزیابی و استخراج دقیق تفاوت‌های Running-Config و Startup-Config.',
+      'اصلاح نمایش وضعیت رایت در لیست تجهیزات (Device List): حذف برچسب اضافی Write Needed و نگه داشتن دکمه کاربردی Write Memory در سطر تگ‌های تجهیز جهت سادگی و تمیزی رابط کاربری.',
+      'تجهیز مودال جدید به امکان مینیمایز (Rule 5) و رعایت کامل چندزبانگی انگلیسی و فارسی (Rule 4).'
+    ],
+    changes_en: [
+      'Added dedicated intelligent confirmation modal before executing "Write Memory" in Cisco Port Inspector and Cisco Terminal modals to prevent accidental writes.',
+      'Comprehensive summary display of pending modifications including modified interfaces, change types (VLAN, Description, Port-Security, Mode, Shutdown), timestamps, and CLI Diff Preview.',
+      'Full adaptive support for both Dark Mode and Light Mode with high-contrast glassmorphism aesthetic.',
+      'Added backend endpoint GET /api/devices/:id/unsaved-changes to analyze and extract running vs startup config differences.',
+      'Refined device status in Network Equipment Inventory & Management list: removed redundant "Write Needed" text label while keeping the functional "Write Memory" button.',
+      'Equipped the confirmation modal with universal minimization capability (Rule 5) and strict English/Persian localization (Rule 4).'
+    ]
+  },
   {
     version: '1.73.3',
     releaseDate: '2026-09-18',

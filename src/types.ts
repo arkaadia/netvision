@@ -99,6 +99,14 @@ export interface Device {
   total_ports: number;
   has_unsaved_changes?: boolean;
   last_modified_time?: string;
+  last_write_memory_time?: string;
+  pending_changes?: Array<{
+    port_id?: string;
+    type?: string;
+    description?: string;
+    command?: string;
+    timestamp?: string;
+  }>;
   ssh_host?: string;
   ssh_port?: number;
   ssh_username?: string;

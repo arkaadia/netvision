@@ -687,29 +687,19 @@ export const DeviceListView: React.FC<DeviceListViewProps> = ({
                                 </button>
                               )}
 
-                              {dev.has_unsaved_changes && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold" title={isEn ? 'Unsaved changes in NVRAM (Startup-Config)' : 'دارای تغییرات ذخیره نشده در Startup-Config (Running vs Startup)'}>
-                                  <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
-                                  <span>Write Needed</span>
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-slate-400">{dev.role}</div>
-
-                            {/* If unsaved changes, quick write button */}
-                            {dev.has_unsaved_changes && onWriteMemory && (
-                              <div className="flex items-center gap-1 mt-1.5">
+                              {dev.has_unsaved_changes && onWriteMemory && (
                                 <button
                                   onClick={() => handleWriteMem(dev.id)}
                                   disabled={writingId === dev.id}
-                                  className="px-2 py-0.5 rounded bg-amber-500/30 hover:bg-amber-500/50 text-amber-200 border border-amber-500/50 font-bold text-[10px] transition flex items-center gap-1 shadow-sm cursor-pointer"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-500/50 font-bold text-[10px] transition shadow-sm cursor-pointer"
                                   title={isEn ? 'Execute "write memory" to commit running-config to NVRAM' : 'اجرای دستور write memory و ذخیره دائم در NVRAM'}
                                 >
                                   <Save className="w-2.5 h-2.5" />
                                   <span>{writingId === dev.id ? (isEn ? 'Writing...' : 'در حال رایت...') : 'Write Memory'}</span>
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400">{dev.role}</div>
                           </div>
                         </div>
                       </td>

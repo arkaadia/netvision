@@ -8,6 +8,7 @@ import { CiscoCommandConfirmModal } from './CiscoCommandConfirmModal';
 import { CiscoPortConfigConfirmModal, PortConfigUpdates } from './CiscoPortConfigConfirmModal';
 import { AssignVlanModal } from './AssignVlanModal';
 import { PortDescriptionModal } from './PortDescriptionModal';
+import { CiscoWriteConfirmModal, WriteChangeItem } from './CiscoWriteConfirmModal';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface PortInspectorModalProps {
@@ -68,6 +69,8 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
   } | null>(null);
   const [isExecutingPortConfig, setIsExecutingPortConfig] = useState(false);
   const [isWritingMem, setIsWritingMem] = useState(false);
+  const [showWriteConfirm, setShowWriteConfirm] = useState(false);
+  const [sessionChanges, setSessionChanges] = useState<WriteChangeItem[]>([]);
 
   // Right-click action confirmation modal state (Yes/No with device CLI preview)
   const [confirmModalState, setConfirmModalState] = useState<{
@@ -246,6 +249,16 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       }
 
       device.has_unsaved_changes = true;
+      setSessionChanges((prev) => [
+        ...prev,
+        {
+          target: targetPort.port_id,
+          type: 'vlan',
+          change: `Assigned VLAN ${newVlan} (Access)`,
+          command: `interface ${targetPort.port_id}\n switchport mode access\n switchport access vlan ${newVlan}`,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
       setVlanAssignModalPort(null);
       if (onPortUpdated) onPortUpdated();
     } catch (err: any) {
@@ -307,6 +320,16 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       }
 
       device.has_unsaved_changes = true;
+      setSessionChanges((prev) => [
+        ...prev,
+        {
+          target: targetPort.port_id,
+          type: 'description',
+          change: `Set description to "${cleanDesc}"`,
+          command: `interface ${targetPort.port_id}\n description ${cleanDesc}`,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
       setDescriptionModalPort(null);
       if (onPortUpdated) onPortUpdated();
     } catch (err: any) {
@@ -641,9 +664,10 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
       setIsWritingMem(true);
       await writeMemory(device.id);
       device.has_unsaved_changes = false;
+      setSessionChanges([]);
       if (onPortUpdated) onPortUpdated();
     } catch (err: any) {
-      alert('خطا در ذخیره سازی در استارتاپ: ' + err.message);
+      alert((isEn ? 'Failed to save configuration to NVRAM: ' : 'خطا در ذخیره‌سازی در استارتاپ: ') + (err.message || err));
     } finally {
       setIsWritingMem(false);
     }
@@ -716,7 +740,7 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span className="text-[11px] font-medium hidden sm:inline">{isEn ? 'Unsaved Changes' : 'تغییرات رایت‌نشده'}</span>
                 <button
-                  onClick={handleWriteMemory}
+                  onClick={() => setShowWriteConfirm(true)}
                   disabled={isWritingMem}
                   className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold text-[10px] transition flex items-center gap-1 cursor-pointer"
                   title={isEn ? 'Save running-config to startup-config (NVRAM)' : 'ذخیره تغییرات در NVRAM (Startup-Config)'}
@@ -1821,6 +1845,22 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
             port={descriptionModalPort}
             device={device}
             isLoading={isSavingDescription}
+          />
+        )}
+
+        {/* Cisco Write Memory Confirmation Modal */}
+        {showWriteConfirm && device && (
+          <CiscoWriteConfirmModal
+            isOpen={showWriteConfirm}
+            onClose={() => setShowWriteConfirm(false)}
+            onConfirm={async () => {
+              await handleWriteMemory();
+              setShowWriteConfirm(false);
+            }}
+            device={device}
+            isWriting={isWritingMem}
+            sessionChanges={sessionChanges}
+            onMinimize={onMinimize}
           />
         )}
       </div>

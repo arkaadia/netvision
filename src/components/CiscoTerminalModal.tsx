@@ -48,6 +48,7 @@ import {
 import { useLanguage } from '../i18n/LanguageContext';
 import { logDeviceCommand, evaluateCommandRisk } from '../services/auditLogger';
 import { CompactTerminalFaceplate } from './terminal/CompactTerminalFaceplate';
+import { CiscoWriteConfirmModal, WriteChangeItem } from './CiscoWriteConfirmModal';
 
 export interface CiscoTerminalModalProps {
   device: Device | null;
@@ -219,6 +220,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
   });
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [isWritingMemory, setIsWritingMemory] = useState(false);
+  const [showWriteConfirm, setShowWriteConfirm] = useState(false);
+  const [sessionChanges, setSessionChanges] = useState<WriteChangeItem[]>([]);
   const [sshSessionMode, setSshSessionMode] = useState<'connecting' | 'real_ssh' | 'simulated' | 'failed'>('connecting');
   const [sshLatency, setSshLatency] = useState<number | null>(null);
   const [isSyncingPorts, setIsSyncingPorts] = useState<boolean>(false);
@@ -898,6 +901,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
 
       await writeMemory(device.id);
       setHasUnsavedChanges(false);
+      setSessionChanges([]);
 
       appendLines([
         {
@@ -1256,6 +1260,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       setCurrentVlanId(vlanNum);
       setCliMode('VLAN_CONFIG');
       setHasUnsavedChanges(true);
+      setSessionChanges((prev) => [
+        ...prev,
+        {
+          target: `VLAN ${vlanNum}`,
+          type: 'vlan',
+          change: `Created/Configured VLAN ${vlanNum}`,
+          command: `vlan ${vlanNum}`,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
       appendLines([inputLine]);
       return;
     }
@@ -1270,6 +1284,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       if (newHost) {
         setHostname(newHost);
         setHasUnsavedChanges(true);
+        setSessionChanges((prev) => [
+          ...prev,
+          {
+            target: 'Global Config',
+            type: 'hostname',
+            change: `Hostname set to ${newHost}`,
+            command: `hostname ${newHost}`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
         appendLines([inputLine]);
       }
       return;
@@ -1333,6 +1357,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           );
         }
         setHasUnsavedChanges(true);
+        setSessionChanges((prev) => [
+          ...prev,
+          {
+            target: currentInterface,
+            type: 'admin_status',
+            change: `Interface administratively shut down`,
+            command: `interface ${currentInterface}\n shutdown`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
         appendLines([
           inputLine,
           { id: String(Date.now() + 1), type: 'system', text: `%LINK-5-CHANGED: Interface ${currentInterface}, changed state to administratively down` },
@@ -1352,6 +1386,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           );
         }
         setHasUnsavedChanges(true);
+        setSessionChanges((prev) => [
+          ...prev,
+          {
+            target: currentInterface,
+            type: 'admin_status',
+            change: `Interface administratively enabled`,
+            command: `interface ${currentInterface}\n no shutdown`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
         appendLines([
           inputLine,
           { id: String(Date.now() + 1), type: 'system', text: `%LINK-3-UPDOWN: Interface ${currentInterface}, changed state to up` },
@@ -1372,6 +1416,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           );
         }
         setHasUnsavedChanges(true);
+        setSessionChanges((prev) => [
+          ...prev,
+          {
+            target: currentInterface,
+            type: 'mode',
+            change: `Switchport mode ${mode}`,
+            command: `interface ${currentInterface}\n switchport mode ${mode}`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
         appendLines([inputLine]);
         return;
       }
@@ -1387,6 +1441,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             prev.map((p) => (targetIds.includes(p.port_id) ? { ...p, vlan: vlanVal } : p))
           );
           setHasUnsavedChanges(true);
+          setSessionChanges((prev) => [
+            ...prev,
+            {
+              target: currentInterface,
+              type: 'vlan',
+              change: `Access VLAN ${vlanVal}`,
+              command: `interface ${currentInterface}\n switchport access vlan ${vlanVal}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
         }
         appendLines([inputLine]);
         return;
@@ -1403,6 +1467,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             prev.map((p) => (targetIds.includes(p.port_id) ? { ...p, allowed_vlans: allowed } : p))
           );
           setHasUnsavedChanges(true);
+          setSessionChanges((prev) => [
+            ...prev,
+            {
+              target: currentInterface,
+              type: 'vlan',
+              change: `Trunk allowed VLANs: ${allowed}`,
+              command: `interface ${currentInterface}\n switchport trunk allowed vlan ${allowed}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
         }
         appendLines([inputLine]);
         return;
@@ -1419,6 +1493,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             prev.map((p) => (targetIds.includes(p.port_id) ? { ...p, description: descText } : p))
           );
           setHasUnsavedChanges(true);
+          setSessionChanges((prev) => [
+            ...prev,
+            {
+              target: currentInterface,
+              type: 'description',
+              change: `Description: "${descText}"`,
+              command: `interface ${currentInterface}\n description ${descText}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
         }
         appendLines([inputLine]);
         return;
@@ -1429,6 +1513,16 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         const ip = parts[2];
         const mask = parts[3];
         setHasUnsavedChanges(true);
+        setSessionChanges((prev) => [
+          ...prev,
+          {
+            target: currentInterface,
+            type: 'ip_address',
+            change: `IP address ${ip} ${mask}`,
+            command: `interface ${currentInterface}\n ip address ${ip} ${mask}`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
         appendLines([
           inputLine,
           { id: String(Date.now() + 1), type: 'success', text: `IP address ${ip} ${mask} configured on ${currentInterface}.` },
@@ -2207,10 +2301,10 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
                 <span className="text-[11px]">{isEn ? 'Unsaved running-config changes' : 'تغییرات در Running-Config ذخیره نشده در استارتاپ'}</span>
                 <button
-                  onClick={handleExecuteWriteMemory}
+                  onClick={() => setShowWriteConfirm(true)}
                   disabled={isWritingMemory}
-                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-[10px] transition flex items-center gap-1"
-                  title={isEn ? "Execute write memory command directly" : "اجرای مستقیم دستور write memory"}
+                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-[10px] transition flex items-center gap-1 cursor-pointer"
+                  title={isEn ? "Review pending changes & write to memory (NVRAM)" : "مشاهده تغییرات و ذخیره در NVRAM"}
                 >
                   <Save className="w-3 h-3" />
                   <span>Write Memory</span>
@@ -2956,25 +3050,49 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       </div>
     );
 
+    const writeConfirmModal = showWriteConfirm && device && (
+      <CiscoWriteConfirmModal
+        isOpen={showWriteConfirm}
+        onClose={() => setShowWriteConfirm(false)}
+        onConfirm={async () => {
+          await handleExecuteWriteMemory();
+          setShowWriteConfirm(false);
+        }}
+        device={device}
+        isWriting={isWritingMemory}
+        sessionChanges={sessionChanges}
+        onMinimize={onMinimize}
+        isLightMode={isLightMode}
+      />
+    );
+
     if (isEmbedded) {
-      return terminalWindow;
+      return (
+        <>
+          {terminalWindow}
+          {writeConfirmModal}
+        </>
+      );
     }
 
     return (
-      <div
-        className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center ${
-          isFullscreen ? 'p-0' : 'p-2 sm:p-4'
-        } modal-backdrop-blur overflow-y-auto`}
-        data-modal-backdrop="true"
-        dir={isEn ? 'ltr' : 'rtl'}
-        onClick={(e) => {
-          if (e.target === e.currentTarget && !preventBackdropClose) {
-            handleCloseModal();
-          }
-        }}
-      >
-        {terminalWindow}
-      </div>
+      <>
+        <div
+          className={`fixed top-0 left-0 right-0 bottom-8 z-50 flex items-center justify-center ${
+            isFullscreen ? 'p-0' : 'p-2 sm:p-4'
+          } modal-backdrop-blur overflow-y-auto`}
+          data-modal-backdrop="true"
+          dir={isEn ? 'ltr' : 'rtl'}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !preventBackdropClose) {
+              handleCloseModal();
+            }
+          }}
+        >
+          {terminalWindow}
+        </div>
+        {writeConfirmModal}
+      </>
     );
   };
 
