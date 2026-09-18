@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.75.0';
+export const APP_VERSION = '1.76.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.76.0',
+    releaseDate: '2026-09-18',
+    type: 'minor',
+    title: 'یکپارچه‌سازی افزودن رک و دکل در مودال جامع نصب سخت‌افزار با تب‌های اختصاصی رک و دکل (Unified Rack & Tower Hardware Catalog Integration)',
+    title_en: 'Unified Rack & Tower Creation within Hardware Catalog Modal as First & Second Tabs',
+    changes: [
+      'انتقال دکمه‌های مجزای افزودن رک (Add Rack) و افزودن دکل (Add Tower) از صفحه نقشه شماتیک و ویوی فیزیکال به داخل مودال جامع Add Hardware Device to Rack.',
+      'افزودن دو تب اول و دوم اختصاصی به بخش Hardware Catalog Selection: تب ۱ برای رک سرور (Server Rack Cabinet) و تب ۲ برای دکل مخابراتی (Telecom Tower).',
+      'تجهیز تب‌های رک و دکل به گزینه‌های کامل فنی شامل یونیت‌های رک (۱۲U تا ۴۸U)، عمق‌های مختلف (۶۰ تا ۱۲۰ سانتیمتر)، ارتفاع دکل (۶ تا ۱۲۰ متر)، انواع استراکچر (مهاری G35/G45، خودایستا ۳ پایه/۴ پایه، منوپل) و انتخاب رنگ بدنه.',
+      'پیاده‌سازی پیش‌نمایش برداری وکتور زنده (Photorealistic SVG Vector Preview) اختصاصی و لحظه‌ای برای رک و دکل متناسب با ابعاد و رنگ انتخابی.',
+      'یکپارچه‌سازی و بهینه‌سازی دکمه نوار ابزار و بوم خالی در ویوی فیزیکال با باز شدن مستقیم مودال جامع با دسترسی به تمام دسته‌ها.'
+    ],
+    changes_en: [
+      'Relocated standalone Add Rack and Add Tower buttons from the schematic map toolbar and empty canvas into the unified Add Hardware Device modal.',
+      'Added dedicated Tab 1 (Server Rack Cabinet) and Tab 2 (Telecom Tower) within the Hardware Catalog Selection category tabs.',
+      'Equipped Rack and Tower tabs with full technical configuration: rack unit sizing (12U-48U), depth choices (60-120cm), tower structural height (6-120m), mast lattice types (G35/G45 guyed, 3/4-legged self-supporting, monopole), and chassis coating colors.',
+      'Implemented dedicated live photorealistic SVG vector preview engines for both server rack cabinets and telecommunications towers responding in real-time to selected dimensions and colors.',
+      'Consolidated toolbar and empty canvas action buttons in physical view to seamlessly launch the unified catalog modal.'
+    ]
+  },
   {
     version: '1.75.0',
     releaseDate: '2026-09-18',

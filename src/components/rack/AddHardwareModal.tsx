@@ -2,6 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   CustomTopologyRack,
+  CustomTopologyTower,
+  TowerType,
+  RackUnitSize,
+  RackDepth,
   HardwareCategory,
   MountedHardwareDevice,
   NetworkCardConfig,
@@ -33,6 +37,10 @@ import {
   Wifi,
   Shield,
   Building2,
+  Box,
+  Radio,
+  Palette,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -48,6 +56,8 @@ interface AddHardwareModalProps {
   currentMapDeviceIds?: string[];
   isLightMode?: boolean;
   onMinimize?: () => void;
+  onAddRack?: (rack: Omit<CustomTopologyRack, 'id' | 'devices' | 'x' | 'y'>) => void;
+  onAddTower?: (tower: Omit<CustomTopologyTower, 'id' | 'devices' | 'x' | 'y'>) => void;
 }
 
 const PORT_TYPES: NetworkPortType[] = [
@@ -64,6 +74,260 @@ const PORT_TYPES: NetworkPortType[] = [
   '32G FC',
 ];
 
+interface ColorOption {
+  color: string;
+  label_en: string;
+  label_fa: string;
+}
+
+const RACK_SIZES: RackUnitSize[] = [12, 16, 21, 24, 28, 32, 36, 40, 42, 44, 48];
+const RACK_DEPTHS: RackDepth[] = [60, 80, 100, 120];
+const RACK_COLORS: ColorOption[] = [
+  { color: '#0f172a', label_en: 'Slate Black', label_fa: 'مشکی صنعتی' },
+  { color: '#1e293b', label_en: 'Dark Gray', label_fa: 'طوسی تیره' },
+  { color: '#18181b', label_en: 'Charcoal', label_fa: 'زغالی' },
+  { color: '#0369a1', label_en: 'Telecom Blue', label_fa: 'آبی مخابراتی' },
+  { color: '#1e1b4b', label_en: 'Deep Indigo', label_fa: 'سرمه‌ای تیره' },
+  { color: '#064e3b', label_en: 'Industrial Emerald', label_fa: 'سبز صنعتی' },
+];
+
+interface TowerTypeOption {
+  type: TowerType;
+  title_en: string;
+  title_fa: string;
+  desc_en: string;
+  desc_fa: string;
+  defaultHeight: number;
+  availableHeights: number[];
+}
+
+const TOWER_TYPE_OPTIONS: TowerTypeOption[] = [
+  {
+    type: 'guyed_g35',
+    title_en: 'G35 Guyed Mast Tower',
+    title_fa: 'دکل مهاری استاندارد G35',
+    desc_en: 'Triangular lattice 3m sections with guy wire tension anchor cables. Standard for heights up to 36m.',
+    desc_fa: 'سکشن‌های سه ضلعی ۳ متری با سیم مهاری بکسل استاندارد. مناسب دیش‌های ۳۰dBi تا ارتفاع ۳۶ متر.',
+    defaultHeight: 30,
+    availableHeights: [18, 24, 30, 36],
+  },
+  {
+    type: 'guyed_g45',
+    title_en: 'G45 Heavy Guyed Tower',
+    title_fa: 'دکل مهاری سنگین صنعتی G45',
+    desc_en: 'Heavy-duty triangular lattice mast with larger face width. Capable of multiple high-gain dishes up to 48m.',
+    desc_fa: 'دکل مهاری صنعتی با قاعده عریض‌تر و تحمل بار باد بالا جهت نصب چندین دیش و رادیوی سنگین تا ۴۸ متر.',
+    defaultHeight: 36,
+    availableHeights: [24, 30, 36, 42, 48],
+  },
+  {
+    type: 'self_supporting_3leg',
+    title_en: '3-Legged Self-Supporting Tower',
+    title_fa: 'دکل خودایستا سه پایه',
+    desc_en: 'Trapezoidal steel lattice tower with wide reinforced concrete base. No guy wires needed.',
+    desc_fa: 'دکل مشبک لتیس با پایه ذوزنقه‌ای عریض بتنی بدون نیاز به سیم مهار. مناسب فضاهای صنعتی و پشت‌بام.',
+    defaultHeight: 30,
+    availableHeights: [24, 30, 36, 42],
+  },
+  {
+    type: 'self_supporting_4leg',
+    title_en: '4-Legged Self-Supporting Tower',
+    title_fa: 'دکل خودایستا چهار پایه صنعتی',
+    desc_en: 'Four-legged heavy carrier telecommunication tower engineered for extreme microwave dish payloads up to 60m.',
+    desc_fa: 'دکل مخابراتی سنگین چهار پایه با بالاترین پایداری در برابر بادهای شدید و نصب دیش‌های بزرگ ۳۴dBi تا ۶۰ متر.',
+    defaultHeight: 36,
+    availableHeights: [30, 36, 48, 60],
+  },
+  {
+    type: 'monopole',
+    title_en: 'Monopole Tubular Mast',
+    title_fa: 'دکل منوپل لوله‌ای مخابراتی',
+    desc_en: 'Tubular steel monopole with minimal ground footprint. Ideal for rooftop or urban space-constrained sites.',
+    desc_fa: 'دکل تک‌پایه منوپل استوانه‌ای با اشغال حداقل فضای سطح زمین، ایده‌آل برای محیط‌های اداری و پشت‌بام.',
+    defaultHeight: 24,
+    availableHeights: [18, 24, 30],
+  },
+];
+const TOWER_COLORS: ColorOption[] = [
+  { color: '#f59e0b', label_en: 'Aviation Orange', label_fa: 'نارنجی هشدار هوانوردی' },
+  { color: '#0284c7', label_en: 'Industrial Blue', label_fa: 'آبی صنعتی' },
+  { color: '#10b981', label_en: 'Galvanized Green', label_fa: 'سبز گالوانیزه' },
+  { color: '#ef4444', label_en: 'Signal Red', label_fa: 'قرمز هشدار دکل' },
+  { color: '#8b5cf6', label_en: 'Purple', label_fa: 'بنفش صنعتی' },
+  { color: '#64748b', label_en: 'Galvanized Steel Gray', label_fa: 'طوسی گالوانیزه روی' },
+];
+
+const RackSvgPreview: React.FC<{
+  units: number;
+  depth: number;
+  color: string;
+  isLightMode: boolean;
+}> = ({ units, depth, color, isLightMode }) => {
+  return (
+    <div
+      className={`p-4 rounded-2xl border flex flex-col items-center justify-center ${
+        isLightMode ? 'bg-slate-100/90 border-slate-300' : 'bg-slate-950 border-slate-800'
+      }`}
+    >
+      <svg width={220} height={300} viewBox="0 0 220 300" className="drop-shadow-lg">
+        <defs>
+          <linearGradient id="modalRackFrameGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="50%" stopColor="#334155" />
+            <stop offset="100%" stopColor={color} />
+          </linearGradient>
+          <pattern id="modalMeshPattern" width="6" height="6" patternUnits="userSpaceOnUse">
+            <circle cx="3" cy="3" r="1.2" fill="#475569" opacity="0.35" />
+          </pattern>
+        </defs>
+
+        {/* Outer Cabinet Frame */}
+        <rect x="25" y="16" width="170" height="252" rx="8" fill="url(#modalRackFrameGrad)" stroke="#64748b" strokeWidth="1.5" />
+
+        {/* Top Roof Vent / Cable Ingress */}
+        <rect x="55" y="20" width="110" height="9" rx="3" fill="#0f172a" stroke="#475569" strokeWidth="0.8" />
+        <line x1="65" y1="24.5" x2="155" y2="24.5" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="3 3" />
+
+        {/* Internal 19" EIA-310 Mounting Chamber */}
+        <rect x="42" y="34" width="136" height="220" fill="#020617" stroke="#334155" strokeWidth="1" />
+        <rect x="42" y="34" width="136" height="220" fill="url(#modalMeshPattern)" />
+
+        {/* Left and Right 19" Mounting Rails */}
+        <rect x="44" y="38" width="12" height="212" rx="1.5" fill="#1e293b" stroke="#475569" strokeWidth="0.8" />
+        <rect x="164" y="38" width="12" height="212" rx="1.5" fill="#1e293b" stroke="#475569" strokeWidth="0.8" />
+
+        {/* Mounting Rail Holes / Ticks */}
+        {Array.from({ length: 13 }).map((_, i) => (
+          <g key={i}>
+            <circle cx="50" cy={46 + i * 16} r="1.5" fill="#94a3b8" />
+            <circle cx="170" cy={46 + i * 16} r="1.5" fill="#94a3b8" />
+          </g>
+        ))}
+
+        {/* U markings text */}
+        <text x="33" y="48" fontSize="7.5" fill="#64748b" textAnchor="middle" fontFamily="monospace">
+          {units}U
+        </text>
+        <text x="33" y="148" fontSize="7.5" fill="#64748b" textAnchor="middle" fontFamily="monospace">
+          {Math.round(units / 2)}U
+        </text>
+        <text x="33" y="248" fontSize="7.5" fill="#64748b" textAnchor="middle" fontFamily="monospace">
+          1U
+        </text>
+
+        {/* Base / Plinth & Casters */}
+        <rect x="35" y="268" width="150" height="9" rx="3" fill="#1e293b" stroke="#334155" />
+        <rect x="45" y="277" width="16" height="6" rx="2" fill="#475569" />
+        <rect x="159" y="277" width="16" height="6" rx="2" fill="#475569" />
+
+        {/* Depth Badge */}
+        <rect x="65" y="232" width="90" height="18" rx="9" fill="#0f172a" stroke="#38bdf8" strokeWidth="1" />
+        <text x="110" y="244" fontSize="9" fontWeight="bold" fill="#38bdf8" textAnchor="middle" fontFamily="sans-serif">
+          {units}U • {depth}cm Depth
+        </text>
+      </svg>
+    </div>
+  );
+};
+
+const TowerSvgPreview: React.FC<{
+  type: TowerType;
+  heightMeters: number;
+  color: string;
+  isLightMode: boolean;
+}> = ({ type, heightMeters, color, isLightMode }) => {
+  const isMonopole = type === 'monopole';
+  const isGuyed = type === 'guyed_g35' || type === 'guyed_g45';
+
+  return (
+    <div
+      className={`p-4 rounded-2xl border flex flex-col items-center justify-center ${
+        isLightMode ? 'bg-slate-100/90 border-slate-300' : 'bg-slate-950 border-slate-800'
+      }`}
+    >
+      <svg width={220} height={300} viewBox="0 0 220 300" className="drop-shadow-lg">
+        {/* Guy Wires (if guyed) */}
+        {isGuyed && (
+          <g stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" opacity="0.65">
+            <line x1="110" y1="55" x2="25" y2="270" />
+            <line x1="110" y1="55" x2="195" y2="270" />
+            <line x1="110" y1="130" x2="35" y2="270" />
+            <line x1="110" y1="130" x2="185" y2="270" />
+            <line x1="110" y1="195" x2="45" y2="270" />
+            <line x1="110" y1="195" x2="175" y2="270" />
+          </g>
+        )}
+
+        {/* Tower Body */}
+        {isMonopole ? (
+          // Monopole tubular mast
+          <g>
+            <polygon points="104,28 116,28 120,270 100,270" fill={color} stroke="#0f172a" strokeWidth="1.5" />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <line key={i} x1="102" y1={46 + i * 28} x2="118" y2={46 + i * 28} stroke="#ffffff" strokeWidth="1.5" opacity="0.8" />
+            ))}
+          </g>
+        ) : (
+          // Lattice Mast (Guyed or Self-Supporting)
+          <g stroke={color} strokeWidth="1.8">
+            {type.includes('self') ? (
+              // Trapezoidal wide base for self-supporting
+              <>
+                <line x1="102" y1="32" x2="75" y2="270" strokeWidth="2.5" />
+                <line x1="118" y1="32" x2="145" y2="270" strokeWidth="2.5" />
+                {Array.from({ length: 8 }).map((_, i) => {
+                  const yTop = 32 + i * 29;
+                  const yBottom = 32 + (i + 1) * 29;
+                  const xLeftTop = 102 - i * 3.3;
+                  const xRightTop = 118 + i * 3.3;
+                  const xLeftBottom = 102 - (i + 1) * 3.3;
+                  const xRightBottom = 118 + (i + 1) * 3.3;
+                  return (
+                    <g key={i}>
+                      <line x1={xLeftTop} y1={yTop} x2={xRightTop} y2={yTop} strokeWidth="1.5" />
+                      <line x1={xLeftTop} y1={yTop} x2={xRightBottom} y2={yBottom} strokeWidth="1.2" opacity="0.85" />
+                      <line x1={xRightTop} y1={yTop} x2={xLeftBottom} y2={yBottom} strokeWidth="1.2" opacity="0.85" />
+                    </g>
+                  );
+                })}
+              </>
+            ) : (
+              // Triangular parallel lattice for G35 / G45
+              <>
+                <line x1="100" y1="32" x2="100" y2="270" strokeWidth="2.2" />
+                <line x1="120" y1="32" x2="120" y2="270" strokeWidth="2.2" />
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <g key={i}>
+                    <line x1="100" y1={32 + i * 23} x2="120" y2={32 + i * 23} strokeWidth="1.5" />
+                    <line x1="100" y1={32 + i * 23} x2="120" y2={32 + (i + 1) * 23} strokeWidth="1.2" opacity="0.8" />
+                  </g>
+                ))}
+              </>
+            )}
+          </g>
+        )}
+
+        {/* Top Mast & Aviation Obstruction Red Beacon */}
+        <line x1="110" y1="16" x2="110" y2="32" stroke="#94a3b8" strokeWidth="2" />
+        <circle cx="110" cy="14" r="3.5" fill="#ef4444" className="animate-pulse" />
+
+        {/* Microwave Antennas mounted on preview */}
+        <ellipse cx="88" cy="62" rx="8" ry="12" fill="#f8fafc" stroke="#475569" strokeWidth="1" />
+        <ellipse cx="132" cy="92" rx="7" ry="10" fill="#f8fafc" stroke="#475569" strokeWidth="1" />
+
+        {/* Base Foundation */}
+        <rect x="65" y="270" width="90" height="11" rx="3" fill="#334155" stroke="#475569" />
+
+        {/* Height Badge */}
+        <rect x="60" y="242" width="100" height="18" rx="9" fill="#0f172a" stroke={color} strokeWidth="1" />
+        <text x="110" y="254" fontSize="9" fontWeight="bold" fill={color} textAnchor="middle" fontFamily="sans-serif">
+          {heightMeters}m Height
+        </text>
+      </svg>
+    </div>
+  );
+};
+
 export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
   isOpen,
   onClose,
@@ -76,6 +340,8 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
   currentMapDeviceIds = [],
   isLightMode: propIsLightMode,
   onMinimize,
+  onAddRack,
+  onAddTower,
 }) => {
   const { t, isEn, isRtl } = useLanguage();
 
@@ -150,19 +416,65 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
   };
 
   const [sourceMode, setSourceMode] = useState<'inventory' | 'catalog'>(() => {
-    return inventoryDevices.length > 0 && !editingDevice ? 'inventory' : 'catalog';
+    return inventoryDevices.length > 0 && !editingDevice && racks.length > 0 ? 'inventory' : 'catalog';
   });
   const [selectedInventoryDeviceId, setSelectedInventoryDeviceId] = useState<string | null>(null);
   const [inventorySearch, setInventorySearch] = useState('');
   const [catalogSearch, setCatalogSearch] = useState('');
 
-  const [activeCategory, setActiveCategory] = useState<HardwareCategory>('hpe_server');
-  const [selectedTemplate, setSelectedTemplate] = useState<HardwareCatalogTemplate>(HARDWARE_CATALOG[0]);
-  const [selectedGeneration, setSelectedGeneration] = useState<string>('Gen10');
+  const [activeCategory, setActiveCategory] = useState<HardwareCategory>(() => {
+    return 'server_rack';
+  });
+  const [selectedTemplate, setSelectedTemplate] = useState<HardwareCatalogTemplate>(() => {
+    const rackTpl = HARDWARE_CATALOG.find((t) => t.category === 'server_rack');
+    return rackTpl || HARDWARE_CATALOG[0];
+  });
+  const [selectedGeneration, setSelectedGeneration] = useState<string>('Standard');
   const [targetRackId, setTargetRackId] = useState<string>(defaultRackId || (racks[0]?.id ?? ''));
   const [targetU, setTargetU] = useState<number>(defaultTargetU || 1);
   const [customName, setCustomName] = useState<string>('');
   const [previewViewMode, setPreviewViewMode] = useState<'front' | 'rear'>('front');
+
+  // Rack creation state
+  const [rackName, setRackName] = useState<string>('');
+  const [rackUnits, setRackUnits] = useState<RackUnitSize>(42);
+  const [rackDepth, setRackDepth] = useState<RackDepth>(100);
+  const [rackColor, setRackColor] = useState<string>('#0f172a');
+
+  // Tower creation state
+  const [towerType, setTowerType] = useState<TowerType>('guyed_g35');
+  const [towerName, setTowerName] = useState<string>('');
+  const [towerHeight, setTowerHeight] = useState<number>(30);
+  const [towerColor, setTowerColor] = useState<string>('#f59e0b');
+
+  // Auto-generate Rack name
+  useEffect(() => {
+    if (isOpen && activeCategory === 'server_rack' && !rackName) {
+      const existingNames = new Set(racks.map((r) => r.name.trim().toLowerCase()));
+      let num = 1;
+      let candidate = isEn ? `Rack-0${num}` : `رک-0${num}`;
+      while (existingNames.has(candidate.toLowerCase())) {
+        num++;
+        const numStr = num < 10 ? `0${num}` : `${num}`;
+        candidate = isEn ? `Rack-${numStr}` : `رک-${numStr}`;
+      }
+      setRackName(candidate);
+    }
+  }, [isOpen, activeCategory, racks, isEn, rackName]);
+
+  // Auto-generate Tower name
+  useEffect(() => {
+    if (isOpen && activeCategory === 'telecom_tower' && !towerName) {
+      const opt = TOWER_TYPE_OPTIONS.find((t) => t.type === towerType) || TOWER_TYPE_OPTIONS[0];
+      setTowerName(isEn ? `${opt.title_en} (${towerHeight}m)` : `${opt.title_fa} (${towerHeight} متر)`);
+    }
+  }, [isOpen, activeCategory, towerType, towerHeight, isEn, towerName]);
+
+  // Check duplicate rack name
+  const isDuplicateRackName = useMemo(() => {
+    if (!rackName.trim()) return false;
+    return racks.some((r) => r.name.trim().toLowerCase() === rackName.trim().toLowerCase());
+  }, [racks, rackName]);
 
   // Power and PDU state
   const [powerSupplyCount, setPowerSupplyCount] = useState<number>(2);
@@ -246,19 +558,18 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
     return inventoryDevices.find((d) => d.id === selectedInventoryDeviceId) || null;
   }, [inventoryDevices, selectedInventoryDeviceId]);
 
-  // Categories available for mounting inside a server rack (telecom towers are freestanding outside structures)
+  // Categories available in hardware catalog (rack tab 1, tower tab 2, then equipment)
   const rackAvailableCategories = useMemo(() => {
-    return HARDWARE_CATEGORIES.filter((c) => c.id !== 'telecom_tower');
+    return HARDWARE_CATEGORIES;
   }, []);
 
   // Filtered hardware catalog templates based on search query or active category
   const filteredCatalogTemplates = useMemo(() => {
     const q = catalogSearch.toLowerCase().trim();
     if (!q) {
-      return HARDWARE_CATALOG.filter((t) => t.category === activeCategory && t.category !== 'telecom_tower');
+      return HARDWARE_CATALOG.filter((t) => t.category === activeCategory);
     }
     return HARDWARE_CATALOG.filter((t) => {
-      if (t.category === 'telecom_tower') return false;
       const modelMatch = (t.model || '').toLowerCase().includes(q);
       const brandMatch = (t.brand || '').toLowerCase().includes(q);
       const descFaMatch = (t.description_fa || '').toLowerCase().includes(q);
@@ -389,38 +700,38 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
     const tpls = HARDWARE_CATALOG.filter((t) => t.category === cat);
     if (tpls.length > 0) {
       const tpl = tpls[0];
-      setSelectedTemplate(tpl);
-      setSelectedGeneration(tpl.defaultGeneration || tpl.generations?.[0] || '');
-      setCustomName(`${tpl.brand} ${tpl.model}`);
-      setPowerWatts(tpl.defaultPowerWatts);
-      setPowerSupplyCount(tpl.defaultPowerSupplyCount ?? (tpl.category.includes('server') || tpl.category.includes('storage') ? 2 : tpl.category.includes('panel') || tpl.category.includes('cable') || tpl.category === 'blank_panel' ? 0 : 1));
-      setPduOutletsCount(tpl.defaultPduOutlets ?? 8);
-      setPduOutletType(tpl.defaultPduOutletType ?? 'IEC C13');
-      setPduAmperage(tpl.defaultPduAmperage ?? 16);
-      setNetworkCards(
-        tpl.defaultNetworkCards.map((c, i) => ({
-          id: `nic-${Date.now()}-${i}`,
-          name: c.name,
-          portCount: c.portCount,
-          portType: c.portType,
-          slot: c.slot,
-        }))
-      );
-
-      // Check collision with current targetU only if defaultTargetU was not specified
-      if (!defaultTargetU) {
-        const col = getCollision(currentRack, targetU, tpl.heightU, editingDevice?.id);
-        if (col) {
-          const freeU = findFirstFreeSlot(currentRack, tpl.heightU, editingDevice?.id);
-          if (freeU !== null) setTargetU(freeU);
-        }
-      }
+      handleTemplateChange(tpl);
     }
   };
 
   // When changing template
   const handleTemplateChange = (tpl: HardwareCatalogTemplate) => {
     setSelectedTemplate(tpl);
+    if (tpl.category === 'server_rack') {
+      if (RACK_SIZES.includes(tpl.heightU as RackUnitSize)) {
+        setRackUnits(tpl.heightU as RackUnitSize);
+      }
+      if (tpl.generations && tpl.generations[0]) {
+        const dMatch = tpl.generations[0].match(/(\d+)/);
+        if (dMatch) {
+          const d = parseInt(dMatch[1], 10) as RackDepth;
+          if (RACK_DEPTHS.includes(d)) setRackDepth(d);
+        }
+      }
+      return;
+    }
+    if (tpl.category === 'telecom_tower') {
+      let matchedType: TowerType = 'guyed_g35';
+      if (tpl.id.includes('g45')) matchedType = 'guyed_g45';
+      else if (tpl.id.includes('3leg')) matchedType = 'self_supporting_3leg';
+      else if (tpl.id.includes('4leg')) matchedType = 'self_supporting_4leg';
+      else if (tpl.id.includes('monopole')) matchedType = 'monopole';
+      else if (tpl.id.includes('g35')) matchedType = 'guyed_g35';
+      setTowerType(matchedType);
+      setTowerHeight(tpl.heightU || 30);
+      return;
+    }
+
     setSelectedGeneration(tpl.defaultGeneration || tpl.generations?.[0] || '');
     setCustomName(`${tpl.brand} ${tpl.model}`);
     setPowerWatts(tpl.defaultPowerWatts);
@@ -542,6 +853,45 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
     onClose();
   };
 
+  const handleSaveRack = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rackName.trim() || isDuplicateRackName) return;
+    if (onAddRack) {
+      onAddRack({
+        name: rackName.trim(),
+        units: rackUnits,
+        depth: rackDepth,
+        viewMode: 'front',
+        color: rackColor,
+      });
+    }
+    onClose();
+  };
+
+  const handleSaveTower = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!towerName.trim()) return;
+    if (onAddTower) {
+      onAddTower({
+        name: towerName.trim(),
+        type: towerType,
+        heightMeters: Number(towerHeight),
+        color: towerColor,
+      });
+    }
+    onClose();
+  };
+
+  const handleSubmitForm = (e: React.FormEvent) => {
+    if (activeCategory === 'server_rack') {
+      handleSaveRack(e);
+    } else if (activeCategory === 'telecom_tower') {
+      handleSaveTower(e);
+    } else {
+      handleSave(e);
+    }
+  };
+
   return createPortal(
     <div
       className={`fixed top-0 left-0 right-0 bottom-8 z-[1100] flex items-center justify-center p-3 sm:p-5 md:py-8 backdrop-blur-md animate-fade-in ${
@@ -568,12 +918,26 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
           <div className="flex items-center gap-3">
             <div
               className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                isLightMode
+                activeCategory === 'server_rack'
+                  ? isLightMode
+                    ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  : activeCategory === 'telecom_tower'
+                  ? isLightMode
+                    ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : isLightMode
                   ? 'bg-cyan-50 border border-cyan-200 text-cyan-700'
                   : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
               }`}
             >
-              <Server className="w-5 h-5" />
+              {activeCategory === 'server_rack' ? (
+                <Box className="w-5 h-5" />
+              ) : activeCategory === 'telecom_tower' ? (
+                <Radio className="w-5 h-5" />
+              ) : (
+                <Server className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h3 className={`text-base font-bold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
@@ -581,12 +945,28 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
                   ? isEn
                     ? 'Edit Hardware Specifications & Network Cards'
                     : 'ویرایش و تنظیم کارت‌های شبکه تجهیز'
+                  : activeCategory === 'server_rack'
+                  ? isEn
+                    ? 'Add Server Rack Cabinet'
+                    : 'افزودن رک سرور استاندارد'
+                  : activeCategory === 'telecom_tower'
+                  ? isEn
+                    ? 'Add Telecom Tower / Mast'
+                    : 'افزودن دکل مخابراتی'
                   : isEn
                   ? 'Add Hardware Device to Rack'
                   : 'افزودن تجهیز سخت‌افزاری به رک'}
               </h3>
               <p className={`text-xs ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                {isEn
+                {activeCategory === 'server_rack'
+                  ? isEn
+                    ? 'Configure 19" EIA-310 standard rack dimensions, depth, and placement'
+                    : 'پیکربندی ابعاد، عمق و ظرفیت یونیت‌های رک استاندارد ۱۹ اینچ'
+                  : activeCategory === 'telecom_tower'
+                  ? isEn
+                    ? 'Configure telecommunications tower structure, height, and site placement'
+                    : 'پیکربندی سازه، ارتفاع و مشخصات دکل مخابراتی'
+                  : isEn
                   ? 'Select from inventory equipment or catalog templates to mount into rack'
                   : 'انتخاب از تجهیزات انبار شبکه یا کاتالوگ استاندارد جهت جانمایی و نصب در رک'}
               </p>
@@ -623,7 +1003,7 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
         </div>
 
         {/* Scrollable Modal Body */}
-        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmitForm} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Hardware Source Toggle (Inventory vs Catalog) */}
           {!editingDevice && (
             <div
@@ -969,12 +1349,311 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
             </>
           )}
 
-          {/* Model Generations Dropdown (if available) & Custom Device Label */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
-                {isEn ? 'Device Name / Custom Label:' : 'برچسب / نام دلخواه تجهیز:'}
-              </label>
+          {/* CATEGORY 1: SERVER RACK CABINET CONFIGURATION & PREVIEW */}
+          {!editingDevice && activeCategory === 'server_rack' && (
+            <div className="space-y-6">
+              <div className={`p-4 rounded-2xl border space-y-4 ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/70 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <h4 className={`text-xs font-bold flex items-center gap-2 ${isLightMode ? 'text-blue-800' : 'text-blue-400'}`}>
+                    <Box className="w-4 h-4" />
+                    <span>{isEn ? 'Server Rack Specifications & Dimensions' : 'مشخصات فیزیکی و ابعاد رک سرور'}</span>
+                  </h4>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${
+                    isLightMode ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-blue-950 text-blue-300 border-blue-800'
+                  }`}>
+                    {rackUnits}U • {rackDepth} cm
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Rack Name */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Rack Cabinet Name / ID:' : 'نام / شناسه رک:'}
+                    </label>
+                    <input
+                      type="text"
+                      value={rackName}
+                      onChange={(e) => setRackName(e.target.value)}
+                      placeholder={isEn ? 'e.g. Rack-01 (Datacenter A)' : 'مثال: رک-01 (اتاق سرور اصلی)'}
+                      className={`w-full px-3.5 py-2 rounded-xl border text-xs focus:outline-none ${
+                        isDuplicateRackName
+                          ? isLightMode
+                            ? 'border-rose-500 bg-rose-50 text-rose-800'
+                            : 'border-rose-500 bg-rose-950/50 text-rose-300'
+                          : isLightMode
+                          ? 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-600'
+                          : 'bg-slate-900 border-slate-700 text-white focus:border-blue-500'
+                      }`}
+                      required
+                    />
+                    {isDuplicateRackName && (
+                      <p className="text-[11px] text-rose-500 font-medium">
+                        {isEn ? 'A rack with this name already exists!' : 'رکی با این نام از قبل در نقشه وجود دارد!'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Rack Units (U) */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Rack Unit Capacity (U):' : 'ظرفیت یونیت رک (U):'}
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {RACK_SIZES.map((sz) => (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => setRackUnits(sz)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold transition border cursor-pointer ${
+                            rackUnits === sz
+                              ? isLightMode
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                : 'bg-blue-600 text-white border-blue-500 shadow-xs'
+                              : isLightMode
+                              ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {sz}U
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rack Depth */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Rack Depth:' : 'عمق رک:'}
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {RACK_DEPTHS.map((dp) => (
+                        <button
+                          key={dp}
+                          type="button"
+                          onClick={() => setRackDepth(dp)}
+                          className={`px-2 py-1.5 rounded-lg text-xs font-mono font-bold transition border text-center cursor-pointer ${
+                            rackDepth === dp
+                              ? isLightMode
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                : 'bg-blue-600 text-white border-blue-500 shadow-xs'
+                              : isLightMode
+                              ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {dp}cm
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rack Frame Color */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Chassis & Frame Color:' : 'رنگ بدنه و شاسی رک:'}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {RACK_COLORS.map((col) => (
+                        <button
+                          key={col.color}
+                          type="button"
+                          onClick={() => setRackColor(col.color)}
+                          className={`w-7 h-7 rounded-xl border-2 transition transform active:scale-95 flex items-center justify-center cursor-pointer ${
+                            rackColor === col.color
+                              ? 'border-cyan-400 scale-110 shadow-md'
+                              : 'border-transparent hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: col.color }}
+                          title={isEn ? col.label_en : col.label_fa}
+                        >
+                          {rackColor === col.color && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Photorealistic Vector SVG Rack Preview */}
+              <div className={`p-4 rounded-2xl border space-y-2 ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/90 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Live 19" Server Rack Cabinet Vector Preview:' : 'پیش‌نمایش زنده وکتور رک سرور ۱۹ اینچ استاندارد:'}
+                  </span>
+                  <span className={`text-[11px] font-mono ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    19" EIA-310-E Standard
+                  </span>
+                </div>
+                <div className={`p-4 rounded-xl flex items-center justify-center overflow-x-auto border ${
+                  isLightMode ? 'bg-slate-100 border-slate-300 shadow-inner' : 'bg-slate-950 border-slate-800/80'
+                }`}>
+                  <RackSvgPreview units={rackUnits} depth={rackDepth} color={rackColor} isLightMode={!!isLightMode} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CATEGORY 2: TELECOM TOWER CONFIGURATION & PREVIEW */}
+          {!editingDevice && activeCategory === 'telecom_tower' && (
+            <div className="space-y-6">
+              <div className={`p-4 rounded-2xl border space-y-4 ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/70 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <h4 className={`text-xs font-bold flex items-center gap-2 ${isLightMode ? 'text-amber-800' : 'text-amber-400'}`}>
+                    <Radio className="w-4 h-4" />
+                    <span>{isEn ? 'Telecommunications Tower Specifications' : 'مشخصات فنی و سازه دکل مخابراتی'}</span>
+                  </h4>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${
+                    isLightMode ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-amber-950 text-amber-300 border-amber-800'
+                  }`}>
+                    {towerHeight}m • {TOWER_TYPE_OPTIONS.find((t) => t.type === towerType)?.[isEn ? 'title_en' : 'title_fa']}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Tower Name */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Tower Name / Site Label:' : 'نام دکل / برچسب سایت:'}
+                    </label>
+                    <input
+                      type="text"
+                      value={towerName}
+                      onChange={(e) => setTowerName(e.target.value)}
+                      placeholder={isEn ? 'e.g. Site Central Guyed Mast' : 'مثال: دکل مهاری سایت مرکزی'}
+                      className={`w-full px-3.5 py-2 rounded-xl border text-xs focus:outline-none ${
+                        isLightMode
+                          ? 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-amber-600'
+                          : 'bg-slate-900 border-slate-700 text-white focus:border-amber-500'
+                      }`}
+                      required
+                    />
+                  </div>
+
+                  {/* Tower Height */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                        {isEn ? 'Structure Height (Meters):' : 'ارتفاع سازه (متر):'}
+                      </label>
+                      <span className={`font-mono text-xs font-bold ${isLightMode ? 'text-amber-800' : 'text-amber-400'}`}>
+                        {towerHeight} {isEn ? 'meters' : 'متر'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={6}
+                        max={120}
+                        step={3}
+                        value={towerHeight}
+                        onChange={(e) => setTowerHeight(parseInt(e.target.value, 10))}
+                        className="flex-1 accent-amber-500"
+                      />
+                      <input
+                        type="number"
+                        min={6}
+                        max={120}
+                        value={towerHeight}
+                        onChange={(e) => setTowerHeight(Math.max(6, Math.min(120, parseInt(e.target.value, 10) || 6)))}
+                        className={`w-16 px-2 py-1.5 rounded-lg border text-xs font-mono text-center focus:outline-none ${
+                          isLightMode ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tower Type Selector */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Structural Mast Type:' : 'نوع سازه و استراکچر دکل:'}
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {TOWER_TYPE_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.type}
+                          type="button"
+                          onClick={() => {
+                            setTowerType(opt.type);
+                            setTowerHeight(opt.defaultHeight);
+                            setTowerName(isEn ? `${opt.title_en} (${opt.defaultHeight}m)` : `${opt.title_fa} (${opt.defaultHeight} متر)`);
+                          }}
+                          className={`p-2.5 rounded-xl border text-start transition cursor-pointer ${
+                            towerType === opt.type
+                              ? isLightMode
+                                ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-500'
+                                : 'bg-amber-950/40 border-amber-500 ring-1 ring-amber-500'
+                              : isLightMode
+                              ? 'bg-white border-slate-200 hover:bg-slate-100'
+                              : 'bg-slate-900 border-slate-800 hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className={`text-xs font-bold ${towerType === opt.type ? 'text-amber-500' : isLightMode ? 'text-slate-800' : 'text-slate-200'}`}>
+                            {isEn ? opt.title_en : opt.title_fa}
+                          </div>
+                          <div className={`text-[10px] mt-1 ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {isEn ? opt.desc_en : opt.desc_fa}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tower Color Selection */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                      {isEn ? 'Warning Coating & Galvanized Color:' : 'رنگ‌آمیزی هشدار / گالوانیزه دکل:'}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {TOWER_COLORS.map((col) => (
+                        <button
+                          key={col.color}
+                          type="button"
+                          onClick={() => setTowerColor(col.color)}
+                          className={`w-7 h-7 rounded-xl border-2 transition transform active:scale-95 flex items-center justify-center cursor-pointer ${
+                            towerColor === col.color
+                              ? 'border-amber-400 scale-110 shadow-md'
+                              : 'border-transparent hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: col.color }}
+                          title={isEn ? col.label_en : col.label_fa}
+                        >
+                          {towerColor === col.color && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Photorealistic Vector SVG Tower Preview */}
+              <div className={`p-4 rounded-2xl border space-y-2 ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/90 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Live Structural Tower Vector Preview:' : 'پیش‌نمایش زنده استراکچر وکتور دکل مخابراتی:'}
+                  </span>
+                  <span className={`text-[11px] font-mono ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {towerHeight}m ICAO Standard
+                  </span>
+                </div>
+                <div className={`p-4 rounded-xl flex items-center justify-center overflow-x-auto border ${
+                  isLightMode ? 'bg-slate-100 border-slate-300 shadow-inner' : 'bg-slate-950 border-slate-800/80'
+                }`}>
+                  <TowerSvgPreview type={towerType} heightMeters={towerHeight} color={towerColor} isLightMode={!!isLightMode} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STANDARD HARDWARE DEVICE MOUNTING (when not adding a rack or tower) */}
+          {(editingDevice || (activeCategory !== 'server_rack' && activeCategory !== 'telecom_tower')) && (
+            <>
+              {/* Model Generations Dropdown (if available) & Custom Device Label */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className={`text-xs font-bold block ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                    {isEn ? 'Device Name / Custom Label:' : 'برچسب / نام دلخواه تجهیز:'}
+                  </label>
               <input
                 type="text"
                 value={customName}
@@ -1474,6 +2153,8 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
               />
             </div>
           </div>
+          </>
+          )}
 
           {/* Submit / Cancel Buttons */}
           <div className={`pt-4 border-t flex items-center justify-end gap-3 ${isLightMode ? 'border-slate-200' : 'border-slate-800'}`}>
@@ -1490,12 +2171,24 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={!!currentCollision}
+              disabled={
+                activeCategory === 'server_rack'
+                  ? !rackName.trim() || isDuplicateRackName
+                  : activeCategory === 'telecom_tower'
+                  ? !towerName.trim()
+                  : (!targetRackId || !!currentCollision || racks.length === 0)
+              }
               className={`px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg transition active:scale-95 flex items-center gap-2 cursor-pointer ${
-                currentCollision
+                (activeCategory === 'server_rack' && (!rackName.trim() || isDuplicateRackName)) ||
+                (activeCategory === 'telecom_tower' && !towerName.trim()) ||
+                (activeCategory !== 'server_rack' && activeCategory !== 'telecom_tower' && (!targetRackId || !!currentCollision || racks.length === 0))
                   ? isLightMode
                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
                     : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : activeCategory === 'server_rack'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/30'
+                  : activeCategory === 'telecom_tower'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-amber-600/30'
                   : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-600/30'
               }`}
             >
@@ -1505,6 +2198,14 @@ export const AddHardwareModal: React.FC<AddHardwareModalProps> = ({
                   ? isEn
                     ? 'Save Device Changes'
                     : 'ذخیره تغییرات تجهیز'
+                  : activeCategory === 'server_rack'
+                  ? isEn
+                    ? 'Add Server Rack Cabinet'
+                    : 'افزودن رک سرور استاندارد'
+                  : activeCategory === 'telecom_tower'
+                  ? isEn
+                    ? 'Add Telecom Tower'
+                    : 'افزودن دکل مخابراتی'
                   : isEn
                   ? 'Install Hardware in Rack'
                   : 'نصب تجهیز در رک'}

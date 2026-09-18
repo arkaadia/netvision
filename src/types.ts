@@ -221,6 +221,8 @@ export interface NetworkCardConfig {
 }
 
 export type HardwareCategory =
+  | 'server_rack'
+  | 'telecom_tower'
   | 'hpe_server'
   | 'asus_server'
   | 'cisco_server'
