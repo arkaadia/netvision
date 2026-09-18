@@ -10,9 +10,22 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.80.0';
+export const APP_VERSION = '1.80.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.80.1',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'حذف دکمه تکراری ترمینال سیسکو از کنار دکمه بروزرسانی در تب منابع سیستم مودال پورت سیسکو',
+    title_en: 'Removed Redundant Cisco CLI Button next to Refresh in Cisco Port Modal System Resources Tab',
+    changes: [
+      'حذف دکمه اضافی و تکراری «Cisco CLI» از کنار دکمه بروزرسانی (Refresh) در نوار تله‌متری تب منابع سیستم مودال پورت سیسکو (CiscoSystemResourcesTab) به دلیل وجود دکمه دائمی ترمینال در هدر بالای مودال.'
+    ],
+    changes_en: [
+      'Removed redundant "Cisco CLI" button adjacent to the Refresh button in the Cisco System Resources telemetry header bar (CiscoSystemResourcesTab), as terminal access is already persistently available in the modal top header.'
+    ]
+  },
   {
     version: '1.80.0',
     releaseDate: '2026-09-18',
