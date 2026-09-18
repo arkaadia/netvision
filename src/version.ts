@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.81.1';
+export const APP_VERSION = '1.81.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.81.2',
+    releaseDate: '2026-09-18',
+    type: 'patch',
+    title: 'اصلاح کامل سازگاری تم تیره و انطباق مودال تأیید و اجرای تنظیمات پورت سیسکو با استانداردهای پنج‌گانه مودال‌ها',
+    title_en: 'Full Dark Mode Theme Compatibility and 5-Pillar Modal Standards Alignment for Cisco Port Configuration Confirm Modal',
+    changes: [
+      'اصلاح پس‌زمینه، کادرها و رنگ متون مودال تأیید تنظیمات پورت سیسکو (CiscoPortConfigConfirmModal) در تم تیره جهت رفع ناهماهنگی و ایجاد کنتراست ارگونومیک بالا.',
+      'افزودن دکمه‌های کنترلی سه‌گانه در هدر مودال شامل دکمه بستن (Close)، کوچک‌کردن (Minimize) و تمام‌صفحه (Fullscreen).',
+      'رعایت فاصله دقیق لبه پایینی مودال تا لبه بالایی فوتر (bottom-8) در حالت تمام‌صفحه و ممانعت از رفتن به زیر فوتر.',
+      'تجهیز بخش‌ها و فیلدهای کلیدی به ابزارک راهنمای سه‌بخشی (FieldInfoTooltip) با تشخیص موقعیت خودکار و عدم خروج از صفحه.',
+      'پشتیبانی دوطرفه و دقیق از حالت چندزبانگی (انگلیسی و فارسی بدون تداخل متنی).'
+    ],
+    changes_en: [
+      'Fixed background, borders, and text contrast in Cisco Port Configuration Confirm Modal (CiscoPortConfigConfirmModal) for full dark mode harmony and high ergonomic readability.',
+      'Added the mandatory tri-button header suite: Close, Minimize, and Fullscreen toggle buttons.',
+      'Enforced strict footer clearance in fullscreen mode ensuring the bottom edge aligns directly with the top of the footer (bottom-8) without overlapping.',
+      'Equipped key configuration sections with 3-part boundary-safe FieldInfoTooltips with portal rendering and automatic viewport clamping.',
+      'Strict bidirectional English and Persian localization synchronization.'
+    ]
+  },
   {
     version: '1.81.1',
     releaseDate: '2026-09-18',
