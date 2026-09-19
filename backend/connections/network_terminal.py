@@ -34,17 +34,18 @@ try:
     import paramiko
     HAS_PARAMIKO = True
     try:
-        from .ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel
+        from .ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely
     except ImportError:
         try:
-            from connections.ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel
+            from connections.ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely
         except ImportError:
-            from ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel
+            from ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely
     ensure_paramiko_compatibility()
 except ImportError:
     HAS_PARAMIKO = False
     paramiko = None
     open_adaptive_shell_channel = None
+    apply_security_options_safely = None
 
 
 class NetworkTerminalSession:
@@ -161,7 +162,6 @@ class NetworkTerminalSession:
         sock.connect((self.host, self.port))
 
         transport = paramiko.Transport(sock)
-        sec = transport.get_security_options()
 
         if use_legacy:
             # Enable older Cisco 2960 / Catalyst legacy algorithms
@@ -171,11 +171,7 @@ class NetworkTerminalSession:
                 'diffie-hellman-group-exchange-sha1',
                 'diffie-hellman-group-exchange-sha256',
             )
-            sec.kex = legacy_kex + tuple(k for k in sec.kex if k not in legacy_kex)
-
-            legacy_keys = ('ssh-rsa', 'ssh-dss')
-            sec.key_types = legacy_keys + tuple(k for k in sec.key_types if k not in legacy_keys)
-
+            legacy_keys = ('ssh-rsa', 'ssh-dss', 'rsa-sha2-256', 'rsa-sha2-512')
             legacy_ciphers = (
                 'aes128-cbc',
                 '3des-cbc',
@@ -185,7 +181,26 @@ class NetworkTerminalSession:
                 'aes192-ctr',
                 'aes256-ctr',
             )
-            sec.ciphers = legacy_ciphers + tuple(c for c in sec.ciphers if c not in legacy_ciphers)
+            legacy_macs = (
+                'hmac-sha1',
+                'hmac-sha1-96',
+                'hmac-md5',
+                'hmac-md5-96',
+                'hmac-sha2-256',
+            )
+            if apply_security_options_safely:
+                apply_security_options_safely(
+                    transport,
+                    kex_candidates=legacy_kex,
+                    key_candidates=legacy_keys,
+                    cipher_candidates=legacy_ciphers,
+                    mac_candidates=legacy_macs
+                )
+            else:
+                sec = transport.get_security_options()
+                sec.kex = legacy_kex + tuple(k for k in sec.kex if k not in legacy_kex)
+                sec.key_types = legacy_keys + tuple(k for k in sec.key_types if k not in legacy_keys)
+                sec.ciphers = legacy_ciphers + tuple(c for c in sec.ciphers if c not in legacy_ciphers)
 
         transport.start_client(timeout=timeout)
 

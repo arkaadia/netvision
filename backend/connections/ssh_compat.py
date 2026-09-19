@@ -66,8 +66,8 @@ TIER1_MODERN_MACS = (
 # Activated ONLY if the peer rejects modern algorithms or drops handshake
 # ==============================================================================
 TIER2_LEGACY_KEX = (
-    'diffie-hellman-group14-sha1',
     'diffie-hellman-group1-sha1',
+    'diffie-hellman-group14-sha1',
     'diffie-hellman-group-exchange-sha1',
     'diffie-hellman-group-exchange-sha256',
     'diffie-hellman-group14-sha256',
@@ -78,9 +78,9 @@ TIER2_LEGACY_KEX = (
 
 TIER2_LEGACY_KEYS = (
     'ssh-rsa',
-    'ssh-dss',
     'rsa-sha2-256',
     'rsa-sha2-512',
+    'ssh-dss',
 )
 
 TIER2_LEGACY_CIPHERS = (
@@ -100,14 +100,63 @@ TIER2_LEGACY_MACS = (
     'hmac-sha2-256',
 )
 
+# Oakley Group 2 (1024-bit MODP Group) - RFC 2409 Section 6.2 & RFC 4253 Section 8.1
+P_GROUP1 = int(
+    "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
+    "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
+    "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
+    "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
+    "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381"
+    "FFFFFFFFFFFFFFFF",
+    16
+)
+G_GROUP1 = 2
+
 _PATCHED = False
+_KEX_GROUP1_CLASS = None
+
+
+def get_kex_group1_class():
+    """
+    Returns a class implementing 'diffie-hellman-group1-sha1'.
+    First attempts native import from paramiko.kex_group1.
+    If unavailable, constructs it by subclassing paramiko.kex_group14.KexGroup14
+    with Oakley Group 2 (RFC 2409 / RFC 4253) parameters.
+    """
+    global _KEX_GROUP1_CLASS
+    if _KEX_GROUP1_CLASS is not None:
+        return _KEX_GROUP1_CLASS
+
+    try:
+        from paramiko.kex_group1 import KexGroup1
+        _KEX_GROUP1_CLASS = KexGroup1
+        return _KEX_GROUP1_CLASS
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from paramiko.kex_group14 import KexGroup14
+        from cryptography.hazmat.primitives import hashes
+
+        class KexGroup1Legacy(KexGroup14):
+            name = "diffie-hellman-group1-sha1"
+            P = P_GROUP1
+            G = G_GROUP1
+            hash_algo = hashes.SHA1
+
+        _KEX_GROUP1_CLASS = KexGroup1Legacy
+        return _KEX_GROUP1_CLASS
+    except Exception as e:
+        logger.warning(f"Could not initialize KexGroup1 class: {e}")
+        return None
 
 
 def ensure_paramiko_compatibility() -> bool:
     """
-    Registers legacy KEX and host keys in Paramiko defaults and instruments
-    _parse_kex_init to capture exact negotiated key exchange algorithm.
-    CRITICAL: Does not touch _preferred_ciphers to prevent 'unknown cipher' errors.
+    Ensures Paramiko's internal dictionaries support legacy Cisco algorithms
+    (diffie-hellman-group1-sha1, CBC ciphers, ssh-rsa, hmac-sha1) when requested.
+    CRITICAL: Does NOT globally weaken modern defaults. Modern defaults remain
+    intact for all modern devices.
     """
     global _PATCHED
     if _PATCHED:
@@ -119,38 +168,30 @@ def ensure_paramiko_compatibility() -> bool:
         return False
 
     try:
-        # 1. Register legacy KEX if supported
-        if hasattr(paramiko.Transport, '_preferred_kex'):
-            existing_kex = list(paramiko.Transport._preferred_kex)
-            for k in [
-                'diffie-hellman-group14-sha1',
-                'diffie-hellman-group-exchange-sha1',
-                'diffie-hellman-group-exchange-sha256',
-                'diffie-hellman-group1-sha1'
-            ]:
-                if k not in existing_kex:
-                    existing_kex.append(k)
-            paramiko.Transport._preferred_kex = tuple(existing_kex)
+        # Register diffie-hellman-group1-sha1 in _kex_info dictionaries
+        kex_cls = get_kex_group1_class()
+        if kex_cls:
+            if hasattr(paramiko, 'transport') and hasattr(paramiko.transport, '_kex_info') and isinstance(paramiko.transport._kex_info, dict):
+                paramiko.transport._kex_info['diffie-hellman-group1-sha1'] = kex_cls
+            if hasattr(paramiko, 'Transport') and hasattr(paramiko.Transport, '_kex_info') and isinstance(paramiko.Transport._kex_info, dict):
+                paramiko.Transport._kex_info['diffie-hellman-group1-sha1'] = kex_cls
 
-        # 2. Register legacy Host Keys (ssh-rsa, ssh-dss)
-        if hasattr(paramiko.Transport, '_preferred_keys'):
-            existing_keys = list(paramiko.Transport._preferred_keys)
-            for k in ['ssh-rsa', 'ssh-dss', 'rsa-sha2-256', 'rsa-sha2-512']:
-                if k not in existing_keys:
-                    existing_keys.append(k)
-            paramiko.Transport._preferred_keys = tuple(existing_keys)
-
-        # 3. Instrument _parse_kex_init to record the exact negotiated KEX
+        # Instrument _parse_kex_init to accurately record the negotiated KEX name
         orig_parse_kex_init = paramiko.Transport._parse_kex_init
         if not getattr(paramiko.Transport, '_netmgmt_kex_instrumented', False):
             def instrumented_parse_kex_init(self, m):
                 res = orig_parse_kex_init(self, m)
                 try:
                     if hasattr(self, 'kex_engine') and self.kex_engine:
-                        for name, cls in getattr(self, '_kex_info', {}).items():
-                            if isinstance(self.kex_engine, cls):
-                                self._agreed_kex = name
-                                break
+                        engine_name = getattr(self.kex_engine, 'name', None)
+                        if engine_name:
+                            self._agreed_kex = engine_name
+                        else:
+                            kex_dict = getattr(self, '_kex_info', None) or getattr(paramiko.transport, '_kex_info', {})
+                            for name, cls in kex_dict.items():
+                                if isinstance(self.kex_engine, cls):
+                                    self._agreed_kex = name
+                                    break
                 except Exception:
                     pass
                 return res
@@ -160,12 +201,33 @@ def ensure_paramiko_compatibility() -> bool:
         _PATCHED = True
         return True
     except Exception as e:
-        logger.warning(f"Could not patch paramiko defaults: {e}")
+        logger.warning(f"Could not patch paramiko compatibility: {e}")
         return False
 
 
 # Automatically ensure compatibility on import
 ensure_paramiko_compatibility()
+
+
+def _get_supported_dict(transport: Any, attr_name: str) -> Optional[dict]:
+    """
+    Finds the algorithm lookup dictionary (_kex_info, _cipher_info, etc.)
+    by checking the instance, the Transport class, and the paramiko.transport module.
+    """
+    for obj in [transport, getattr(transport, '__class__', None)]:
+        if obj and hasattr(obj, attr_name):
+            val = getattr(obj, attr_name)
+            if isinstance(val, dict) and val:
+                return val
+    try:
+        import paramiko.transport
+        if hasattr(paramiko.transport, attr_name):
+            val = getattr(paramiko.transport, attr_name)
+            if isinstance(val, dict) and val:
+                return val
+    except Exception:
+        pass
+    return None
 
 
 def apply_security_options_safely(
@@ -177,64 +239,101 @@ def apply_security_options_safely(
 ) -> None:
     """
     Safely applies security options to a live paramiko.Transport instance.
-    Every candidate is strictly filtered against the transport's actual internal
-    dictionaries (_cipher_info, _kex_info, _key_info, _mac_info).
-    This completely eliminates 'unknown cipher' or 'unknown algorithm' ValueErrors.
+    Validates candidates against Paramiko's internal dictionaries to prevent
+    'unknown cipher' or 'unknown algorithm' ValueErrors, while ensuring legacy
+    algorithms (diffie-hellman-group1-sha1, aes128-cbc, ssh-rsa) are properly
+    assigned both through SecurityOptions and direct transport attributes.
     """
     try:
         sec = transport.get_security_options()
     except Exception:
-        return
+        sec = None
 
     # 1. Safely apply KEX
     if kex_candidates:
-        valid_kex_dict = getattr(transport, '_kex_info', None)
-        if valid_kex_dict and isinstance(valid_kex_dict, dict):
-            filtered = tuple(k for k in kex_candidates if k in valid_kex_dict)
+        valid_kex = _get_supported_dict(transport, '_kex_info')
+        if 'diffie-hellman-group1-sha1' in kex_candidates:
+            kex_cls = get_kex_group1_class()
+            if kex_cls:
+                if valid_kex is not None:
+                    valid_kex['diffie-hellman-group1-sha1'] = kex_cls
+                try:
+                    import paramiko.transport
+                    if hasattr(paramiko.transport, '_kex_info') and isinstance(paramiko.transport._kex_info, dict):
+                        paramiko.transport._kex_info['diffie-hellman-group1-sha1'] = kex_cls
+                except Exception:
+                    pass
+
+        if valid_kex:
+            filtered_kex = tuple(k for k in kex_candidates if k in valid_kex)
         else:
-            filtered = tuple(k for k in kex_candidates if k in (sec.kex or ()))
-        if filtered:
+            filtered_kex = tuple(kex_candidates)
+
+        if filtered_kex:
+            if sec:
+                try:
+                    sec.kex = filtered_kex
+                except Exception:
+                    pass
             try:
-                sec.kex = filtered
+                transport._preferred_kex = filtered_kex
             except Exception:
                 pass
 
     # 2. Safely apply Host Keys
     if key_candidates:
-        valid_key_dict = getattr(transport, '_key_info', None)
-        if valid_key_dict and isinstance(valid_key_dict, dict):
-            filtered = tuple(k for k in key_candidates if k in valid_key_dict)
+        valid_keys = _get_supported_dict(transport, '_key_info')
+        if valid_keys:
+            filtered_keys = tuple(k for k in key_candidates if k in valid_keys)
         else:
-            filtered = tuple(k for k in key_candidates if k in (sec.key_types or ()))
-        if filtered:
+            filtered_keys = tuple(key_candidates)
+
+        if filtered_keys:
+            if sec:
+                try:
+                    sec.key_types = filtered_keys
+                except Exception:
+                    pass
             try:
-                sec.key_types = filtered
+                transport._preferred_keys = filtered_keys
             except Exception:
                 pass
 
-    # 3. Safely apply Ciphers (CRITICAL: only assign what strictly exists in transport._cipher_info)
+    # 3. Safely apply Ciphers (validates against _cipher_info)
     if cipher_candidates:
-        valid_cipher_dict = getattr(transport, '_cipher_info', None)
-        if valid_cipher_dict and isinstance(valid_cipher_dict, dict):
-            filtered = tuple(c for c in cipher_candidates if c in valid_cipher_dict)
+        valid_ciphers = _get_supported_dict(transport, '_cipher_info')
+        if valid_ciphers:
+            filtered_ciphers = tuple(c for c in cipher_candidates if c in valid_ciphers)
         else:
-            filtered = tuple(c for c in cipher_candidates if c in (sec.ciphers or ()))
-        if filtered:
+            filtered_ciphers = tuple(cipher_candidates)
+
+        if filtered_ciphers:
+            if sec:
+                try:
+                    sec.ciphers = filtered_ciphers
+                except Exception:
+                    pass
             try:
-                sec.ciphers = filtered
+                transport._preferred_ciphers = filtered_ciphers
             except Exception:
                 pass
 
     # 4. Safely apply MACs
     if mac_candidates:
-        valid_mac_dict = getattr(transport, '_mac_info', None)
-        if valid_mac_dict and isinstance(valid_mac_dict, dict):
-            filtered = tuple(m for m in mac_candidates if m in valid_mac_dict)
+        valid_macs = _get_supported_dict(transport, '_mac_info')
+        if valid_macs:
+            filtered_macs = tuple(m for m in mac_candidates if m in valid_macs)
         else:
-            filtered = tuple(m for m in mac_candidates if m in (sec.digests or ()))
-        if filtered:
+            filtered_macs = tuple(mac_candidates)
+
+        if filtered_macs:
+            if sec:
+                try:
+                    sec.digests = filtered_macs
+                except Exception:
+                    pass
             try:
-                sec.digests = filtered
+                transport._preferred_macs = filtered_macs
             except Exception:
                 pass
 

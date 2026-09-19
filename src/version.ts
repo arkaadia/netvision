@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.83.1';
+export const APP_VERSION = '1.83.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.83.2',
+    releaseDate: '2026-09-19',
+    type: 'patch',
+    title: 'پشتیبانی کامل از diffie-hellman-group1-sha1 و الگوریتم‌های میرا برای تجهیزات قدیمی سیسکو (Cisco-1.25)',
+    title_en: 'Native diffie-hellman-group1-sha1 and Legacy Algorithm Suite Support for Legacy Cisco Hardware (Cisco-1.25)',
+    changes: [
+      'پیاده‌سازی کلاس سفارشی KexGroup1Legacy مبتنی بر گروه اوکلی ۲ (RFC 2409 / RFC 4253) جهت ثبت پویا در جدول تبادل کلید پارامیکو (Paramiko 3.x).',
+      'اصلاح منطق اعتبارسنجی الگوریتم‌ها در apply_security_options_safely و حل خطای Incompatible ssh peer در اتصال به سوئیچ‌ها و روترهای نسل قدیم سیسکو.',
+      'تجهیز ماژول ترمینال شبکه (network_terminal) به متدهای امن تنظیم الگوریتم‌های میرا بدون ریسک خطای مقدار یا تضعیف پیش‌فرض‌های امنیتی سایر تجهیزات.'
+    ],
+    changes_en: [
+      'Implemented custom KexGroup1Legacy class based on Oakley Group 2 (RFC 2409 / RFC 4253) for dynamic registration in Paramiko KEX dictionaries.',
+      'Refined algorithm validation logic in apply_security_options_safely, completely resolving "Incompatible ssh peer (no acceptable kex algorithm)" on legacy Cisco IOS/Cisco-1.25 devices.',
+      'Updated network terminal transport layer with safe algorithm configuration, preserving modern security defaults while enabling robust legacy Cisco connectivity.'
+    ]
+  },
   {
     version: '1.83.1',
     releaseDate: '2026-09-18',
