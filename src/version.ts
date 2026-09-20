@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.0';
+export const APP_VERSION = '1.84.1';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.1',
+    releaseDate: '2026-09-20',
+    type: 'patch',
+    title: 'رفع خطای ناسازگاری KEX و تطبیق امن مشخصه‌های ترنسپورت پارامیکو برای تجهیزات سیسکو',
+    title_en: 'Fix Incompatible KEX Error and Safe Paramiko Transport Detection for Legacy Cisco Devices',
+    changes: [
+      'اصلاح و ایمن‌سازی بررسی پشتیبانی از server_sig_algs در ساخت ترنسپورت پارامیکو بدون ریسک بروز خطای ویژگی (AttributeError).',
+      'همگام‌سازی کامل لایه سوکت و ترنسپورت ماژول‌های network_terminal و ssh_compat با الگوریتم‌های diffie-hellman-group1-sha1، ssh-rsa و aes128-cbc.',
+      'افزودن پیام‌های تشخیصی تفکیک‌شده و استاندارد برای خطاهای تبادل کلید (KEX)، کلید میزبان (Host Key) و سایفر در ترمینال تعاملی.'
+    ],
+    changes_en: [
+      'Refactored and hardened server_sig_algs parameter capability check in Paramiko Transport instantiation across all compatibility layers to eliminate AttributeError.',
+      'Synchronized socket and transport instantiation in network_terminal and ssh_compat with full support for diffie-hellman-group1-sha1, ssh-rsa, and aes128-cbc.',
+      'Added granular diagnostic error reporting for KEX, host key, and cipher negotiation failures in interactive network terminals.'
+    ]
+  },
   {
     version: '1.84.0',
     releaseDate: '2026-09-20',

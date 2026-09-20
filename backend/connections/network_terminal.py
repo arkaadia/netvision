@@ -34,12 +34,12 @@ try:
     import paramiko
     HAS_PARAMIKO = True
     try:
-        from .ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely
+        from .ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely, supports_server_sig_algs
     except ImportError:
         try:
-            from connections.ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely
+            from connections.ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely, supports_server_sig_algs
         except ImportError:
-            from ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely
+            from ssh_compat import ensure_paramiko_compatibility, open_adaptive_shell_channel, apply_security_options_safely, supports_server_sig_algs
     ensure_paramiko_compatibility()
 except ImportError:
     HAS_PARAMIKO = False
@@ -162,7 +162,7 @@ class NetworkTerminalSession:
         sock.connect((self.host, self.port))
 
         transport_kwargs = {}
-        if use_legacy and hasattr(paramiko, "Transport") and "server_sig_algs" in getattr(paramiko.Transport.__init__, "__code__", {}).get("co_varnames", ()):
+        if use_legacy and supports_server_sig_algs and supports_server_sig_algs():
             transport_kwargs["server_sig_algs"] = False
 
         transport = paramiko.Transport(sock, **transport_kwargs)
@@ -339,6 +339,27 @@ class NetworkTerminalSession:
                     f"Verify that SSH server daemon is enabled on this device.\r\n"
                 )
                 self.error_message = f"Connection refused by {self.host}:{self.port}"
+            elif "kex" in err_lower or "key exchange" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH KEX Negotiation Error]\x1b[0m\r\n"
+                    f"Key exchange algorithm negotiation failed with {self.host}:{self.port}:\r\n"
+                    f"{err_str}\r\n"
+                )
+                self.error_message = f"SSH KEX negotiation error for {self.host}:{self.port}: {err_str}"
+            elif "host key" in err_lower or "server key" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH Host Key Negotiation Error]\x1b[0m\r\n"
+                    f"Host key algorithm negotiation failed with {self.host}:{self.port}:\r\n"
+                    f"{err_str}\r\n"
+                )
+                self.error_message = f"SSH host key negotiation error for {self.host}:{self.port}: {err_str}"
+            elif "cipher" in err_lower:
+                user_msg = (
+                    f"\r\n\x1b[1;31m[SSH Cipher Negotiation Error]\x1b[0m\r\n"
+                    f"Cipher algorithm negotiation failed with {self.host}:{self.port}:\r\n"
+                    f"{err_str}\r\n"
+                )
+                self.error_message = f"SSH cipher negotiation error for {self.host}:{self.port}: {err_str}"
             elif "unreachable" in err_lower or "no route" in err_lower:
                 user_msg = (
                     f"\r\n\x1b[1;31m[Network Unreachable]\x1b[0m\r\n"

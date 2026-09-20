@@ -211,6 +211,16 @@ def ensure_paramiko_compatibility() -> bool:
 ensure_paramiko_compatibility()
 
 
+def supports_server_sig_algs() -> bool:
+    """Checks if paramiko.Transport.__init__ supports the server_sig_algs argument."""
+    try:
+        import paramiko
+        code_obj = getattr(getattr(paramiko, "Transport", None).__init__, "__code__", None)
+        return bool(code_obj and "server_sig_algs" in getattr(code_obj, "co_varnames", ()))
+    except Exception:
+        return False
+
+
 def _get_supported_dict(transport: Any, attr_name: str) -> Optional[dict]:
     """
     Finds the algorithm lookup dictionary (_kex_info, _cipher_info, etc.)
@@ -558,7 +568,7 @@ def connect_ssh_device(
         sock2.connect((hostname, port))
 
         transport_kwargs = {}
-        if hasattr(paramiko, "Transport") and "server_sig_algs" in getattr(paramiko.Transport.__init__, "__code__", {}).get("co_varnames", ()):
+        if supports_server_sig_algs():
             transport_kwargs["server_sig_algs"] = False
         transport2 = paramiko.Transport(sock2, **transport_kwargs)
         apply_security_options_safely(
