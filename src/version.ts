@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.1';
+export const APP_VERSION = '1.84.2';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.2',
+    releaseDate: '2026-09-20',
+    type: 'patch',
+    title: 'حذف شبیه‌سازی محلی دستورات و پاک‌سازی مسیر جریان تعاملی SSH زنده تجهیزات',
+    title_en: 'Purge Dead Client-Side Command Simulation and Clean Interactive Hardware SSH Stream',
+    changes: [
+      'حذف کامل کدهای بلااستفاده و شبیه‌سازهای محلی در مودال ترمینال سیسکو برای هدایت صددرصدی دستورات به ارتباط واقعی سخت‌افزار.',
+      'پاک‌سازی مسیر تعاملی PTY پارامیکو و بهینه‌سازی جریان داده بدون تداخل شبیه‌سازها.',
+      'انطباق کامل پیام‌های ترمینال با وضعیت اتصال زنده سوکت سخت‌افزاری.'
+    ],
+    changes_en: [
+      'Removed all dead client-side simulation code in CiscoTerminalModal to ensure 100% direct streaming to real hardware SSH.',
+      'Streamlined Paramiko PTY interactive channel data flow without simulated responses.',
+      'Aligned all terminal status outputs strictly with live physical device socket states.'
+    ]
+  },
   {
     version: '1.84.1',
     releaseDate: '2026-09-20',
