@@ -507,7 +507,9 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
         }
         // If the line is an orphan prompt at the very end of stream, skip it because input bar displays the live prompt
         const segTrim = segments[i].trim();
-        if (i === segments.length - 1 && !endsWithNewline && promptMatch && segTrim === promptMatch[1].trim()) {
+        if (segTrim.includes('--More--') || segTrim.includes('-- More --')) {
+          // Never skip Cisco pagination prompts
+        } else if (i === segments.length - 1 && !endsWithNewline && promptMatch && segTrim === promptMatch[1].trim()) {
           continue;
         }
         updated.push({
@@ -925,7 +927,11 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
   const executeCommand = async (rawCmd: string) => {
     const trimmed = rawCmd.trim();
     if (!trimmed) {
-      appendLines([{ id: String(Date.now()), type: 'input', text: getPrompt() }]);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'input', data: '\r\n' }));
+      } else {
+        appendLines([{ id: String(Date.now()), type: 'input', text: getPrompt() }]);
+      }
       return;
     }
 
@@ -1026,8 +1032,6 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
 
       wsRef.current.send(JSON.stringify({ type: 'input', data: trimmed + '\r\n' }));
       if (
-        cmdLower.startsWith('sh ') ||
-        cmdLower.startsWith('show ') ||
         cmdLower === 'write memory' ||
         cmdLower === 'wr' ||
         cmdLower.startsWith('copy run') ||
@@ -1085,8 +1089,6 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
             { id: String(Date.now() + 1), type: 'output', text: res.output || '(Command executed on device)' },
           ]);
           if (
-            cmdLower.startsWith('sh ') ||
-            cmdLower.startsWith('show ') ||
             cmdLower === 'write memory' ||
             cmdLower === 'wr' ||
             cmdLower.startsWith('copy run') ||
@@ -1552,6 +1554,26 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
       e.preventDefault();
       executeCommand(currentInput);
       setCurrentInput('');
+    } else if (e.key === ' ' && currentInput === '') {
+      // If at a Cisco --More-- prompt, pressing space sends space to advance a full page
+      const lastLine = lines[lines.length - 1]?.text || '';
+      if (lastLine.includes('--More--') || lastLine.includes('-- More --')) {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          e.preventDefault();
+          wsRef.current.send(JSON.stringify({ type: 'input', data: ' ' }));
+          return;
+        }
+      }
+    } else if ((e.key === 'q' || e.key === 'Q') && currentInput === '') {
+      // If at a Cisco --More-- prompt, pressing q sends q to abort pagination
+      const lastLine = lines[lines.length - 1]?.text || '';
+      if (lastLine.includes('--More--') || lastLine.includes('-- More --')) {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          e.preventDefault();
+          wsRef.current.send(JSON.stringify({ type: 'input', data: 'q' }));
+          return;
+        }
+      }
     } else if (e.key === 'Tab') {
       e.preventDefault();
       handleTabCompletion();

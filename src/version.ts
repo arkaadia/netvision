@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.4';
+export const APP_VERSION = '1.84.5';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.5',
+    releaseDate: '2026-09-20',
+    type: 'patch',
+    title: 'بهبود جریان استریم زنده خروجی دستورات ترمینال، پشتیبانی از صفحه‌بندی --More-- و تفکیک اجرای دستورات نمایشی',
+    title_en: 'Terminal Live Stream Enhancement, --More-- Pagination Support, and Pure CLI Output Separation',
+    changes: [
+      'حذف کامل ارسال خودکار کلید فاصله در لایه پایتون هنگام مواجهه با پیام --More-- جهت تضمین استریم دست‌نخورده تمام بایت‌های دریافتی از سوئیچ واقعی سیسکو.',
+      'پشتیبانی کامل از کلیدهای Space و Enter و Q در صفحه کلید برای صفحه‌بندی طبیعی پیام‌های --More-- سیسکو در ترمینال فرانت‌اند.',
+      'ارسال مستقیم کاراکتر Enter (خط جدید) به شل تعاملی در صورت خالی بودن ورودی جهت دریافت پرامپت یا پیشروی خط به خط در صفحه‌بندی.',
+      'تفکیک کامل اجرای دستورات نمایشی نظیر show running-config و show version از فرآیندهای همگام‌سازی وضعیت پورت‌ها جهت جلوگیری از درخواست‌های ناخواسته.'
+    ],
+    changes_en: [
+      'Removed auto-space interception in Python backend for --More-- prompts to ensure 100% transparent live streaming of every byte from real Cisco hardware.',
+      'Added full keyboard support for Space, Enter, and Q to natively advance or quit Cisco --More-- pagination prompts in the frontend terminal.',
+      'Directly forward Enter keystroke to remote PTY on empty input to refresh the real hardware prompt or advance single-line pagination.',
+      'Decoupled show commands such as show running-config and show version from background port-sync events to display pure CLI output directly.'
+    ]
+  },
   {
     version: '1.84.4',
     releaseDate: '2026-09-20',
