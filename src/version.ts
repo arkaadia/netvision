@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.3';
+export const APP_VERSION = '1.84.4';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.4',
+    releaseDate: '2026-09-20',
+    type: 'patch',
+    title: 'تطبیق کامل مذاکره Paramiko با الگوریتم‌های سوئیچ سیسکو ۲۹۶۰ (diffie-hellman-group1-sha1 و aes128-cbc)',
+    title_en: 'Full Paramiko SSH Negotiation Support for Legacy Cisco 2960 (diffie-hellman-group1-sha1 & aes128-cbc)',
+    changes: [
+      'تنظیم دقیق اولویت الگوریتم‌های رمزشکنی و تبادل کلید در لایه Paramiko برای سوئیچ‌های قدیمی سیسکو سری Catalyst 2960G با نگارش IOS 12.2 (پشتیبانی از diffie-hellman-group1-sha1، ssh-rsa، aes128-cbc و hmac-sha1).',
+      'ایجاد اسکریپت آزمون و اعتبارسنجی مستقیم ارتباط سخت‌افزاری در test_cisco_legacy_ssh.py جهت اجرای فرامین show version و show running-config بدون شبیه‌سازی.',
+      'افزودن قابلیت شناسایی خودکار و مسیریابی مستقیم (force_legacy) در لایه ترمینال تعاملی وب‌سوکت برای سوییچ‌های مدل 2960 و آی‌پی‌های هدف.',
+      'حفظ امنیت پیش‌فرض سایر تجهیزات مدرن بدون تضعیف سراسری و اجرای سیاست امنیتی دو سطحی (Tier 1 مدرن و Tier 2 تطبیقی).'
+    ],
+    changes_en: [
+      'Tailored Paramiko cryptographic algorithm negotiation specifically for legacy Cisco Catalyst 2960G switches running IOS 12.2 (enabling diffie-hellman-group1-sha1, ssh-rsa, aes128-cbc, and hmac-sha1).',
+      'Created dedicated direct hardware verification script backend/tests/test_cisco_legacy_ssh.py to execute real show version and show running-config commands without simulation.',
+      'Added targeted legacy detection and force_legacy fast-path routing in interactive WebSocket terminal sessions for 2960 switches.',
+      'Maintained modern cipher suites for modern infrastructure without globally weakening SSH security via the two-tier adaptive negotiation engine.'
+    ]
+  },
   {
     version: '1.84.3',
     releaseDate: '2026-09-20',

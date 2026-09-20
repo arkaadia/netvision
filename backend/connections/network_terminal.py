@@ -69,6 +69,8 @@ class NetworkTerminalSession:
         on_data_callback: Optional[Callable[[str], Any]] = None,
         on_close_callback: Optional[Callable[[], Any]] = None,
         on_status_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
+        legacy_ssh: bool = False,
+        model: str = "",
     ):
         self.session_id = f"term-{uuid.uuid4().hex[:8]}"
         self.device_id = device_id
@@ -82,6 +84,15 @@ class NetworkTerminalSession:
         self.enable_password = decrypt_credential(enable_password)
         
         self.platform = (platform or "cisco_ios_xe").lower()
+        self.legacy_ssh = legacy_ssh
+        self.model = model or ""
+        self.is_legacy_cisco = (
+            self.legacy_ssh
+            or (self.host == "172.22.100.10")
+            or ("2960" in str(self.model))
+            or ("2960" in str(self.platform))
+        )
+
         self.cols = max(20, min(500, int(cols)))
         self.rows = max(5, min(200, int(rows)))
         self.on_data_callback = on_data_callback
@@ -299,14 +310,15 @@ class NetworkTerminalSession:
             cols=self.cols,
             rows=self.rows,
             term_name=term_name,
-            timeout=6.0,
-            on_status_msg=self.on_data_callback
+            timeout=8.0,
+            on_status_msg=self.on_data_callback,
+            force_legacy=self.is_legacy_cisco
         )
 
         first_error = None
         if channel and transport and client:
             self._paramiko_client = client
-            self.used_legacy_algorithms = (info.get("tier") == "tier2_legacy_fallback")
+            self.used_legacy_algorithms = (info.get("tier") in ("tier2_legacy_fallback", "legacy_direct")) or self.is_legacy_cisco
         else:
             first_error = Exception(err or "SSH connection failed")
 
@@ -406,10 +418,10 @@ class NetworkTerminalSession:
         # Send initial terminal configuration commands to disable pagination on Cisco
         try:
             if self.is_cisco and self._ssh_channel:
-                time.sleep(0.08)
+                time.sleep(0.35)
                 self._ssh_channel.send("terminal length 0\r\n".encode("utf-8"))
             elif self.is_mikrotik and self._ssh_channel:
-                time.sleep(0.08)
+                time.sleep(0.2)
                 self._ssh_channel.send("/console/set terminal=vt100\r\n".encode("utf-8"))
         except Exception as e:
             print(f"[NetworkTerminal] Initial paging config send warning: {e}")

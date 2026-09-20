@@ -27,16 +27,17 @@ except ImportError:
         execute_real_hardware_probe = None
 
 try:
-    from backend.connections.ssh_compat import ensure_paramiko_compatibility, connect_ssh_device
+    from backend.connections.ssh_compat import ensure_paramiko_compatibility, connect_ssh_device, run_cisco_legacy_test
 except ImportError:
     try:
-        from connections.ssh_compat import ensure_paramiko_compatibility, connect_ssh_device
+        from connections.ssh_compat import ensure_paramiko_compatibility, connect_ssh_device, run_cisco_legacy_test
     except ImportError:
         try:
-            from ssh_compat import ensure_paramiko_compatibility, connect_ssh_device
+            from ssh_compat import ensure_paramiko_compatibility, connect_ssh_device, run_cisco_legacy_test
         except ImportError:
             ensure_paramiko_compatibility = lambda: False
             connect_ssh_device = None
+            run_cisco_legacy_test = None
 
 if ensure_paramiko_compatibility:
     ensure_paramiko_compatibility()
@@ -2030,6 +2031,27 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
         # -------------------------------------------------------------
         # Network Tools Suite Endpoints
         # -------------------------------------------------------------
+        if path in ("/api/devices/test-cisco-legacy", "/api/terminal/test-legacy"):
+            host = (body.get("host") or "172.22.100.10").strip()
+            port = int(body.get("port", 22))
+            username = (body.get("username") or "admin").strip()
+            password = body.get("password") or ""
+            enable_password = body.get("enable_password") or None
+            timeout = float(body.get("timeout", 12.0))
+            if run_cisco_legacy_test:
+                res = run_cisco_legacy_test(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    enable_password=enable_password,
+                    timeout=timeout
+                )
+                self._send_json(200 if res.get("success") else 400, res)
+            else:
+                self._send_json(500, {"success": False, "error": "Legacy test engine not available"})
+            return
+
         if path == "/api/tools/port-scan":
             host = (body.get("host") or "").strip()
             if not host:
@@ -3868,6 +3890,15 @@ def start_websocket_server(ws_port: int):
             enable_password = decrypt_credential(raw_enable) if raw_enable and callable(globals().get("decrypt_credential")) else raw_enable
             
             platform = qs.get("platform", [""])[0].strip() or device.get("platform", "cisco_ios_xe")
+            raw_legacy = qs.get("legacy_ssh", [""])[0].strip().lower()
+            legacy_ssh = (
+                raw_legacy in ("1", "true", "yes")
+                or bool(conn.get("legacy_ssh"))
+                or bool(device.get("legacy_ssh"))
+                or (host == "172.22.100.10")
+                or ("2960" in str(device.get("model", "")))
+            )
+            device_model = str(device.get("model", "") or "")
 
             if not host:
                 err_msg = f"No Management IP or Host configured for device '{device.get('name', device_id)}'."
@@ -3930,7 +3961,9 @@ def start_websocket_server(ws_port: int):
                 cols=cols,
                 rows=rows,
                 on_data_callback=on_data_received,
-                on_close_callback=on_session_closed
+                on_close_callback=on_session_closed,
+                legacy_ssh=legacy_ssh,
+                model=device_model
             )
             terminal_session_manager.register_session(session)
 

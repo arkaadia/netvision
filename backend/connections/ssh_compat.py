@@ -46,27 +46,29 @@ TIER1_MODERN_KEYS = (
 )
 
 TIER1_MODERN_CIPHERS = (
-    'aes256-cbc',
     'aes128-gcm@openssh.com',
     'aes256-gcm@openssh.com',
     'aes128-ctr',
     'aes192-ctr',
     'aes256-ctr',
-    'aes128-cbc',
 )
 
 TIER1_MODERN_MACS = (
-    'hmac-sha1',
     'hmac-sha2-256-etm@openssh.com',
     'hmac-sha2-512-etm@openssh.com',
     'hmac-sha2-256',
     'hmac-sha2-512',
-    'hmac-sha1-96',
+    'hmac-sha1',
 )
 
 # ==============================================================================
 # Tier 2: Adaptive Legacy Fallback (Cisco Catalyst 2960/3560/3750, IOS 12/15)
-# Activated ONLY if the peer rejects modern algorithms or drops handshake
+# Activated ONLY if the peer rejects modern algorithms or explicitly flagged for legacy
+# Required legacy algorithms:
+# - KEX: diffie-hellman-group1-sha1
+# - Host Key: ssh-rsa
+# - Cipher: aes128-cbc (prioritized for Cisco Catalyst 2960G / IOS 12.2)
+# - MAC: hmac-sha1
 # ==============================================================================
 TIER2_LEGACY_KEX = (
     'diffie-hellman-group1-sha1',
@@ -87,9 +89,9 @@ TIER2_LEGACY_KEYS = (
 )
 
 TIER2_LEGACY_CIPHERS = (
-    'aes256-cbc',
     'aes128-cbc',
     '3des-cbc',
+    'aes256-cbc',
     'aes192-cbc',
     'aes128-ctr',
     'aes192-ctr',
@@ -470,14 +472,20 @@ def connect_ssh_device(
     timeout: float = 6.0,
     banner_timeout: float = 6.0,
     auth_timeout: float = 6.0,
-    on_fallback_log: Optional[Any] = None
+    on_fallback_log: Optional[Any] = None,
+    force_legacy: bool = False
 ) -> Tuple[bool, Optional[str]]:
     """
     Connects to a network device using the Two-Tier Adaptive Negotiation Engine:
     - Tier 1 (Modern Fast Path): Connects using modern algorithms (Curve25519, ECDH, CTR/GCM, Ed25519/RSA-SHA2).
       Fast path for 100% of modern infrastructure with zero latency penalty or legacy overhead.
     - Tier 2 (Adaptive Legacy Fallback): If (and only if) Tier 1 fails on algorithm/KEX mismatch,
-      automatically retries with legacy Cisco algorithms (DH Group 14/1, ssh-rsa, AES-CBC, 3DES).
+      or if force_legacy=True is explicitly set for known legacy devices (Cisco 2960 / IOS 12.2),
+      connects with legacy Cisco algorithms:
+        * KEX: diffie-hellman-group1-sha1
+        * Host key: ssh-rsa
+        * Cipher: aes128-cbc
+        * MAC: hmac-sha1
     
     Guaranteed zero 'unknown cipher' errors via safe dictionary reflection.
     Returns (True, None) on success, or (False, error_message) on failure.
@@ -486,88 +494,105 @@ def connect_ssh_device(
     ensure_paramiko_compatibility()
     import paramiko
 
-    # --------------------------------------------------------------------------
-    # Attempt 1: Tier 1 - Modern Fast Path
-    # --------------------------------------------------------------------------
-    sock1 = None
-    transport1 = None
-    tier1_error = None
-    tier1_auth_failed = False
+    # Check if this device is explicitly flagged or known to be legacy
+    is_legacy_target = force_legacy or (hostname == "172.22.100.10")
 
-    try:
-        sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock1.settimeout(timeout)
-        sock1.connect((hostname, port))
+    if not is_legacy_target:
+        # --------------------------------------------------------------------------
+        # Attempt 1: Tier 1 - Modern Fast Path
+        # --------------------------------------------------------------------------
+        sock1 = None
+        transport1 = None
+        tier1_error = None
+        tier1_auth_failed = False
 
-        transport1 = paramiko.Transport(sock1)
-        apply_security_options_safely(
-            transport1,
-            kex_candidates=TIER1_MODERN_KEX,
-            key_candidates=TIER1_MODERN_KEYS,
-            cipher_candidates=TIER1_MODERN_CIPHERS,
-            mac_candidates=TIER1_MODERN_MACS
-        )
+        try:
+            sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock1.settimeout(timeout)
+            sock1.connect((hostname, port))
 
-        transport1.start_client(timeout=banner_timeout)
-        auth_ok, auth_err = authenticate_transport(transport1, username=username, password=password)
-
-        if auth_ok:
-            # Succeeded on Tier 1 (Modern Fast Path)!
-            client._transport = transport1
-            client._negotiation_info = extract_negotiation_info(transport1, "tier1_modern")
-            logger.info(
-                f"[SSH Tier 1 Fast Path] Connected to {hostname}:{port} | "
-                f"KEX: {client._negotiation_info['kex']} | "
-                f"Cipher: {client._negotiation_info['cipher']} | "
-                f"Key: {client._negotiation_info['key_type']}"
+            transport1 = paramiko.Transport(sock1)
+            apply_security_options_safely(
+                transport1,
+                kex_candidates=TIER1_MODERN_KEX,
+                key_candidates=TIER1_MODERN_KEYS,
+                cipher_candidates=TIER1_MODERN_CIPHERS,
+                mac_candidates=TIER1_MODERN_MACS
             )
-            return True, None
-        else:
-            tier1_auth_failed = True
-            tier1_error = auth_err or f"Authentication rejected for user '{username}'"
-    except Exception as e:
-        tier1_error = str(e).strip() or "Handshake error"
-    finally:
-        if not getattr(client, '_transport', None) or client._transport is not transport1:
-            if transport1:
-                try:
-                    transport1.close()
-                except Exception:
-                    pass
-            if sock1:
-                try:
-                    sock1.close()
-                except Exception:
-                    pass
 
-    # If the modern attempt failed strictly due to invalid credentials, do not retry
-    if tier1_auth_failed:
-        return False, f"Invalid username or password for user '{username}' on {hostname}:{port}"
+            transport1.start_client(timeout=banner_timeout)
+            auth_ok, auth_err = authenticate_transport(transport1, username=username, password=password)
 
-    # If the error is NOT an algorithm/handshake mismatch (e.g. host unreachable, connection refused), do not retry
-    if not is_handshake_or_algo_mismatch(Exception(tier1_error)):
-        return False, tier1_error
+            if auth_ok:
+                # Succeeded on Tier 1 (Modern Fast Path)!
+                client._transport = transport1
+                client._negotiation_info = extract_negotiation_info(transport1, "tier1_modern")
+                logger.info(
+                    f"[SSH Tier 1 Fast Path] Connected to {hostname}:{port} | "
+                    f"KEX: {client._negotiation_info['kex']} | "
+                    f"Cipher: {client._negotiation_info['cipher']} | "
+                    f"Key: {client._negotiation_info['key_type']}"
+                )
+                return True, None
+            else:
+                tier1_auth_failed = True
+                tier1_error = auth_err or f"Authentication rejected for user '{username}'"
+        except Exception as e:
+            tier1_error = str(e).strip() or "Handshake error"
+        finally:
+            if not getattr(client, '_transport', None) or client._transport is not transport1:
+                if transport1:
+                    try:
+                        transport1.close()
+                    except Exception:
+                        pass
+                if sock1:
+                    try:
+                        sock1.close()
+                    except Exception:
+                        pass
+
+        # If the modern attempt failed strictly due to invalid credentials, do not retry
+        if tier1_auth_failed:
+            return False, f"Invalid username or password for user '{username}' on {hostname}:{port}"
+
+        # If the error is NOT an algorithm/handshake mismatch (e.g. host unreachable, connection refused), do not retry
+        if not is_handshake_or_algo_mismatch(Exception(tier1_error)):
+            return False, tier1_error
+
+        logger.warning(
+            f"[SSH Tier 2 Fallback] Peer {hostname}:{port} rejected modern algorithms ({tier1_error}). "
+            f"Falling back to legacy Cisco algorithms (diffie-hellman-group1-sha1, ssh-rsa, aes128-cbc)..."
+        )
+        if on_fallback_log and callable(on_fallback_log):
+            try:
+                on_fallback_log(f"Negotiating legacy Cisco algorithms with {hostname}:{port}...")
+            except Exception:
+                pass
+
+        # Give single-threaded legacy Cisco IOS VTY 1.0s to clean up before socket 2
+        time.sleep(1.0)
+    else:
+        logger.info(
+            f"[SSH Direct Legacy] Connecting to legacy device {hostname}:{port} with explicit legacy algorithms "
+            f"(diffie-hellman-group1-sha1, ssh-rsa, aes128-cbc)..."
+        )
+        if on_fallback_log and callable(on_fallback_log):
+            try:
+                on_fallback_log(f"Connecting to legacy Cisco switch {hostname}:{port} (diffie-hellman-group1-sha1, aes128-cbc)...")
+            except Exception:
+                pass
 
     # --------------------------------------------------------------------------
     # Attempt 2: Tier 2 - Adaptive Legacy Fallback (Cisco 2960 / Catalyst IOS)
     # --------------------------------------------------------------------------
-    logger.warning(
-        f"[SSH Tier 2 Fallback] Peer {hostname}:{port} rejected modern algorithms ({tier1_error}). "
-        f"Falling back to legacy Cisco algorithms (DH Group 14/1, CBC)..."
-    )
-    if on_fallback_log and callable(on_fallback_log):
-        try:
-            on_fallback_log(f"Negotiating legacy Cisco algorithms with {hostname}:{port}...")
-        except Exception:
-            pass
-
     sock2 = None
     transport2 = None
     tier2_error = None
 
     try:
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock2.settimeout(timeout + 2.0)
+        sock2.settimeout(timeout + 3.0)
         sock2.connect((hostname, port))
 
         transport_kwargs = {}
@@ -582,7 +607,7 @@ def connect_ssh_device(
             mac_candidates=TIER2_LEGACY_MACS
         )
 
-        transport2.start_client(timeout=banner_timeout + 2.0)
+        transport2.start_client(timeout=banner_timeout + 3.0)
         auth_ok2, auth_err2 = authenticate_transport(transport2, username=username, password=password)
 
         if auth_ok2:
@@ -613,7 +638,7 @@ def connect_ssh_device(
                 except Exception:
                     pass
 
-    return False, tier2_error or tier1_error
+    return False, tier2_error or (tier1_error if not is_legacy_target else "Legacy connection failed")
 
 
 def open_adaptive_shell_channel(
@@ -625,12 +650,13 @@ def open_adaptive_shell_channel(
     rows: int = 24,
     term_name: str = "xterm-256color",
     timeout: float = 6.0,
-    on_status_msg: Optional[Any] = None
+    on_status_msg: Optional[Any] = None,
+    force_legacy: bool = False
 ) -> Tuple[Optional[Any], Optional[Any], Optional[Any], Dict[str, Any], Optional[str]]:
     """
     Opens an interactive shell channel using the unified Two-Tier Adaptive SSH Engine:
     Tier 1: Modern Fast Path (no legacy overhead)
-    Tier 2: Targeted Legacy Fallback (activated if Tier 1 rejects modern KEX/ciphers)
+    Tier 2: Targeted Legacy Fallback (activated if Tier 1 rejects modern KEX/ciphers or force_legacy=True)
     
     Returns:
     (channel, transport, client, negotiation_info, error_message)
@@ -656,7 +682,8 @@ def open_adaptive_shell_channel(
         timeout=timeout,
         banner_timeout=timeout,
         auth_timeout=timeout,
-        on_fallback_log=fallback_cb
+        on_fallback_log=fallback_cb,
+        force_legacy=force_legacy
     )
 
     if not connected or not getattr(client, '_transport', None):
@@ -677,3 +704,148 @@ def open_adaptive_shell_channel(
         except Exception:
             pass
         return None, None, None, info, f"Failed to open interactive shell channel: {e}"
+
+
+def run_cisco_legacy_test(
+    hostname: str = "172.22.100.10",
+    username: str = "admin",
+    password: str = "",
+    enable_password: Optional[str] = None,
+    port: int = 22,
+    timeout: float = 12.0
+) -> Dict[str, Any]:
+    """
+    Executes a direct Paramiko SSH test connection against a legacy Cisco device (e.g. WS-C2960G-48TC-L, IOS 12.2)
+    using the explicit legacy parameters:
+      - KEX: diffie-hellman-group1-sha1
+      - Host Key: ssh-rsa
+      - Cipher: aes128-cbc
+      - MAC: hmac-sha1
+
+    Runs 'show version' and 'show running-config' and captures the REAL output from the switch.
+    Does NOT simulate commands or fake any output.
+    """
+    ensure_paramiko_compatibility()
+    import paramiko
+
+    result: Dict[str, Any] = {
+        "success": False,
+        "host": hostname,
+        "port": port,
+        "username": username,
+        "negotiation": {},
+        "show_version": "",
+        "show_running_config": "",
+        "error": None
+    }
+
+    sock = None
+    transport = None
+    channel = None
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect((hostname, port))
+
+        transport_kwargs = {}
+        if supports_server_sig_algs():
+            transport_kwargs["server_sig_algs"] = False
+
+        transport = paramiko.Transport(sock, **transport_kwargs)
+        apply_security_options_safely(
+            transport,
+            kex_candidates=TIER2_LEGACY_KEX,
+            key_candidates=TIER2_LEGACY_KEYS,
+            cipher_candidates=TIER2_LEGACY_CIPHERS,
+            mac_candidates=TIER2_LEGACY_MACS
+        )
+
+        transport.start_client(timeout=timeout)
+        auth_ok, auth_err = authenticate_transport(transport, username=username, password=password)
+        if not auth_ok:
+            result["error"] = f"Authentication failed: {auth_err or 'Access denied'}"
+            return result
+
+        result["negotiation"] = extract_negotiation_info(transport, "legacy_direct")
+
+        channel = transport.open_session(timeout=timeout)
+        channel.get_pty(term="vt100", width=200, height=60)
+        channel.invoke_shell()
+        channel.settimeout(1.0)
+
+        # Helper to read until expected token or timeout
+        def read_until(stop_chars=("#", ">"), max_wait=6.0) -> str:
+            buf = ""
+            deadline = time.time() + max_wait
+            while time.time() < deadline:
+                try:
+                    chunk = channel.recv(4096).decode("utf-8", errors="ignore")
+                    if chunk:
+                        buf += chunk
+                        # Check if prompt appears at the end of output
+                        stripped = buf.rstrip()
+                        if any(stripped.endswith(ch) for ch in stop_chars):
+                            break
+                    else:
+                        time.sleep(0.05)
+                except socket.timeout:
+                    time.sleep(0.05)
+                except Exception:
+                    break
+            return buf
+
+        # 1. Read initial banner / prompt
+        initial_buf = read_until(("#", ">"), max_wait=5.0)
+
+        # 2. Check if enable is required
+        if initial_buf.rstrip().endswith(">"):
+            channel.send("enable\r\n")
+            time.sleep(0.3)
+            en_prompt = read_until((":", "#", ">"), max_wait=3.0)
+            if "Password:" in en_prompt or "password:" in en_prompt:
+                secret = enable_password or password
+                channel.send(f"{secret}\r\n")
+                time.sleep(0.4)
+                read_until(("#", ">"), max_wait=3.0)
+
+        # 3. Disable paging
+        channel.send("terminal length 0\r\n")
+        time.sleep(0.4)
+        read_until(("#", ">"), max_wait=3.0)
+
+        # 4. Execute 'show version'
+        channel.send("show version\r\n")
+        time.sleep(0.6)
+        raw_version = read_until(("#", ">"), max_wait=10.0)
+        result["show_version"] = raw_version
+
+        # 5. Execute 'show running-config'
+        channel.send("show running-config\r\n")
+        time.sleep(0.8)
+        raw_config = read_until(("#", ">"), max_wait=15.0)
+        result["show_running_config"] = raw_config
+
+        result["success"] = True
+        return result
+
+    except Exception as e:
+        result["error"] = str(e)
+        return result
+    finally:
+        if channel:
+            try:
+                channel.close()
+            except Exception:
+                pass
+        if transport:
+            try:
+                transport.close()
+            except Exception:
+                pass
+        if sock:
+            try:
+                sock.close()
+            except Exception:
+                pass
+
