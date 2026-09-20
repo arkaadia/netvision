@@ -78,9 +78,9 @@ TIER2_LEGACY_KEX = (
 
 TIER2_LEGACY_KEYS = (
     'ssh-rsa',
+    'ssh-dss',
     'rsa-sha2-256',
     'rsa-sha2-512',
-    'ssh-dss',
 )
 
 TIER2_LEGACY_CIPHERS = (
@@ -89,6 +89,7 @@ TIER2_LEGACY_CIPHERS = (
     'aes256-cbc',
     'aes192-cbc',
     'aes128-ctr',
+    'aes192-ctr',
     'aes256-ctr',
 )
 
@@ -98,6 +99,7 @@ TIER2_LEGACY_MACS = (
     'hmac-md5',
     'hmac-md5-96',
     'hmac-sha2-256',
+    'hmac-sha2-512',
 )
 
 # Oakley Group 2 (1024-bit MODP Group) - RFC 2409 Section 6.2 & RFC 4253 Section 8.1
@@ -379,6 +381,11 @@ def is_handshake_or_algo_mismatch(exc: Exception) -> bool:
         "closed by remote",
         "packet",
         "session closed",
+        "handshake",
+        "signature",
+        "negotiat",
+        "corrupt",
+        "disabled",
     ]
     return any(ind in msg for ind in algo_indicators)
 
@@ -550,7 +557,10 @@ def connect_ssh_device(
         sock2.settimeout(timeout + 2.0)
         sock2.connect((hostname, port))
 
-        transport2 = paramiko.Transport(sock2)
+        transport_kwargs = {}
+        if hasattr(paramiko, "Transport") and "server_sig_algs" in getattr(paramiko.Transport.__init__, "__code__", {}).get("co_varnames", ()):
+            transport_kwargs["server_sig_algs"] = False
+        transport2 = paramiko.Transport(sock2, **transport_kwargs)
         apply_security_options_safely(
             transport2,
             kex_candidates=TIER2_LEGACY_KEX,

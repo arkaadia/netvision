@@ -57,10 +57,29 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 };
 
+const defaultLanguageContext: LanguageContextType = {
+  language: 'en',
+  setLanguage: () => {},
+  t: (key: TranslationKey, params?: Record<string, string | number>): string => {
+    const dict = translations.en;
+    let text: string = (dict as any)[key] || key;
+    if (params) {
+      Object.entries(params).forEach(([paramKey, paramVal]) => {
+        text = text.replace(new RegExp(`{${paramKey}}`, 'g'), String(paramVal));
+      });
+    }
+    return text;
+  },
+  isRtl: false,
+  isEn: true,
+  isFa: false,
+};
+
 export const useLanguage = (): LanguageContextType => {
   const context = useContext(LanguageContext);
   if (!context) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
+    console.warn('useLanguage was called outside LanguageProvider; falling back to default language context.');
+    return defaultLanguageContext;
   }
   return context;
 };

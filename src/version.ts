@@ -10,9 +10,30 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.83.2';
+export const APP_VERSION = '1.84.0';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.0',
+    releaseDate: '2026-09-20',
+    type: 'minor',
+    title: 'پشتیبانی جامع از نسخه‌های قدیمی SSH، بهینه‌سازی کانکشن وب‌سوکت با بک‌اند پارامیکو و حذف کامل نت‌میکو',
+    title_en: 'Comprehensive Legacy SSH Protocol Support, Resilient WebSocket Paramiko Bridge, and Complete Netmiko Removal',
+    changes: [
+      'پشتیبانی جامع از پکت‌ها و الگوریتم‌های میرا برای تجهیزات شبکه و سوئیچ‌های نسل قدیم سیسکو (Cisco Catalyst 2960/3560/3750 و IOS 12.x/15.0) با غیرفعال‌سازی هوشمند server_sig_algs در تبادل کلید میرا و تزریق پویا به پارامیکو.',
+      'بازطراحی پل ارتباطی وب‌سوکت با بک‌اند پارامیکو (WebSocket Paramiko Bridge) به همراه سیستم تلاش مجدد (Retry) در صورت آماده نبودن موقت بک‌اند، استخراج و اعتبارسنجی پارامترهای مستقیم اتصال در وب‌سوکت، و رمزگشایی بلادرنگ کلمات عبور ذخیره‌شده.',
+      'تجهیز احراز هویت SSH به مکانیزم فالبک خودکار از password به keyboard-interactive برای پشتیبانی کامل از AAA/TACACS+/RADIUS.',
+      'حذف کامل و قطعی هرگونه وابستگی به کتابخانه netmiko و اتکا بر ارتباط مستقیم و کارآمد paramiko.',
+      'رفع خطای LanguageProvider در لایه i18n فرانت‌اند به همراه فالبک پیش‌فرض امن.'
+    ],
+    changes_en: [
+      'Comprehensive legacy SSH protocol support for legacy Cisco switches and routers (Catalyst 2960/3560/3750, IOS 12.x/15.0) with adaptive negotiation, server_sig_algs mitigation, and dynamic Paramiko algorithm registration.',
+      'Redesigned robust WebSocket bridge to Paramiko backend with automatic reconnection/retry resilience, dynamic query-parameter credential extraction, and real-time Fernet credential decryption.',
+      'Added seamless fallback from password authentication to keyboard-interactive mode for AAA, TACACS+, and RADIUS-enabled devices.',
+      'Complete removal of netmiko library dependencies in favor of lightweight, direct, low-latency Paramiko SSH transport.',
+      'Fixed LanguageProvider runtime exception in frontend i18n layer with a resilient fallback context.'
+    ]
+  },
   {
     version: '1.83.2',
     releaseDate: '2026-09-19',

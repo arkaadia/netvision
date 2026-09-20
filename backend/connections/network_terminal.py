@@ -161,7 +161,11 @@ class NetworkTerminalSession:
         sock.settimeout(timeout)
         sock.connect((self.host, self.port))
 
-        transport = paramiko.Transport(sock)
+        transport_kwargs = {}
+        if use_legacy and hasattr(paramiko, "Transport") and "server_sig_algs" in getattr(paramiko.Transport.__init__, "__code__", {}).get("co_varnames", ()):
+            transport_kwargs["server_sig_algs"] = False
+
+        transport = paramiko.Transport(sock, **transport_kwargs)
 
         if use_legacy:
             # Enable older Cisco 2960 / Catalyst legacy algorithms
@@ -170,6 +174,10 @@ class NetworkTerminalSession:
                 'diffie-hellman-group14-sha1',
                 'diffie-hellman-group-exchange-sha1',
                 'diffie-hellman-group-exchange-sha256',
+                'diffie-hellman-group14-sha256',
+                'diffie-hellman-group16-sha512',
+                'curve25519-sha256@libssh.org',
+                'ecdh-sha2-nistp256',
             )
             legacy_keys = ('ssh-rsa', 'ssh-dss', 'rsa-sha2-256', 'rsa-sha2-512')
             legacy_ciphers = (
@@ -187,6 +195,7 @@ class NetworkTerminalSession:
                 'hmac-md5',
                 'hmac-md5-96',
                 'hmac-sha2-256',
+                'hmac-sha2-512',
             )
             if apply_security_options_safely:
                 apply_security_options_safely(
@@ -209,8 +218,8 @@ class NetworkTerminalSession:
         try:
             transport.auth_password(username=self.username, password=self.password)
             auth_success = transport.is_authenticated()
-        except paramiko.BadAuthenticationType:
-            # Fallback to interactive authentication
+        except (paramiko.BadAuthenticationType, paramiko.AuthenticationException):
+            # Fallback to interactive authentication (AAA / TACACS+ / RADIUS)
             def interactive_handler(title, instructions, prompt_list):
                 return [self.password for _ in prompt_list]
             try:

@@ -3762,7 +3762,12 @@ def start_websocket_server(ws_port: int):
         return
 
     async def terminal_ws_handler(websocket, path=''):
-        req_path = path or getattr(websocket, 'path', '') or ''
+        req_path = (
+            path or
+            getattr(websocket, 'path', None) or
+            (getattr(websocket, 'request', None) and getattr(websocket.request, 'path', None)) or
+            ''
+        )
         parsed_url = urlparse(req_path)
         qs = parse_qs(parsed_url.query)
 
@@ -3812,6 +3817,23 @@ def start_websocket_server(ws_port: int):
                     except Exception:
                         pass
 
+            # If device not found in inventory, check if direct connection parameters are present in query string
+            req_host = qs.get("host", [""])[0].strip()
+            if not device and req_host:
+                device = {
+                    "id": device_id or f"direct-{req_host}",
+                    "name": req_host,
+                    "ip": req_host,
+                    "platform": qs.get("platform", ["cisco_ios_xe"])[0].strip(),
+                    "connection": {
+                        "host": req_host,
+                        "port": int(qs.get("port", [22])[0]),
+                        "username": qs.get("username", ["admin"])[0].strip(),
+                        "password": qs.get("password", [""])[0],
+                        "protocol": req_protocol or "ssh"
+                    }
+                }
+
             if not device:
                 err_msg = f"Device with ID '{device_id}' was not found in inventory."
                 await websocket.send(json.dumps({
@@ -3830,13 +3852,19 @@ def start_websocket_server(ws_port: int):
             conn = device.get("connection", {})
             protocol = req_protocol or conn.get("protocol") or device.get("connection_protocol") or "ssh"
             protocol = protocol.lower()
-            host = conn.get("host") or device.get("ssh_host") or device.get("ip", "").strip()
+            host = req_host or conn.get("host") or device.get("ssh_host") or device.get("ip", "").strip()
             default_port = 23 if protocol == "telnet" else 22
-            port = int(conn.get("port") or device.get("ssh_port") or default_port)
-            username = conn.get("username") or device.get("ssh_username") or "admin"
-            password = conn.get("password") or device.get("ssh_password") or ""
-            enable_password = conn.get("enable_password") or device.get("enable_password") or ""
-            platform = device.get("platform", "cisco_ios_xe")
+            req_port = qs.get("port", [""])[0].strip()
+            port = int(req_port if req_port.isdigit() else (conn.get("port") or device.get("ssh_port") or default_port))
+            username = qs.get("username", [""])[0].strip() or conn.get("username") or device.get("ssh_username") or "admin"
+            
+            raw_pwd = qs.get("password", [""])[0] or conn.get("password") or device.get("ssh_password") or ""
+            password = decrypt_credential(raw_pwd) if raw_pwd and callable(globals().get("decrypt_credential")) else raw_pwd
+            
+            raw_enable = qs.get("enable_password", [""])[0] or conn.get("enable_password") or device.get("enable_password") or ""
+            enable_password = decrypt_credential(raw_enable) if raw_enable and callable(globals().get("decrypt_credential")) else raw_enable
+            
+            platform = qs.get("platform", [""])[0].strip() or device.get("platform", "cisco_ios_xe")
 
             if not host:
                 err_msg = f"No Management IP or Host configured for device '{device.get('name', device_id)}'."

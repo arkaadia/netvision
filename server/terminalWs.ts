@@ -54,6 +54,7 @@ export function setupTerminalWebSocket(
 
     let pyWs: WebSocket | null = null;
     let isPyOpen = false;
+    let isClientClosed = false;
     const clientQueue: Array<{ data: WebSocket.Data; isBinary: boolean }> = [];
 
     const sendClient = (payload: any) => {
@@ -66,94 +67,112 @@ export function setupTerminalWebSocket(
       }
     };
 
-    try {
-      pyWs = new WebSocket(targetWsUrl);
+    let attempt = 0;
+    const maxAttempts = 5;
 
-      pyWs.on('open', () => {
-        isPyOpen = true;
-        while (clientQueue.length > 0) {
-          const item = clientQueue.shift();
-          if (item && pyWs && pyWs.readyState === WebSocket.OPEN) {
-            try {
-              pyWs.send(item.data, { binary: item.isBinary });
-            } catch (err) {
-              console.error('[TerminalWs Proxy] Error flushing queue to Python:', err);
+    const connectToPython = () => {
+      if (isClientClosed) return;
+      attempt++;
+
+      try {
+        pyWs = new WebSocket(targetWsUrl);
+
+        pyWs.on('open', () => {
+          isPyOpen = true;
+          while (clientQueue.length > 0) {
+            const item = clientQueue.shift();
+            if (item && pyWs && pyWs.readyState === WebSocket.OPEN) {
+              try {
+                pyWs.send(item.data, { binary: item.isBinary });
+              } catch (err) {
+                console.error('[TerminalWs Proxy] Error flushing queue to Python:', err);
+              }
             }
           }
-        }
-      });
+        });
 
-      pyWs.on('message', (data: WebSocket.Data, isBinary: boolean) => {
-        const textPreview = typeof data === 'string' ? data : (data instanceof Buffer ? data.toString('utf-8') : '');
-        console.log(`[PROXY-STREAM-OUT] len=${textPreview.length} preview=${JSON.stringify(textPreview.slice(0, 80))}`);
-        if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(data, { binary: isBinary });
-        }
-      });
+        pyWs.on('message', (data: WebSocket.Data, isBinary: boolean) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(data, { binary: isBinary });
+          }
+        });
 
-      pyWs.on('close', (code: number, reason: Buffer) => {
-        if (clientWs.readyState === WebSocket.OPEN) {
-          try {
-            clientWs.close(code, reason.toString());
-          } catch {}
-        }
-      });
+        pyWs.on('close', (code: number, reason: Buffer) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            try {
+              clientWs.close(code, reason.toString());
+            } catch {}
+          }
+        });
 
-      pyWs.on('error', (err: Error) => {
-        console.error(`[TerminalWs Proxy] Cannot reach Python SSH Engine at ${targetWsUrl}:`, err.message);
+        pyWs.on('error', (err: Error) => {
+          if (attempt < maxAttempts && !isClientClosed) {
+            console.warn(`[TerminalWs Proxy] Attempt ${attempt}/${maxAttempts} failed connecting to Python SSH Engine (${err.message}). Retrying in 250ms...`);
+            setTimeout(connectToPython, 250);
+            return;
+          }
+
+          console.error(`[TerminalWs Proxy] Cannot reach Python SSH Engine at ${targetWsUrl}:`, err.message);
+          sendClient({
+            type: 'error',
+            error: `Python SSH Engine unreachable on port ${pythonWsPort}: ${err.message}`,
+            code: 'BACKEND_UNREACHABLE',
+          });
+          sendClient({
+            type: 'status',
+            status: 'failed',
+            message: `Connection failed: Python SSH Engine unreachable (${err.message})`,
+          });
+          sendClient({
+            type: 'data',
+            data: `\r\n\x1b[1;31m[SSH Engine Error]\x1b[0m Failed to reach Python SSH backend on ws://127.0.0.1:${pythonWsPort}.\r\n\x1b[90mEnsure the backend server is running and paramiko is installed.\x1b[0m\r\n`,
+          });
+        });
+      } catch (err: any) {
+        if (attempt < maxAttempts && !isClientClosed) {
+          setTimeout(connectToPython, 250);
+          return;
+        }
+        console.error('[TerminalWs Proxy] Fatal error creating WebSocket to Python:', err);
         sendClient({
           type: 'error',
-          error: `Python SSH Engine unreachable on port ${pythonWsPort}: ${err.message}`,
-          code: 'BACKEND_UNREACHABLE',
+          error: `Terminal initialization failed: ${err.message}`,
+          code: 'PROXY_FATAL_ERROR',
         });
-        sendClient({
-          type: 'status',
-          status: 'failed',
-          message: `Connection failed: Python SSH Engine unreachable (${err.message})`,
-        });
-        sendClient({
-          type: 'data',
-          data: `\r\n\x1b[1;31m[SSH Engine Error]\x1b[0m Failed to reach Python SSH backend on ws://127.0.0.1:${pythonWsPort}.\r\n\x1b[90mEnsure the backend server is running and paramiko is installed.\x1b[0m\r\n`,
-        });
-      });
+      }
+    };
 
-      clientWs.on('message', (data: WebSocket.Data, isBinary: boolean) => {
-        const textPreview = typeof data === 'string' ? data : (data instanceof Buffer ? data.toString('utf-8') : '');
-        console.log(`[PROXY-CLIENT-IN] len=${textPreview.length} preview=${JSON.stringify(textPreview.slice(0, 80))}`);
-        if (isPyOpen && pyWs && pyWs.readyState === WebSocket.OPEN) {
-          try {
-            pyWs.send(data, { binary: isBinary });
-          } catch (err: any) {
-            console.warn('[TerminalWs Proxy] Error forwarding to Python:', err.message);
-          }
-        } else {
-          clientQueue.push({ data, isBinary });
-        }
-      });
+    connectToPython();
 
-      clientWs.on('close', () => {
-        if (pyWs && (pyWs.readyState === WebSocket.OPEN || pyWs.readyState === WebSocket.CONNECTING)) {
-          try {
-            pyWs.close();
-          } catch {}
+    clientWs.on('message', (data: WebSocket.Data, isBinary: boolean) => {
+      if (isPyOpen && pyWs && pyWs.readyState === WebSocket.OPEN) {
+        try {
+          pyWs.send(data, { binary: isBinary });
+        } catch (err: any) {
+          console.warn('[TerminalWs Proxy] Error forwarding to Python:', err.message);
         }
-      });
+      } else {
+        clientQueue.push({ data, isBinary });
+      }
+    });
 
-      clientWs.on('error', (err: Error) => {
-        console.warn('[TerminalWs Proxy] Client WebSocket error:', err.message);
-        if (pyWs) {
-          try {
-            pyWs.close();
-          } catch {}
-        }
-      });
-    } catch (err: any) {
-      console.error('[TerminalWs Proxy] Fatal error creating WebSocket to Python:', err);
-      sendClient({
-        type: 'error',
-        error: `Terminal initialization failed: ${err.message}`,
-        code: 'PROXY_FATAL_ERROR',
-      });
-    }
+    clientWs.on('close', () => {
+      isClientClosed = true;
+      if (pyWs && (pyWs.readyState === WebSocket.OPEN || pyWs.readyState === WebSocket.CONNECTING)) {
+        try {
+          pyWs.close();
+        } catch {}
+      }
+    });
+
+    clientWs.on('error', (err: Error) => {
+      isClientClosed = true;
+      console.warn('[TerminalWs Proxy] Client WebSocket error:', err.message);
+      if (pyWs) {
+        try {
+          pyWs.close();
+        } catch {}
+      }
+    });
   });
 }
