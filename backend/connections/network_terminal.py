@@ -181,10 +181,10 @@ class NetworkTerminalSession:
             )
             legacy_keys = ('ssh-rsa', 'ssh-dss', 'rsa-sha2-256', 'rsa-sha2-512')
             legacy_ciphers = (
+                'aes256-cbc',
                 'aes128-cbc',
                 '3des-cbc',
                 'aes192-cbc',
-                'aes256-cbc',
                 'aes128-ctr',
                 'aes192-ctr',
                 'aes256-ctr',

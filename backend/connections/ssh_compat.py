@@ -46,19 +46,22 @@ TIER1_MODERN_KEYS = (
 )
 
 TIER1_MODERN_CIPHERS = (
+    'aes256-cbc',
     'aes128-gcm@openssh.com',
     'aes256-gcm@openssh.com',
     'aes128-ctr',
     'aes192-ctr',
     'aes256-ctr',
+    'aes128-cbc',
 )
 
 TIER1_MODERN_MACS = (
+    'hmac-sha1',
     'hmac-sha2-256-etm@openssh.com',
     'hmac-sha2-512-etm@openssh.com',
     'hmac-sha2-256',
     'hmac-sha2-512',
-    'hmac-sha1',
+    'hmac-sha1-96',
 )
 
 # ==============================================================================
@@ -84,9 +87,9 @@ TIER2_LEGACY_KEYS = (
 )
 
 TIER2_LEGACY_CIPHERS = (
+    'aes256-cbc',
     'aes128-cbc',
     '3des-cbc',
-    'aes256-cbc',
     'aes192-cbc',
     'aes128-ctr',
     'aes192-ctr',

@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.2';
+export const APP_VERSION = '1.84.3';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.3',
+    releaseDate: '2026-09-20',
+    type: 'patch',
+    title: 'بهینه‌سازی و اولویت‌بندی پروتکل رمزنگاری SSH بر پایه aes256-cbc و hmac-sha1',
+    title_en: 'SSH Cryptographic Protocol Optimization Prioritizing aes256-cbc and hmac-sha1',
+    changes: [
+      'پیکربندی و اولویت‌بندی الگوریتم رمزنگاری aes256-cbc در صدر فهرست Cipherهای مجاز در تمامی موتورهای ارتباطی SSH (پایتون paramiko و نود ssh2).',
+      'تنظیم و ارتقای اولویت الگوریتم کد اصالت‌سنجی پیام hmac-sha1 در تمامی اتصالات زنده ترمینال، کشف خودکار توپولوژی (CDP/LLDP) و بازرسی تجهیزات.',
+      'تضمین سازگاری کامل با سوئیچ‌ها و روترهای سیسکو با پروفایل امنیتی SSH v2.0 و نشست‌های دارای وضعیت aes256-cbc / hmac-sha1.',
+      'به‌روزرسانی تنظیمات دو سطحی موتور انطباقی ssh_compat جهت پاسخگویی بدون وقفه به تجهیزات سازمانی سیسکو.'
+    ],
+    changes_en: [
+      'Configured and prioritized aes256-cbc cipher suite at the top of accepted SSH algorithms across both Paramiko and ssh2 engines.',
+      'Enforced high-priority negotiation for hmac-sha1 message authentication code (MAC) in live terminal sessions, CDP/LLDP discovery, and hardware inspection.',
+      'Guaranteed seamless interoperability with Cisco IOS switches and routers requiring SSH v2.0 with aes256-cbc and hmac-sha1 sessions.',
+      'Refined the two-tier adaptive SSH engine in ssh_compat for instant handshake matching on enterprise Cisco infrastructure.'
+    ]
+  },
   {
     version: '1.84.2',
     releaseDate: '2026-09-20',

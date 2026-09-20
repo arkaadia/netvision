@@ -2784,7 +2784,8 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
             connected = False
             banner = ""
             error_msg = ""
-            cipher = "aes256-gcm@openssh.com"
+            cipher = "aes256-cbc"
+            hmac_algo = "hmac-sha1"
 
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -2843,6 +2844,7 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                     if transport and transport.is_authenticated():
                         info = getattr(p_client, '_negotiation_info', {})
                         cipher = info.get("cipher") or getattr(transport, 'remote_cipher', None) or cipher
+                        hmac_algo = info.get("mac") or getattr(transport, 'remote_mac', None) or hmac_algo
                         banner = transport.get_banner() or banner
                     p_client.close()
                 except Exception as auth_err:
@@ -2878,6 +2880,7 @@ class NetworkAPIHandler(BaseHTTPRequestHandler):
                 "platform": platform,
                 "platform_name": driver.platform_name,
                 "cipher": cipher,
+                "hmac": hmac_algo,
                 "latency_ms": latency,
                 "banner": banner,
                 "connected_at": time.strftime("%Y-%m-%d %H:%M:%S"),

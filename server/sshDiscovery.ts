@@ -881,6 +881,7 @@ export async function testAndDiscoverDeviceViaSsh(options: SshDiscoveryOptions):
             'diffie-hellman-group1-sha1',
           ],
           cipher: [
+            'aes256-cbc',
             'aes128-ctr',
             'aes192-ctr',
             'aes256-ctr',
@@ -888,9 +889,16 @@ export async function testAndDiscoverDeviceViaSsh(options: SshDiscoveryOptions):
             'aes128-gcm@openssh.com',
             'aes256-gcm',
             'aes256-gcm@openssh.com',
-            'aes256-cbc',
             'aes128-cbc',
             '3des-cbc',
+          ],
+          hmac: [
+            'hmac-sha1',
+            'hmac-sha1-96',
+            'hmac-sha2-256',
+            'hmac-sha2-512',
+            'hmac-md5',
+            'hmac-md5-96',
           ],
           serverHostKey: [
             'ssh-ed25519',
