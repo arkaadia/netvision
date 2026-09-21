@@ -10,9 +10,26 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.7';
+export const APP_VERSION = '1.84.8';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.8',
+    releaseDate: '2026-09-21',
+    type: 'patch',
+    title: 'رفع تداخل وابستگی‌های npm میان Vite 8 و esbuild (ارتقا به esbuild 0.28.2)',
+    title_en: 'Resolution of npm Dependency Peer Conflict between Vite 8 and esbuild (Upgraded to esbuild 0.28.2)',
+    changes: [
+      'ارتقای نسخه مستقیم esbuild در devDependencies به 0.28.2 جهت سازگاری کامل با الزامات peer dependency در Vite 8.3.0.',
+      'به‌روزرسانی و همگام‌سازی تمیز package.json و package-lock.json بدون استفاده از فلگ‌های ناامن force یا legacy-peer-deps.',
+      'حذف مراجع قدیمی و منقضی esbuild 0.25.x و تضمین صحت ساخت و بیلد پروژه.'
+    ],
+    changes_en: [
+      'Updated project direct esbuild devDependency to 0.28.2 to satisfy Vite 8.3.0 peer dependency constraints.',
+      'Cleanly synchronized package.json and package-lock.json without using --force or --legacy-peer-deps.',
+      'Removed stale esbuild 0.25.x references and verified clean build and packaging.'
+    ]
+  },
   {
     version: '1.84.7',
     releaseDate: '2026-09-21',
