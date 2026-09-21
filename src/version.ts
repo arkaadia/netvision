@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.5';
+export const APP_VERSION = '1.84.6';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.6',
+    releaseDate: '2026-09-20',
+    type: 'patch',
+    title: 'مهاجرت قطعی بک‌اند به محیط پایتون با Paramiko 2.12.0 و حذف مانکی‌پچ‌های ناپایدار',
+    title_en: 'Migration to Paramiko 2.12.0 Environment and Clean Deprecation of Unstable Monkey-Patches',
+    changes: [
+      'انتقال و اتصال قطعی بک‌اند پروداکشن به محیط پایتون اثبات‌شده (/root/netvision/venv-paramiko-test/bin/python) مجهز به Paramiko 2.12.0 بومی.',
+      'حذف کامل مانکی‌پچ KexGroup14 و رفع قطعی خطای Incompatible ssh peer و عدم واردسازی کلاس‌های KEX منسوخ در Paramiko 5.',
+      'به‌روزرسانی اسکریپت‌های سیستمی start.sh، restart.sh، setup-panel.sh و install.sh برای اجرای پایدار بک‌اند پایتون از طریق venv اختصاصی.',
+      'حذف تزریق دستوری terminal length 0 و حفظ رفتار طبیعی صفحه‌بندی --More-- سوئیچ‌های کاتالیست ۲۹۶۰ سیسکو در خط فرمان زنده.'
+    ],
+    changes_en: [
+      'Migrated production backend to the proven virtualenv runtime (/root/netvision/venv-paramiko-test/bin/python) with native Paramiko 2.12.0.',
+      'Completely removed unstable KexGroup14 monkey-patching and permanently resolved Incompatible ssh peer negotiation errors on Cisco 2960.',
+      'Updated server startup and restart scripts (start.sh, restart.sh, setup-panel.sh, install.sh) to strictly use the dedicated venv Python interpreter.',
+      'Preserved authentic Cisco --More-- pagination stream handling without injecting synthetic terminal length 0 commands.'
+    ]
+  },
   {
     version: '1.84.5',
     releaseDate: '2026-09-20',

@@ -508,7 +508,7 @@ function loadFallbackStore(): FallbackStore {
   if (Array.isArray(store.users)) {
     // Sanitize and filter out invalid/corrupted records that lack username
     store.users = store.users.filter(
-      (u) => u && typeof u.username === 'string' && u.username.trim().length > 0
+      (u: any) => u && typeof u.username === 'string' && u.username.trim().length > 0
     );
   }
   if (!Array.isArray(store.users) || store.users.length === 0) {

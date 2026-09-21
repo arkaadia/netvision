@@ -76,7 +76,7 @@ export const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
       setTargetType(templateToEdit.target_type);
       setRole(templateToEdit.role);
       setDescription(templateToEdit.description);
-      setDefaultCliMode(templateToEdit.default_cli_mode);
+      setDefaultCliMode(templateToEdit.default_cli_mode || '');
       setCommands(templateToEdit.commands);
       
       const loadedVars = (templateToEdit.variables || []).map((v) => {

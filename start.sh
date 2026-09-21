@@ -2,6 +2,15 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
+# Select proven Paramiko 2.12.0 virtualenv runtime for Python backend
+if [ -x "/root/netvision/venv-paramiko-test/bin/python" ]; then
+  export PYTHON_EXEC="/root/netvision/venv-paramiko-test/bin/python"
+elif [ -x "$DIR/venv-paramiko-test/bin/python" ]; then
+  export PYTHON_EXEC="$DIR/venv-paramiko-test/bin/python"
+elif [ -x "/root/netvision/venv/bin/python" ]; then
+  export PYTHON_EXEC="/root/netvision/venv/bin/python"
+fi
+
 if [ -f "$DIR/.env" ]; then
   set -a
   source "$DIR/.env" 2>/dev/null || true

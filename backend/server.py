@@ -4035,12 +4035,23 @@ def start_websocket_server(ws_port: int):
                 session.close()
 
     def run_ws_loop():
-        ws_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(ws_loop)
-        start_server_coro = websockets.serve(terminal_ws_handler, "127.0.0.1", ws_port)
-        ws_loop.run_until_complete(start_server_coro)
-        print(f"[Python WS Server] Real Paramiko SSH WebSocket server running on ws://127.0.0.1:{ws_port}")
-        ws_loop.run_forever()
+        async def main():
+            try:
+                if hasattr(websockets, "legacy") and hasattr(websockets.legacy, "server"):
+                    server = await websockets.legacy.server.serve(terminal_ws_handler, "127.0.0.1", ws_port)
+                    print(f"[Python WS Server] Real Paramiko SSH WebSocket server running on ws://127.0.0.1:{ws_port}")
+                    await asyncio.Future()
+                else:
+                    async with websockets.serve(terminal_ws_handler, "127.0.0.1", ws_port):
+                        print(f"[Python WS Server] Real Paramiko SSH WebSocket server running on ws://127.0.0.1:{ws_port}")
+                        await asyncio.Future()
+            except Exception as ex:
+                print(f"[Python WS Server Error] {ex}")
+
+        try:
+            asyncio.run(main())
+        except Exception as ex:
+            print(f"[Python WS Server Run Error] {ex}")
 
     t = threading.Thread(target=run_ws_loop, daemon=True)
     t.start()

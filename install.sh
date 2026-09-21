@@ -583,6 +583,7 @@ Environment=PORT=$INTERNAL_NODE_PORT
 Environment=FRONTEND_PORT=$INTERNAL_NODE_PORT
 Environment=BACKEND_PORT=$INTERNAL_BACKEND_PORT
 Environment=PYTHON_PORT=$INTERNAL_BACKEND_PORT
+Environment=PYTHON_EXEC=/root/netvision/venv-paramiko-test/bin/python
 
 [Install]
 WantedBy=multi-user.target

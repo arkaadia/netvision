@@ -2059,7 +2059,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
 
   // Group links by pair of connected devices to separate overlapping cables
   const defaultLinkGroups = useMemo(() => {
-    const map = new Map<string, typeof topology.links>();
+    const map = new Map<string, TopologyLink[]>();
     if (!topology?.links) return map;
     for (const link of topology.links) {
       const pairKey = [link.source, link.target].sort().join('___');
@@ -3958,7 +3958,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
       const cleanId = (nodeId || '').replace(/^hw-/, '');
       const targetDev =
         allAvailableDevices.find((n) => n.id === nodeId || n.id === cleanId || n.id === `hw-${cleanId}`) ||
-        topology.nodes.find((n) => n.id === nodeId || n.id === cleanId || n.id === `hw-${cleanId}`) ||
+        topology?.nodes?.find((n) => n.id === nodeId || n.id === cleanId || n.id === `hw-${cleanId}`) ||
         currentCustomMap?.nodes?.find((n) => n.id === nodeId || n.id === cleanId);
 
       const canonicalId = targetDev ? targetDev.id : nodeId;
@@ -4007,7 +4007,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
     },
     [
       allAvailableDevices,
-      topology.nodes,
+      topology?.nodes,
       customPositions,
       currentCustomMap,
       nodePositions,
@@ -6534,7 +6534,7 @@ export const SchematicTopologyView: React.FC<SchematicTopologyViewProps> = ({
                   if (displayMode === 'physical') {
                     const isCanvasNeonHighlighted =
                       neonHighlightedNode !== null &&
-                      (
+                      Boolean(
                         neonHighlightedNode.matchedAliases.includes(node.id) ||
                         neonHighlightedNode.matchedAliases.includes(node.id.replace(/^hw-/, '')) ||
                         neonHighlightedNode.matchedAliases.includes(`hw-${node.id.replace(/^hw-/, '')}`) ||

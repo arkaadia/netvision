@@ -107,28 +107,14 @@ TIER2_LEGACY_MACS = (
     'hmac-sha2-512',
 )
 
-# Oakley Group 2 (1024-bit MODP Group) - RFC 2409 Section 6.2 & RFC 4253 Section 8.1
-P_GROUP1 = int(
-    "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
-    "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
-    "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
-    "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
-    "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381"
-    "FFFFFFFFFFFFFFFF",
-    16
-)
-G_GROUP1 = 2
-
 _PATCHED = False
 _KEX_GROUP1_CLASS = None
 
 
 def get_kex_group1_class():
     """
-    Returns a class implementing 'diffie-hellman-group1-sha1'.
-    First attempts native import from paramiko.kex_group1.
-    If unavailable, constructs it by subclassing paramiko.kex_group14.KexGroup14
-    with Oakley Group 2 (RFC 2409 / RFC 4253) parameters.
+    Returns native 'diffie-hellman-group1-sha1' class from paramiko.kex_group1 (Paramiko 2.12.0).
+    Does NOT use broken KexGroup14 subclassing monkey-patch.
     """
     global _KEX_GROUP1_CLASS
     if _KEX_GROUP1_CLASS is not None:
@@ -142,20 +128,16 @@ def get_kex_group1_class():
         pass
 
     try:
-        from paramiko.kex_group14 import KexGroup14
-        from cryptography.hazmat.primitives import hashes
+        import paramiko
+        if hasattr(paramiko, 'Transport') and hasattr(paramiko.Transport, '_kex_info'):
+            cls = paramiko.Transport._kex_info.get('diffie-hellman-group1-sha1')
+            if cls:
+                _KEX_GROUP1_CLASS = cls
+                return _KEX_GROUP1_CLASS
+    except Exception:
+        pass
 
-        class KexGroup1Legacy(KexGroup14):
-            name = "diffie-hellman-group1-sha1"
-            P = P_GROUP1
-            G = G_GROUP1
-            hash_algo = hashes.SHA1
-
-        _KEX_GROUP1_CLASS = KexGroup1Legacy
-        return _KEX_GROUP1_CLASS
-    except Exception as e:
-        logger.warning(f"Could not initialize KexGroup1 class: {e}")
-        return None
+    return None
 
 
 def ensure_paramiko_compatibility() -> bool:

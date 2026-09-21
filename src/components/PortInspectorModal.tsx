@@ -1663,13 +1663,13 @@ export const PortInspectorModal: React.FC<PortInspectorModalProps> = ({
                               >
                                 {isEn ? 'Insert Sample MAC' : 'درج مک آدرس نمونه'}
                               </button>
-                              {selectedPort.connected_device && (
+                              {selectedPort?.connected_device && (
                                 <button
                                   type="button"
                                   onClick={() => setEditPortSecConfiguredMac('001c.23b4.6789')}
                                   className="px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 text-[11px] font-medium transition cursor-pointer"
                                 >
-                                  {isEn ? `Host MAC (${selectedPort.connected_device})` : `مک هاست فعلی (${selectedPort.connected_device})`}
+                                  {isEn ? `Host MAC (${selectedPort?.connected_device})` : `مک هاست فعلی (${selectedPort?.connected_device})`}
                                 </button>
                               )}
                             </div>

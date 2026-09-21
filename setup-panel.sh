@@ -763,6 +763,7 @@ DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD
 JWT_SECRET=$JWT_SECRET
+PYTHON_EXEC=/root/netvision/venv-paramiko-test/bin/python
 EOF
 
 log_step "Stopping any conflicting or stale server processes..."
@@ -787,6 +788,7 @@ Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=$INSTALL_DIR/.env
+Environment=PYTHON_EXEC=/root/netvision/venv-paramiko-test/bin/python
 ExecStart=$NODE_EXEC dist/server.cjs
 Restart=always
 RestartSec=5

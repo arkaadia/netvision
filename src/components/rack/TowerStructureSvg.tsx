@@ -418,7 +418,7 @@ export const TowerStructureSvg: React.FC<TowerStructureSvgProps> = ({
               className="cursor-pointer transition-all"
               onMouseEnter={() => setHoveredDeviceId(dev.id)}
               onMouseLeave={() => setHoveredDeviceId(null)}
-              onClick={() => onEditRadio(tower.id, dev)}
+              onClick={() => onEditRadio?.(tower.id, dev)}
             >
               {/* Bracket Mounting Arm */}
               <line

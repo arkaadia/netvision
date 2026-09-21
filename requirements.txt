@@ -1,4 +1,7 @@
-# NetTopology Python Backend Dependencies
-paramiko>=3.4.0
-cryptography>=42.0.0
-websockets>=12.0
+# NetTopology Python Backend Dependencies (Paramiko 2.12.0 for Cisco Catalyst 2960 Legacy SSH)
+paramiko==2.12.0
+cryptography>=3.3,<40.0.0
+websockets>=10.0
+requests
+flask
+python-dotenv

@@ -415,16 +415,13 @@ class NetworkTerminalSession:
         )
         self._send_error_to_terminal(success_banner)
 
-        # Send initial terminal configuration commands to disable pagination on Cisco
+        # Preserve native Cisco pagination (do not send artificial terminal length 0)
         try:
-            if self.is_cisco and self._ssh_channel:
-                time.sleep(0.35)
-                self._ssh_channel.send("terminal length 0\r\n".encode("utf-8"))
-            elif self.is_mikrotik and self._ssh_channel:
+            if self.is_mikrotik and self._ssh_channel:
                 time.sleep(0.2)
                 self._ssh_channel.send("/console/set terminal=vt100\r\n".encode("utf-8"))
         except Exception as e:
-            print(f"[NetworkTerminal] Initial paging config send warning: {e}")
+            print(f"[NetworkTerminal] Initial console config warning: {e}")
 
         # Start streaming reader thread
         self._reader_thread = threading.Thread(target=self._ssh_reader_loop, daemon=True)

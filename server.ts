@@ -51,6 +51,31 @@ app.use(express.urlencoded({ extended: true }));
 // Child process for Python backend
 let pythonProcess: ChildProcess | null = null;
 
+function getPythonExecutable(): string {
+  // 1. Explicit environment variable override
+  if (process.env.PYTHON_EXEC && fs.existsSync(process.env.PYTHON_EXEC)) {
+    return process.env.PYTHON_EXEC;
+  }
+  // 2. Known proven Paramiko 2.12.0 virtualenv runtime paths
+  const provenVenvs = [
+    '/root/netvision/venv-paramiko-test/bin/python',
+    path.join(projectRoot, 'venv-paramiko-test', 'bin', 'python'),
+    '/root/netvision/venv/bin/python',
+    path.join(projectRoot, 'venv', 'bin', 'python'),
+  ];
+  for (const venvPython of provenVenvs) {
+    if (fs.existsSync(venvPython)) {
+      try {
+        fs.accessSync(venvPython, fs.constants.X_OK);
+        return venvPython;
+      } catch {
+        // continue
+      }
+    }
+  }
+  return 'python3';
+}
+
 function isPortActive(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -79,13 +104,15 @@ async function startPythonBackend() {
   }
 
   const pythonScript = path.join(projectRoot, 'backend', 'server.py');
-  console.log(`[Python Manager] Starting Python backend from ${pythonScript} on port ${PYTHON_PORT} (WS on ${PYTHON_WS_PORT})...`);
+  const pythonBin = getPythonExecutable();
+  console.log(`[Python Manager] Starting Python backend using '${pythonBin}' from ${pythonScript} on port ${PYTHON_PORT} (WS on ${PYTHON_WS_PORT})...`);
   
-  pythonProcess = spawn('python3', [pythonScript, String(PYTHON_PORT)], {
+  pythonProcess = spawn(pythonBin, [pythonScript, String(PYTHON_PORT)], {
     cwd: projectRoot,
     stdio: 'inherit',
     env: {
       ...process.env,
+      PYTHON_EXEC: pythonBin,
       BACKEND_PORT: String(PYTHON_PORT),
       PYTHON_PORT: String(PYTHON_PORT),
       PYTHON_WS_PORT: String(PYTHON_WS_PORT),
@@ -638,13 +665,14 @@ app.post('/api/system/perform-update', async (req: Request, res: Response) => {
       }
       log(`Released port ${PYTHON_PORT} from old Python backend instance.`);
 
-      const pipInstallCmd = 'python3 -m pip install --upgrade --break-system-packages paramiko cryptography websockets requests flask python-dotenv 2>/dev/null || pip3 install paramiko cryptography websockets requests flask 2>/dev/null || pip install paramiko cryptography websockets requests 2>/dev/null || true';
+      const targetPy = getPythonExecutable();
+      const pipInstallCmd = `${targetPy} -m pip install --break-system-packages "paramiko==2.12.0" "cryptography<40.0.0" "websockets>=10.0" requests flask python-dotenv 2>/dev/null || true`;
       await executeShell(pipInstallCmd, projectRoot, 60000);
       const reqPath = path.join(projectRoot, 'requirements.txt');
       if (fs.existsSync(reqPath)) {
-        await executeShell('python3 -m pip install -r requirements.txt --break-system-packages 2>/dev/null || true', projectRoot, 60000);
+        await executeShell(`${targetPy} -m pip install -r requirements.txt 2>/dev/null || true`, projectRoot, 60000);
       }
-      log('Python environment & drivers (paramiko, cryptography, websockets, requests) verified.');
+      log(`Python environment & drivers verified with runtime: ${targetPy}`);
     } catch (pyErr: any) {
       log(`Python dependency notice: ${pyErr.message}`);
     }
