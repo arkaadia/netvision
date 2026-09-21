@@ -264,6 +264,8 @@ export async function testDeviceConnection(data: {
   connection_mode?: string;
   simulate?: boolean;
   lang?: string;
+  is_en?: boolean;
+  ssh_version?: number;
 }): Promise<{
   success: boolean;
   message: string;
@@ -272,6 +274,8 @@ export async function testDeviceConnection(data: {
   latency_ms?: number;
   banner?: string;
   protocol?: string;
+  engine?: string;
+  ssh_version?: number | string;
   error?: string;
   hostname?: string;
   model?: string;
@@ -291,7 +295,7 @@ export async function testDeviceConnection(data: {
   const res = await fetch(`${API_BASE}/devices/test-connection`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, ssh_version: data.ssh_version || 2 }),
   });
   return res.json();
 }
@@ -309,6 +313,7 @@ export function getTerminalWebSocketUrl(
     password?: string;
     enable_password?: string;
     platform?: string;
+    ssh_version?: number;
   }
 ): string {
   const loc = window.location;
@@ -317,6 +322,7 @@ export function getTerminalWebSocketUrl(
   query.set('deviceId', deviceId);
   if (protocol) query.set('protocol', protocol);
   if (role) query.set('role', role);
+  query.set('ssh_version', String(deviceInfo?.ssh_version || 2));
   if (deviceInfo) {
     const h = deviceInfo.ssh_host || deviceInfo.ip;
     if (h) query.set('host', h);

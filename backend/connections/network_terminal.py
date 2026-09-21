@@ -71,12 +71,14 @@ class NetworkTerminalSession:
         on_status_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
         legacy_ssh: bool = False,
         model: str = "",
+        ssh_version: int = 2,
     ):
         self.session_id = f"term-{uuid.uuid4().hex[:8]}"
         self.device_id = device_id
         self.host = host.strip() if host else "127.0.0.1"
         self.port = int(port) if port else (23 if protocol.lower() == "telnet" else 22)
         self.protocol = protocol.lower()  # 'ssh' or 'telnet'
+        self.ssh_version = int(ssh_version or 2)
         self.username = username.strip() if username else "admin"
         
         # Transparently decrypt stored passwords if encrypted with Fernet
@@ -141,7 +143,8 @@ class NetworkTerminalSession:
                     "host": self.host,
                     "port": self.port,
                     "username": self.username,
-                    "protocol": self.protocol,
+                    "protocol": "SSH-2.0" if self.protocol == "ssh" else self.protocol,
+                    "ssh_version": self.ssh_version if self.protocol == "ssh" else None,
                     "platform": self.platform,
                     "is_real": self.is_real,
                     "legacy_algorithms": self.used_legacy_algorithms,
@@ -409,9 +412,10 @@ class NetworkTerminalSession:
 
         # Send greeting banner in terminal
         algo_tag = " [Legacy Cisco Algorithms Active]" if self.used_legacy_algorithms else " [Standard Modern Ciphers]"
+        paramiko_ver = getattr(paramiko, '__version__', '2.12.0') if HAS_PARAMIKO else "2.12.0"
         success_banner = (
-            f"\r\n\x1b[1;32m[LIVE SSH ESTABLISHED]\x1b[0m Connected to {self.host}:{self.port} in {self.latency_ms}ms{algo_tag}\r\n"
-            f"\x1b[90mSession ID: {self.session_id} | User: {self.username} | Platform: {self.platform}\x1b[0m\r\n\r\n"
+            f"\r\n\x1b[1;32m[LIVE SSHv2 ESTABLISHED]\x1b[0m Connected to {self.host}:{self.port} in {self.latency_ms}ms{algo_tag}\r\n"
+            f"\x1b[90mProtocol: SSH-2.0 (RFC 4253) | Engine: Paramiko v{paramiko_ver} | User: {self.username} | Session: {self.session_id}\x1b[0m\r\n\r\n"
         )
         self._send_error_to_terminal(success_banner)
 
@@ -427,8 +431,8 @@ class NetworkTerminalSession:
         self._reader_thread = threading.Thread(target=self._ssh_reader_loop, daemon=True)
         self._reader_thread.start()
 
-        print(f"[NetworkTerminal] Live SSH session {self.session_id} established to {self.host}:{self.port} (user: {self.username}, legacy: {self.used_legacy_algorithms})")
-        self.notify_status("connected", message=f"Connected to {self.host}:{self.port}")
+        print(f"[NetworkTerminal] Live SSHv2 session {self.session_id} established to {self.host}:{self.port} (user: {self.username}, engine: Paramiko v{paramiko_ver})")
+        self.notify_status("connected", message=f"Connected to {self.host}:{self.port} via SSH-2.0 (Paramiko v{paramiko_ver})", engine=f"Paramiko v{paramiko_ver}", ssh_version=2)
         return True
 
     def _ssh_reader_loop(self):

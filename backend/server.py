@@ -3899,6 +3899,8 @@ def start_websocket_server(ws_port: int):
                 or ("2960" in str(device.get("model", "")))
             )
             device_model = str(device.get("model", "") or "")
+            raw_ssh_ver = qs.get("ssh_version", ["2"])[0].strip()
+            ssh_version = int(raw_ssh_ver) if raw_ssh_ver.isdigit() else 2
 
             if not host:
                 err_msg = f"No Management IP or Host configured for device '{device.get('name', device_id)}'."
@@ -3963,7 +3965,8 @@ def start_websocket_server(ws_port: int):
                 on_data_callback=on_data_received,
                 on_close_callback=on_session_closed,
                 legacy_ssh=legacy_ssh,
-                model=device_model
+                model=device_model,
+                ssh_version=ssh_version
             )
             terminal_session_manager.register_session(session)
 

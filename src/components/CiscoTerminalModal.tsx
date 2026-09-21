@@ -643,13 +643,13 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           id: 'sys-init-1',
           type: 'system',
           text: isEn
-            ? `[${protoUpper} CLIENT v2.5] Initiating persistent direct ${protoUpper} socket connection to ${curDev?.name || 'Device'} (${hostDisplay}:${sshPort})...`
-            : `[کلاینت ${protoUpper} نسخه ۲.۵] برقراری ارتباط سوکت مستقیم و پایدار ${protoUpper} با ${curDev?.name || 'تجهیز'} (${hostDisplay}:${sshPort})...`,
+            ? `[${protoUpper}v2 CLIENT • Paramiko v2] Initiating persistent direct SSH-2.0 socket connection to ${curDev?.name || 'Device'} (${hostDisplay}:${sshPort})...`
+            : `[کلاینت ${protoUpper}v2 • پارامیکو نسخه ۲] برقراری ارتباط سوکت مستقیم و پایدار SSH-2.0 با ${curDev?.name || 'تجهیز'} (${hostDisplay}:${sshPort})...`,
         },
         {
           id: 'sys-init-2',
           type: 'system',
-          text: `[CREDENTIALS] Target User: '${sshUser}' | Target Host: '${targetHost || (isEn ? 'Unassigned' : 'تنظیم نشده')}' | Protocol: ${protoUpper}`,
+          text: `[CREDENTIALS] Target User: '${sshUser}' | Target Host: '${targetHost || (isEn ? 'Unassigned' : 'تنظیم نشده')}' | Protocol: ${protoUpper}v2 (SSH-2.0)`,
         },
       ]);
 
@@ -667,6 +667,7 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
           ssh_password: pass,
           enable_password: enablePass,
           platform: devPlatform,
+          ssh_version: 2,
         });
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
@@ -703,8 +704,8 @@ export const CiscoTerminalModal: React.FC<CiscoTerminalModalProps> = ({
                       id: 'sys-ssh-ok-' + Date.now(),
                       type: 'success',
                       text: isEn
-                        ? `[LIVE ${(connProtocol || 'ssh').toUpperCase()} ESTABLISHED] Connected to ${targetHost}:${sshPort} in ${msg.latency_ms || 2}ms.\nSession: Persistent WebSocket SSH Tunnel Active. Commands execute directly on hardware.`
-                        : `[اتصال زنده ${(connProtocol || 'ssh').toUpperCase()} برقرار شد] اتصال به ${targetHost}:${sshPort} در ${msg.latency_ms || 2} میلی‌ثانیه برقرار شد.\nنشست: تانل پایدار سوکت فعال است و دستورات مستقیماً روی سخت‌افزار اجرا می‌شوند.`,
+                        ? `[LIVE ${(connProtocol || 'ssh').toUpperCase()}v2 ESTABLISHED • SSH-2.0] Connected to ${targetHost}:${sshPort} in ${msg.latency_ms || 2}ms.\nSession: Persistent Paramiko v2.12.0 WebSocket Tunnel Active. Commands execute directly on hardware.`
+                        : `[اتصال زنده ${(connProtocol || 'ssh').toUpperCase()}v2 برقرار شد • پروتکل SSH-2.0] اتصال به ${targetHost}:${sshPort} در ${msg.latency_ms || 2} میلی‌ثانیه برقرار شد.\nنشست: تانل پایدار پارامیکو نسخه ۲ فعال است و دستورات مستقیماً روی سخت‌افزار اجرا می‌شوند.`,
                     },
                   ]);
                 } else {

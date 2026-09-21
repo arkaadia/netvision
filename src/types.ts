@@ -16,6 +16,7 @@ export interface DeviceConnection {
   password?: string;
   private_key?: string;
   connection_timeout?: number;
+  ssh_version?: number;
 }
 
 export interface PlatformCapabilities {
@@ -114,6 +115,7 @@ export interface Device {
   enable_password?: string;
   ssh_status?: 'connected' | 'authenticated' | 'disconnected' | 'failed';
   ssh_connected?: boolean;
+  ssh_version?: number;
   power_supplies?: number;
   power_watts?: number;
   serial_number?: string;

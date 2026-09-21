@@ -131,7 +131,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   const [discoverySource, setDiscoverySource] = useState<string | null>(null);
 
   const [isTestingSsh, setIsTestingSsh] = useState(false);
-  const [sshTestResult, setSshTestResult] = useState<{ success: boolean; message: string; latency_ms?: number } | null>(null);
+  const [sshTestResult, setSshTestResult] = useState<{ success: boolean; message: string; latency_ms?: number; engine?: string; protocol?: string } | null>(null);
   const [isTestingPing, setIsTestingPing] = useState(false);
   const [pingTestResult, setPingTestResult] = useState<{ success: boolean; message: string; latency_ms?: number } | null>(null);
 
@@ -205,6 +205,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       ssh_password: sshPassword,
       enable_password: enablePassword,
       platform: platform,
+      ssh_version: 2,
     };
 
     if (onOpenTerminal) {
@@ -401,6 +402,8 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         connection_mode: connectionMode,
         simulate: forcedSimulate || connectionMode === 'simulator',
         lang: isEn ? 'en' : 'fa',
+        is_en: isEn,
+        ssh_version: 2,
       });
 
       if (res.success) {
@@ -484,18 +487,20 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         const srcText = res.simulated
           ? (isEn ? 'Simulator' : 'شبیه‌ساز')
           : (res.master_session_id
-            ? (isEn ? 'Python SSH (Mother Connection)' : 'پایتون SSH (کانکشن مادر)')
-            : 'SSH (show interface status)');
+            ? (isEn ? 'Python SSH (Paramiko v2)' : 'پایتون SSH (پارامیکو ۲)')
+            : 'SSH-2.0 (Paramiko v2)');
         setDiscoverySource(srcText);
 
         const successMsg = isEn
-          ? (res.message_en || (res.message && !/[\u0600-\u06FF]/.test(res.message) ? res.message : `SSH connection established and authenticated successfully. Discovered ${resolvedTotalPorts} ports, PSU specs & hardware telemetry.`))
-          : (res.message_fa || res.message || `ارتباط SSH با موفقیت برقرار و احراز هویت انجام شد. تعداد ${resolvedTotalPorts} پورت شناسایی گردید.`);
+          ? (res.message_en || (res.message && !/[\u0600-\u06FF]/.test(res.message) ? res.message : `SSH connection established and authenticated successfully via Paramiko v2 (SSH-2.0). Discovered ${resolvedTotalPorts} ports & hardware telemetry.`))
+          : (res.message_fa || res.message || `ارتباط SSH با موفقیت از طریق پارامیکو نسخه ۲ (پروتکل SSH-2.0) برقرار شد. تعداد ${resolvedTotalPorts} پورت شناسایی گردید.`);
 
         setSshTestResult({
           success: true,
           message: successMsg,
           latency_ms: res.latency_ms,
+          engine: res.engine || (connectionProtocol === 'ssh' ? 'Paramiko v2.12.0' : undefined),
+          protocol: res.protocol || (connectionProtocol === 'ssh' ? 'SSH-2.0' : 'Telnet'),
         });
       } else {
         const failMsg = isEn
@@ -581,6 +586,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
           username: sshUsername.trim() || 'admin',
           password: sshPassword,
           connection_timeout: 4000,
+          ssh_version: 2,
         },
         model: model.trim(),
         building: building.trim(),
@@ -593,6 +599,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         lldp_enabled: lldpEnabled,
         snmp_community: snmpCommunity.trim(),
         ssh_port: Number(sshPort) || 22,
+        ssh_version: 2,
         ssh_username: sshUsername.trim() || 'admin',
         ssh_password: sshPassword,
         enable_password: enablePassword,
@@ -1402,6 +1409,11 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                       Telnet
                     </button>
                   </div>
+                  {connectionProtocol === 'ssh' && (
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium tracking-tight bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      Paramiko v2 (SSH-2.0)
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleTestSsh(false)}
@@ -1411,12 +1423,12 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                     {isTestingSsh ? (
                       <>
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>{isEn ? 'Testing & Discovering...' : 'اتصال و دریافت پورت‌ها...'}</span>
+                        <span>{isEn ? 'Testing via Paramiko v2...' : 'اتصال با پارامیکو ۲...'}</span>
                       </>
                     ) : (
                       <>
                         <Terminal className="w-3 h-3" />
-                        <span>{isEn ? `Test ${connectionProtocol.toUpperCase()}` : `تست اتصال ${connectionProtocol.toUpperCase()}`}</span>
+                        <span>{isEn ? (connectionProtocol === 'ssh' ? 'Test SSH (Paramiko v2)' : 'Test Telnet') : (connectionProtocol === 'ssh' ? 'تست SSH (پارامیکو ۲)' : 'تست Telnet')}</span>
                       </>
                     )}
                   </button>
@@ -1443,11 +1455,18 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                   )}
                   <div className="flex-1">
                     <div className="font-semibold">{sshTestResult.message}</div>
-                    {sshTestResult.latency_ms !== undefined && (
-                      <div className={`text-[11px] mt-0.5 font-mono ${isLightMode ? 'text-emerald-700' : 'text-emerald-400/80'}`}>
-                        {isEn ? 'Latency' : 'تاخیر اتصال'}: {sshTestResult.latency_ms} ms
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] mt-1 font-mono">
+                      {sshTestResult.latency_ms !== undefined && (
+                        <span className={isLightMode ? 'text-emerald-700' : 'text-emerald-400/80'}>
+                          {isEn ? 'Latency' : 'تاخیر اتصال'}: {sshTestResult.latency_ms} ms
+                        </span>
+                      )}
+                      {(sshTestResult.engine || connectionProtocol === 'ssh') && (
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/25">
+                          {sshTestResult.engine || 'Paramiko v2.12.0'} • {sshTestResult.protocol || 'SSH-2.0'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

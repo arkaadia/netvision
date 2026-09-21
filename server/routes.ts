@@ -1,4 +1,7 @@
 import { Router, Request, Response } from 'express';
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import {
   hashPassword,
   verifyPassword,
@@ -705,6 +708,62 @@ apiRouter.post('/settings/audit-logs', async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // Live Device SSH Connection & Switch Telemetry Discovery
 // -------------------------------------------------------------
+function executeDirectPythonParamikoProbe(body: any, isEn: boolean): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const projectRoot = process.cwd();
+    let pythonBin = process.env.PYTHON_EXEC || '';
+    if (!pythonBin || !fs.existsSync(pythonBin)) {
+      const candidates = [
+        '/root/netvision/venv-paramiko-test/bin/python',
+        path.join(projectRoot, 'venv-paramiko-test', 'bin', 'python'),
+        '/root/netvision/venv/bin/python',
+        path.join(projectRoot, 'venv', 'bin', 'python'),
+      ];
+      pythonBin = candidates.find((c) => fs.existsSync(c)) || 'python3';
+    }
+
+    const scriptPath = path.join(projectRoot, 'backend', 'connections', 'hardware_discovery.py');
+    const child = spawn(pythonBin, [scriptPath], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        PYTHONPATH: projectRoot,
+        PYTHON_EXEC: pythonBin,
+      },
+    });
+
+    let stdoutData = '';
+    let stderrData = '';
+    const timer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch {}
+      reject(new Error('Python Paramiko probe timed out after 12s'));
+    }, 12000);
+
+    child.stdout.on('data', (d) => { stdoutData += d.toString(); });
+    child.stderr.on('data', (d) => { stderrData += d.toString(); });
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      try {
+        const jsonOut = JSON.parse(stdoutData.trim());
+        resolve(jsonOut);
+      } catch {
+        reject(new Error(stderrData || stdoutData || `Process exited with code ${code}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.stdin.write(JSON.stringify({ ...body, is_en: isEn, lang: isEn ? 'en' : 'fa', ssh_version: 2 }));
+    child.stdin.end();
+  });
+}
+
 apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response) => {
   const langHeader = (req.headers['accept-language'] as string) || '';
   const lang = (req.body?.lang || (langHeader.toLowerCase().includes('en') ? 'en' : 'fa')).toLowerCase();
@@ -712,7 +771,7 @@ apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response)
 
   try {
     const pythonPort = process.env.BACKEND_PORT || process.env.PYTHON_PORT || '5001';
-    // Forward directly to Python backend SSH discovery engine to establish real Python SSH tunnel & mother connection
+    // 1. Forward directly to Python backend SSH discovery engine (Paramiko v2 / SSH-2.0)
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
@@ -722,7 +781,7 @@ apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response)
           'Content-Type': 'application/json',
           'Accept-Language': isEn ? 'en' : 'fa',
         },
-        body: JSON.stringify({ ...req.body, lang: isEn ? 'en' : 'fa', is_en: isEn }),
+        body: JSON.stringify({ ...req.body, lang: isEn ? 'en' : 'fa', is_en: isEn, ssh_version: 2 }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -776,13 +835,24 @@ apiRouter.post(['/devices/test-connection'], async (req: Request, res: Response)
         }
       }
     } catch {
-      // If Python probe fails or times out, fallback to Node SSH discovery
+      // Python HTTP daemon did not reply, try direct Python script execution
+    }
+
+    // 2. Direct Python process invocation with Paramiko 2.12.0 virtualenv
+    try {
+      const directPyResult = await executeDirectPythonParamikoProbe(req.body, isEn);
+      if (directPyResult && (directPyResult.success || directPyResult.connected !== undefined)) {
+        return res.json(directPyResult);
+      }
+    } catch {
+      // Fall through to Node SSH discovery as absolute fallback
     }
 
     const discoveryResult = await testAndDiscoverDeviceViaSsh({
       ...req.body,
       lang: isEn ? 'en' : 'fa',
       is_en: isEn,
+      ssh_version: 2,
     });
     res.json(discoveryResult);
   } catch (err: any) {

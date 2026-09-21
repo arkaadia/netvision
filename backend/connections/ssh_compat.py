@@ -494,6 +494,7 @@ def connect_ssh_device(
             sock1.connect((hostname, port))
 
             transport1 = paramiko.Transport(sock1)
+            transport1._client_version = f"SSH-2.0-paramiko_{getattr(paramiko, '__version__', '2.12.0')}"
             apply_security_options_safely(
                 transport1,
                 kex_candidates=TIER1_MODERN_KEX,
@@ -581,6 +582,7 @@ def connect_ssh_device(
         if supports_server_sig_algs():
             transport_kwargs["server_sig_algs"] = False
         transport2 = paramiko.Transport(sock2, **transport_kwargs)
+        transport2._client_version = f"SSH-2.0-paramiko_{getattr(paramiko, '__version__', '2.12.0')}"
         apply_security_options_safely(
             transport2,
             kex_candidates=TIER2_LEGACY_KEX,

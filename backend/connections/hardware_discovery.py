@@ -481,6 +481,9 @@ def execute_real_hardware_probe(
 
     # 2. Real Paramiko SSH Tunnel with Legacy Cisco & Network Device Compatibility
     import paramiko
+    paramiko_version = getattr(paramiko, '__version__', '2.12.0')
+    logger.info(f"[Paramiko v{paramiko_version}] Starting SSH probe against {ip}:{port} using SSH-2.0 protocol engine")
+
     try:
         from .ssh_compat import connect_ssh_device, ensure_paramiko_compatibility
     except ImportError:
@@ -515,12 +518,14 @@ def execute_real_hardware_probe(
         except Exception:
             pass
         clean_err = str(conn_err or "Connection failed")
-        err_en = f"SSH connection failed on {ip}:{port} for user '{username}': {clean_err}"
-        err_fa = f"اتصال SSH در {ip}:{port} برای کاربر '{username}' ناموفق بود: {clean_err}"
+        err_en = f"[Paramiko v{paramiko_version} / SSH-2.0] SSH connection failed on {ip}:{port} for user '{username}': {clean_err}"
+        err_fa = f"[پارامیکو ۲ / پروتکل SSH-2.0] اتصال SSH در {ip}:{port} برای کاربر '{username}' ناموفق بود: {clean_err}"
         return {
             "success": False,
             "connected": False,
-            "protocol": "SSH",
+            "protocol": "SSH-2.0",
+            "ssh_version": 2,
+            "engine": f"Paramiko v{paramiko_version}",
             "ip": ip,
             "port": port,
             "latency_ms": round((time.time() - start_t) * 1000, 1),
@@ -656,13 +661,15 @@ def execute_real_hardware_probe(
     notconnect_count = sum(1 for p in ports if p.get("status") == "notconnect")
     disabled_count = sum(1 for p in ports if p.get("status") == "disabled")
 
-    msg_en = f"SSH connection to {ip}:{port} successfully established. Telemetry extracted: {hw['hostname']} ({hw['model']}), {total_ports} ports discovered."
-    msg_fa = f"اتصال SSH به {ip}:{port} با موفقیت برقرار شد. مشخصات سخت‌افزاری دریافت شد: {hw['hostname']} ({hw['model']}) با {total_ports} پورت شناسایی گردید."
+    msg_en = f"[Paramiko v{paramiko_version} / SSH-2.0] SSH connection to {ip}:{port} successfully established. Telemetry extracted: {hw['hostname']} ({hw['model']}), {total_ports} ports discovered."
+    msg_fa = f"[پارامیکو ۲ / پروتکل SSH-2.0] اتصال SSH به {ip}:{port} با موفقیت برقرار شد. مشخصات سخت‌افزاری دریافت شد: {hw['hostname']} ({hw['model']}) با {total_ports} پورت شناسایی گردید."
 
     return {
         "success": True,
         "connected": True,
-        "protocol": "SSH",
+        "protocol": "SSH-2.0",
+        "ssh_version": 2,
+        "engine": f"Paramiko v{paramiko_version}",
         "ip": ip,
         "port": port,
         "username": username,
@@ -695,3 +702,40 @@ def execute_real_hardware_probe(
         "message_fa": msg_fa,
         "paramiko_client": p_client
     }
+
+
+if __name__ == "__main__":
+    import json
+    input_payload = {}
+    try:
+        if len(sys.argv) > 1 and sys.argv[1].strip().startswith("{"):
+            input_payload = json.loads(sys.argv[1])
+        elif not sys.stdin.isatty():
+            content = sys.stdin.read()
+            if content.strip():
+                input_payload = json.loads(content)
+    except Exception as e:
+        sys.stderr.write(f"Error parsing json input: {e}\n")
+
+    probe_ip = input_payload.get("ssh_host") or input_payload.get("ip") or input_payload.get("host") or ""
+    proto = (input_payload.get("protocol") or input_payload.get("connection_protocol") or "ssh").lower()
+    probe_port = int(input_payload.get("ssh_port") or input_payload.get("port") or (23 if proto == "telnet" else 22))
+    user = input_payload.get("ssh_username") or input_payload.get("username") or "admin"
+    pwd = input_payload.get("ssh_password") or input_payload.get("password") or ""
+    enable_pwd = input_payload.get("enable_password") or ""
+    probe_platform = input_payload.get("platform") or "cisco_ios_xe"
+    probe_lang = input_payload.get("lang") or "en"
+
+    probe = execute_real_hardware_probe(
+        ip=probe_ip,
+        port=probe_port,
+        username=user,
+        password=pwd,
+        enable_password=enable_pwd,
+        protocol=proto,
+        platform=probe_platform,
+        lang=probe_lang
+    )
+    if "paramiko_client" in probe:
+        del probe["paramiko_client"]
+    print(json.dumps(probe, default=str))

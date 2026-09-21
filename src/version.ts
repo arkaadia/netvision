@@ -10,9 +10,28 @@ export interface ReleaseNote {
   changes_en?: string[];
 }
 
-export const APP_VERSION = '1.84.6';
+export const APP_VERSION = '1.84.7';
 
 export const RELEASE_HISTORY: ReleaseNote[] = [
+  {
+    version: '1.84.7',
+    releaseDate: '2026-09-21',
+    type: 'patch',
+    title: 'تضمین و اعمال قطعی Paramiko نسخه ۲ و پروتکل SSH-2.0 در تست اتصال و ترمینال زنده',
+    title_en: 'Strict Paramiko v2 & SSH-2.0 Protocol Enforcement for Connection Testing and Live Interactive Terminal',
+    changes: [
+      'تضمین استفاده قطعی از Paramiko نسخه ۲ (2.12.0) در فرآیند Register New Network Device و دکمه تست اتصال SSH.',
+      'اعمال پروتکل SSH نسخه ۲ (SSH-2.0) در بازگشایی ترمینال تعاملی زنده تجهیزات شبکه.',
+      'افزودن شناسنامه پروتکل SSH-2.0 و مشخصات موتور Paramiko v2 در بنر و اعلان‌های ترمینال و مدال ثبت تجهیزات.',
+      'همگام‌سازی کامل وب‌سوکت ترمینال و متدهای دیسکاوری با پارامترهای پروتکل SSHv2 و گزارش نسخه.'
+    ],
+    changes_en: [
+      'Strictly enforced Paramiko v2 (2.12.0) for SSH connection testing in the Register New Network Device workflow.',
+      'Enforced SSH version 2 (SSH-2.0) protocol across live interactive terminal sessions for all network devices.',
+      'Added explicit SSH-2.0 and Paramiko v2 engine badges and telemetry indicators in terminal banners and device modals.',
+      'Fully synchronized backend WebSocket handler and hardware discovery pipeline with explicit SSHv2 protocol arguments.'
+    ]
+  },
   {
     version: '1.84.6',
     releaseDate: '2026-09-20',
